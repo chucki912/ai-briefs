@@ -1,66 +1,147 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
+import IssueCard from '@/components/IssueCard';
+import { BriefReport } from '@/types';
+
+export default function HomePage() {
+  const [brief, setBrief] = useState<BriefReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 브리핑 로드
+  const loadBrief = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/brief');
+      const data = await res.json();
+
+      if (data.success) {
+        setBrief(data.data);
+        setError(null);
+      } else {
+        setError(data.error || '브리핑을 불러올 수 없습니다.');
+        setBrief(null);
+      }
+    } catch (err) {
+      setError('서버 연결 오류');
+      setBrief(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 브리핑 생성
+  const generateBrief = async () => {
+    try {
+      setGenerating(true);
+      setError(null);
+
+      const res = await fetch('/api/generate', { method: 'POST' });
+      const data = await res.json();
+
+      if (data.success) {
+        setBrief(data.data);
+      } else {
+        setError(data.error || '브리핑 생성에 실패했습니다.');
+      }
+    } catch (err) {
+      setError('브리핑 생성 중 오류가 발생했습니다.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBrief();
+  }, []);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
+    <div className="container">
+      {/* Header */}
+      <header className="header">
+        <Link href="/" className="logo">
+          🤖 AI Daily Brief
+        </Link>
+        <nav className="nav">
+          <Link href="/archive" className="nav-link">
+            아카이브
+          </Link>
+          <ThemeToggle />
+        </nav>
+      </header>
+
+      {/* Main Content */}
+      <main>
+        {loading ? (
+          <div className="loading">
+            <div className="spinner" />
+            <span>브리핑을 불러오는 중...</span>
+          </div>
+        ) : brief ? (
+          <>
+            {/* Brief Header */}
+            <div className="brief-header">
+              <div className="brief-date">
+                {brief.date.replace(/-/g, '년 ').replace(/-/g, '월 ')}일 ({brief.dayOfWeek})
+              </div>
+              <div className="brief-title">
+                LLM이 찾아주는 데일리 AI 이슈 by Chuck Choi
+              </div>
+              <div className="brief-meta">
+                총 {brief.totalIssues}개 이슈 | 생성: {new Date(brief.generatedAt).toLocaleString('ko-KR')}
+              </div>
+            </div>
+
+            {/* Issues */}
+            {brief.issues.length > 0 ? (
+              brief.issues.map((issue, index) => (
+                <IssueCard key={index} issue={issue} index={index} />
+              ))
+            ) : (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h2 className="empty-title">금일 수집된 주요 이슈가 없습니다</h2>
+                <p className="empty-description">
+                  내일 다시 확인해주세요.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon">🚀</div>
+            <h2 className="empty-title">아직 생성된 브리핑이 없습니다</h2>
+            <p className="empty-description">
+              {error || '지금 바로 오늘의 AI 뉴스 브리핑을 생성해보세요.'}
+            </p>
+            <button
+              className="btn"
+              onClick={generateBrief}
+              disabled={generating}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+              {generating ? (
+                <>
+                  <div className="spinner" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  ✨ 브리핑 생성하기
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>© 2026 AI Daily Brief. 매일 오전 7시 자동 업데이트</p>
+      </footer>
     </div>
   );
 }

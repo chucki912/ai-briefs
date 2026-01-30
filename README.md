@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Daily Brief
 
-## Getting Started
+매일 자동으로 글로벌 AI 산업 뉴스를 수집하고, 분석하여 한국어 브리핑 리포트를 생성하는 완전 자동화 웹 서비스입니다.
 
-First, run the development server:
+## ✨ 주요 기능
+
+- **뉴스 수집**: RSS 피드 + Google News 검색 (24시간 이내 필터링)
+- **AI 분석**: 7대 프레임워크 기반 Gemini API 인사이트 생성
+- **웹 UI**: 다크/라이트 모드, 반응형, Pretendard 폰트
+- **자동화**: 매일 오전 7시(KST) 스케줄러
+
+## 🚀 시작하기
+
+### 1. 설치
+
+```bash
+npm install
+```
+
+### 2. 환경 변수 설정
+
+`.env.local` 파일 생성:
+
+```
+GEMINI_API_KEY=your_api_key_here
+```
+
+> 💡 API 키는 https://aistudio.google.com 에서 무료로 발급받을 수 있습니다.
+
+### 3. 개발 서버 실행
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000 접속
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. 브리핑 생성
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- 웹 페이지에서 "브리핑 생성하기" 버튼 클릭
+- 또는 API 호출: `curl -X POST http://localhost:3000/api/generate`
 
-## Learn More
+## 📁 프로젝트 구조
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── page.tsx           # 메인 (오늘의 브리핑)
+│   ├── archive/page.tsx   # 아카이브
+│   └── api/
+│       ├── brief/route.ts # 브리핑 조회 API
+│       └── generate/route.ts # 브리핑 생성 API
+├── lib/
+│   ├── collectors/        # 뉴스 수집
+│   ├── analyzers/         # 분석 엔진
+│   ├── generators/        # 리포트 생성
+│   ├── database.ts        # SQLite
+│   └── gemini.ts          # Gemini API
+├── components/
+│   ├── IssueCard.tsx
+│   └── ThemeToggle.tsx
+└── types/
+    └── index.ts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔧 스케줄러 실행
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+매일 오전 7시(KST) 자동 브리핑 생성:
 
-## Deploy on Vercel
+```bash
+npm run scheduler
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📊 7대 분석 프레임워크
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **지정학 및 패권** - K-AI 관점 위기/기회 분석
+2. **산업 구조 및 BM 변화** - 포지셔닝 전략 시사점
+3. **경제적 해자** - 경쟁력 확보 방안
+4. **밸류체인 역학** - 가치사슬 포지션 변화
+5. **규제 및 기술 장벽** - 대응 전략
+6. **인재 및 조직 역학** - AI 인재 확보 시사점
+7. **컴퓨팅 경제학** - 비용 최적화 방향
+
+## 🛠 기술 스택
+
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Database**: SQLite (better-sqlite3)
+- **LLM**: Google Gemini API
+- **Scheduler**: node-cron
+- **Font**: Pretendard
+
+## 📝 라이선스
+
+MIT License

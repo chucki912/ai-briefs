@@ -43,7 +43,6 @@ async function generateDailyBrief() {
 // cron 표현식: 분 시 일 월 요일
 cron.schedule('0 7 * * *', generateDailyBrief, {
     timezone: 'Asia/Seoul',
-    scheduled: true,
 });
 
 console.log(`

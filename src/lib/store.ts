@@ -95,13 +95,14 @@ class FileSystemStorage implements StorageAdapter {
 // 2. Vercel KV 스토리지 (프로덕션 배포용)
 class VercelKvStorage implements StorageAdapter {
     async saveBrief(report: BriefReport): Promise<void> {
-        // 개별 브리핑 저장
-        await kv.set(`brief:${report.date}`, report);
+        // 개별 브리핑 저장 (90일 유지: 60s * 60m * 24h * 90d = 7776000)
+        await kv.set(`brief:${report.date}`, report, { ex: 7776000 });
+
         // 날짜 인덱싱을 위한 Sorted Set 업데이트 (정렬 및 목록 조회용)
         // Score: 타임스탬프 (최신순 정렬을 위해), Member: 날짜 문자열
         const timestamp = new Date(report.date).getTime();
         await kv.zadd('briefs_index', { score: timestamp, member: report.date });
-        console.log(`[KV Store] 브리핑 저장 완료: ${report.date}`);
+        console.log(`[KV Store] 브리핑 저장 완료 (90일 보관): ${report.date}`);
     }
 
     async getBriefByDate(date: string): Promise<BriefReport | null> {

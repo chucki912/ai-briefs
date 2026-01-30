@@ -18,6 +18,7 @@
     "node-cron": "^4.2.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "redis": "^5.10.0",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {

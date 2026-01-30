@@ -173,59 +173,89 @@ class InMemoryStorage implements StorageAdapter {
     }
 }
 
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
-// ... (Existing InMemoryStorage)
+// Redis Client Singleton (for Next.js Hot Reload)
+let redisClientInstance: RedisClientType | undefined;
+
+async function getRedisClient(url: string) {
+    if (redisClientInstance) return redisClientInstance;
+
+    const isTls = url.startsWith('rediss://');
+    const client = createClient({
+        url: url,
+        socket: isTls ? {
+            tls: true,
+            rejectUnauthorized: false
+        } : undefined
+    });
+
+    client.on('error', (err) => console.error('[Redis Client Error]', err));
+
+    // User's preferred pattern: await connect()
+    // We attach it to the global scope in dev to prevent multiple instances
+    if (process.env.NODE_ENV !== 'production') {
+        if (!global.redisGlobal) {
+            await client.connect();
+            global.redisGlobal = client;
+        }
+        redisClientInstance = global.redisGlobal as RedisClientType;
+    } else {
+        await client.connect();
+        redisClientInstance = client as RedisClientType;
+    }
+
+    return redisClientInstance;
+}
+
+// Global declaration for TypeScript
+declare global {
+    var redisGlobal: unknown;
+}
 
 // 4. Redis Client 스토리지 (표준 Redis용)
 class RedisStorage implements StorageAdapter {
-    private client;
+    private clientPromise: Promise<RedisClientType>;
 
     constructor(url: string) {
-        const isTls = url.startsWith('rediss://');
-
-        this.client = createClient({
-            url: url,
-            socket: isTls ? {
-                tls: true,
-                rejectUnauthorized: false
-            } : undefined
-        });
-        this.client.on('error', (err) => console.error('[Redis Client Error]', err));
-        this.client.connect().catch(console.error);
+        this.clientPromise = getRedisClient(url);
     }
 
     async saveBrief(report: BriefReport): Promise<void> {
+        const client = await this.clientPromise;
         // 개별 브리핑 저장 (90일 유지)
-        await this.client.set(`brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
+        await client.set(`brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
 
         // 정렬용 인덱스
         const timestamp = new Date(report.date).getTime();
-        await this.client.zAdd('briefs_index', { score: timestamp, value: report.date });
+        await client.zAdd('briefs_index', { score: timestamp, value: report.date });
         console.log(`[Redis] 브리핑 저장 완료: ${report.date}`);
     }
 
     async getBriefByDate(date: string): Promise<BriefReport | null> {
-        const data = await this.client.get(`brief:${date}`);
+        const client = await this.clientPromise;
+        const data = await client.get(`brief:${date}`);
         return data ? JSON.parse(data) : null;
     }
 
     async getLatestBrief(): Promise<BriefReport | null> {
-        const list = await this.client.zRange('briefs_index', 0, 0, { REV: true });
+        const client = await this.clientPromise;
+        const list = await client.zRange('briefs_index', 0, 0, { REV: true });
         if (list.length === 0) return null;
         return this.getBriefByDate(list[0]);
     }
 
     async getAllBriefs(limit = 30): Promise<BriefReport[]> {
+        const client = await this.clientPromise;
         // 인덱스 조회
-        const dates = await this.client.zRange('briefs_index', 0, limit - 1, { REV: true });
+        const dates = await client.zRange('briefs_index', 0, limit - 1, { REV: true });
         if (dates.length === 0) return [];
 
         // MGET을 위한 키 생성
         const keys = dates.map(date => `brief:${date}`);
         if (keys.length === 0) return [];
 
-        const results = await this.client.mGet(keys);
+        const results = await client.mGet(keys);
 
         // null 제외하고 파싱
         return results
@@ -234,9 +264,10 @@ class RedisStorage implements StorageAdapter {
     }
 
     async deleteBrief(date: string): Promise<boolean> {
+        const client = await this.clientPromise;
         try {
-            await this.client.del(`brief:${date}`);
-            await this.client.zRem('briefs_index', date);
+            await client.del(`brief:${date}`);
+            await client.zRem('briefs_index', date);
             console.log(`[Redis] 브리핑 삭제 완료: ${date}`);
             return true;
         } catch (error) {

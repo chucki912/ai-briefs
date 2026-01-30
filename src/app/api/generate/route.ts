@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { fetchAllNews } from '@/lib/collectors/news-fetcher';
 import { analyzeNewsAndGenerateInsights } from '@/lib/gemini';
 import { buildReport, buildEmptyReport } from '@/lib/generators/report-builder';
-import { saveBrief, getBriefByDate } from '@/lib/database';
+import { saveBrief, getBriefByDate } from '@/lib/store';
 
 // 브리핑 생성 API
 export async function POST() {

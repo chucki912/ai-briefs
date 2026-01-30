@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBriefByDate, getLatestBrief, getAllBriefs } from '@/lib/database';
+import { getBriefByDate, getLatestBrief, getAllBriefs } from '@/lib/store';
 
 // 브리핑 조회 API
 export async function GET(request: NextRequest) {

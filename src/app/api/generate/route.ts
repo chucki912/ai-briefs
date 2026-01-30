@@ -13,7 +13,7 @@ export async function POST() {
         const dateStr = today.toISOString().split('T')[0];
 
         // 이미 오늘 브리핑이 있는지 확인
-        const existingBrief = getBriefByDate(dateStr);
+        const existingBrief = await getBriefByDate(dateStr);
         if (existingBrief) {
             console.log('[Generate] 오늘 브리핑이 이미 존재합니다.');
             return NextResponse.json({
@@ -30,7 +30,7 @@ export async function POST() {
         if (newsItems.length === 0) {
             console.log('[Generate] 수집된 뉴스가 없습니다.');
             const emptyReport = buildEmptyReport(today);
-            saveBrief(emptyReport);
+            await saveBrief(emptyReport);
             return NextResponse.json({
                 success: true,
                 data: emptyReport,
@@ -50,7 +50,7 @@ export async function POST() {
 
         // 4. 데이터베이스 저장
         console.log('[Generate] Step 4: 저장 중...');
-        saveBrief(report);
+        await saveBrief(report);
 
         console.log('[Generate] 브리핑 생성 완료!');
 

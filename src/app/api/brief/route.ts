@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
         // 목록 조회
         if (list === 'true') {
-            const briefs = getAllBriefs(30);
+            const briefs = await getAllBriefs(30);
             return NextResponse.json({
                 success: true,
                 data: briefs.map(b => ({
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
         // 특정 날짜 조회
         if (date) {
-            const brief = getBriefByDate(date);
+            const brief = await getBriefByDate(date);
             if (!brief) {
                 return NextResponse.json(
                     { success: false, error: '해당 날짜의 브리핑이 없습니다.' },
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         }
 
         // 최신 브리핑 조회
-        const latest = getLatestBrief();
+        const latest = await getLatestBrief();
         if (!latest) {
             return NextResponse.json(
                 { success: false, error: '생성된 브리핑이 없습니다.' },

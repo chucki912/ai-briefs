@@ -173,24 +173,102 @@ class InMemoryStorage implements StorageAdapter {
     }
 }
 
+import { createClient } from 'redis';
+
+// ... (Existing InMemoryStorage)
+
+// 4. Redis Client 스토리지 (표준 Redis용)
+class RedisStorage implements StorageAdapter {
+    private client;
+
+    constructor(url: string) {
+        const isTls = url.startsWith('rediss://');
+
+        this.client = createClient({
+            url: url,
+            socket: isTls ? {
+                tls: true,
+                rejectUnauthorized: false
+            } : undefined
+        });
+        this.client.on('error', (err) => console.error('[Redis Client Error]', err));
+        this.client.connect().catch(console.error);
+    }
+
+    async saveBrief(report: BriefReport): Promise<void> {
+        // 개별 브리핑 저장 (90일 유지)
+        await this.client.set(`brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
+
+        // 정렬용 인덱스
+        const timestamp = new Date(report.date).getTime();
+        await this.client.zAdd('briefs_index', { score: timestamp, value: report.date });
+        console.log(`[Redis] 브리핑 저장 완료: ${report.date}`);
+    }
+
+    async getBriefByDate(date: string): Promise<BriefReport | null> {
+        const data = await this.client.get(`brief:${date}`);
+        return data ? JSON.parse(data) : null;
+    }
+
+    async getLatestBrief(): Promise<BriefReport | null> {
+        const list = await this.client.zRange('briefs_index', 0, 0, { REV: true });
+        if (list.length === 0) return null;
+        return this.getBriefByDate(list[0]);
+    }
+
+    async getAllBriefs(limit = 30): Promise<BriefReport[]> {
+        // 인덱스 조회
+        const dates = await this.client.zRange('briefs_index', 0, limit - 1, { REV: true });
+        if (dates.length === 0) return [];
+
+        // MGET을 위한 키 생성
+        const keys = dates.map(date => `brief:${date}`);
+        if (keys.length === 0) return [];
+
+        const results = await this.client.mGet(keys);
+
+        // null 제외하고 파싱
+        return results
+            .filter((item): item is string => item !== null)
+            .map(item => JSON.parse(item) as BriefReport);
+    }
+
+    async deleteBrief(date: string): Promise<boolean> {
+        try {
+            await this.client.del(`brief:${date}`);
+            await this.client.zRem('briefs_index', date);
+            console.log(`[Redis] 브리핑 삭제 완료: ${date}`);
+            return true;
+        } catch (error) {
+            console.error(`[Redis] 브리핑 삭제 실패: ${date}`, error);
+            return false;
+        }
+    }
+}
+
 // 환경에 따른 스토리지 선택 factory
 function getStorage(): StorageAdapter {
-    // 1. Vercel KV (권장 프로덕션 설정)
+    // 1. Vercel KV (전용 SDK 사용)
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         console.log('[Store] Vercel KV Storage 모드로 동작합니다.');
         return new VercelKvStorage();
     }
 
-    // 2. Vercel 환경이지만 KV 설정이 없는 경우 (Crash 방지 + Fallback)
-    // process.env.VERCEL은 Vercel 환경에서 자동으로 '1'로 설정됨
+    // 2. 표준 Redis (KV_URL 또는 REDIS_URL)
+    const redisUrl = process.env.KV_URL || process.env.REDIS_URL;
+    if (redisUrl) {
+        console.log('[Store] Standard Redis Storage 모드로 동작합니다.');
+        return new RedisStorage(redisUrl);
+    }
+
+    // 3. Fallback: Vercel 환경이지만 설정 없는 경우
     if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
         console.warn('⚠️ [Store] Vercel 환경이 감지되었으나 KV 설정이 없습니다.');
         console.warn('⚠️ [Store] InMemoryStorage로 전환합니다. (서버 재시작 시 데이터가 초기화됩니다)');
-        console.warn('👉 [Guide] 영구 저장을 위해 Vercel KV를 설정해주세요.');
         return new InMemoryStorage();
     }
 
-    // 3. 로컬 개발 환경 (File System)
+    // 4. 로컬 개발 환경
     console.log('[Store] Local File Storage 모드로 동작합니다.');
     return new FileSystemStorage();
 }
@@ -204,5 +282,5 @@ export const getAllBriefs = (limit?: number) => storage.getAllBriefs(limit);
 export const deleteBrief = (date: string) => storage.deleteBrief(date);
 
 export function closeDb(): void {
-    // no-op
+    // 필요 시 연결 종료 로직 추가 가능
 }

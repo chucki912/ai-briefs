@@ -144,13 +144,52 @@ class VercelKvStorage implements StorageAdapter {
     }
 }
 
+// 3. 인메모리 스토리지 (Vercel 배포 시 KV 미설정 상황 대비 Fallback)
+class InMemoryStorage implements StorageAdapter {
+    private store = new Map<string, BriefReport>();
+
+    async saveBrief(report: BriefReport): Promise<void> {
+        this.store.set(report.date, report);
+        console.log(`[Memory Store] 브리핑 저장 완료: ${report.date}`);
+    }
+
+    async getBriefByDate(date: string): Promise<BriefReport | null> {
+        return this.store.get(date) || null;
+    }
+
+    async getLatestBrief(): Promise<BriefReport | null> {
+        const dates = Array.from(this.store.keys()).sort().reverse();
+        return dates.length > 0 ? this.store.get(dates[0])! : null;
+    }
+
+    async getAllBriefs(limit = 30): Promise<BriefReport[]> {
+        const dates = Array.from(this.store.keys()).sort().reverse().slice(0, limit);
+        return dates.map(date => this.store.get(date)!);
+    }
+
+    async deleteBrief(date: string): Promise<boolean> {
+        return this.store.delete(date);
+    }
+}
+
 // 환경에 따른 스토리지 선택 factory
 function getStorage(): StorageAdapter {
-    // Vercel KV 환경변수가 있으면 KV 사용, 아니면 로컬 파일 사용
+    // 1. Vercel KV (권장 프로덕션 설정)
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         console.log('[Store] Vercel KV Storage 모드로 동작합니다.');
         return new VercelKvStorage();
     }
+
+    // 2. Vercel 환경이지만 KV 설정이 없는 경우 (Crash 방지 + Fallback)
+    // process.env.VERCEL은 Vercel 환경에서 자동으로 '1'로 설정됨
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        console.warn('⚠️ [Store] Vercel 환경이 감지되었으나 KV 설정이 없습니다.');
+        console.warn('⚠️ [Store] InMemoryStorage로 전환합니다. (서버 재시작 시 데이터가 초기화됩니다)');
+        console.warn('👉 [Guide] 영구 저장을 위해 Vercel KV를 설정해주세요.');
+        return new InMemoryStorage();
+    }
+
+    // 3. 로컬 개발 환경 (File System)
     console.log('[Store] Local File Storage 모드로 동작합니다.');
     return new FileSystemStorage();
 }

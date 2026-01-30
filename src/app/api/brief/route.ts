@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBriefByDate, getLatestBrief, getAllBriefs } from '@/lib/store';
+import { getBriefByDate, getLatestBrief, getAllBriefs, deleteBrief } from '@/lib/store';
 
 // 브리핑 조회 API
 export async function GET(request: NextRequest) {
@@ -50,6 +50,39 @@ export async function GET(request: NextRequest) {
         console.error('[Brief API Error]', error);
         return NextResponse.json(
             { success: false, error: '브리핑 조회 중 오류가 발생했습니다.' },
+            { status: 500 }
+        );
+    }
+}
+
+// 브리핑 삭제 API
+export async function DELETE(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const date = searchParams.get('date');
+
+        if (!date) {
+            return NextResponse.json(
+                { success: false, error: '삭제할 날짜가 지정되지 않았습니다.' },
+                { status: 400 }
+            );
+        }
+
+        const success = await deleteBrief(date);
+
+        if (success) {
+            return NextResponse.json({ success: true, message: '브리핑이 삭제되었습니다.' });
+        } else {
+            return NextResponse.json(
+                { success: false, error: '브리핑 삭제에 실패했습니다.' },
+                { status: 500 }
+            );
+        }
+
+    } catch (error) {
+        console.error('[Brief Delete Error]', error);
+        return NextResponse.json(
+            { success: false, error: '브리핑 삭제 중 오류가 발생했습니다.' },
             { status: 500 }
         );
     }

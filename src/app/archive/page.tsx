@@ -62,6 +62,32 @@ export default function ArchivePage() {
         return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
     };
 
+    // 브리핑 삭제
+    const handleDelete = async (date: string) => {
+        try {
+            const res = await fetch(`/api/brief?date=${date}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert('브리핑이 삭제되었습니다.');
+                setSelectedBrief(null);
+                // 목록 갱신 reload
+                const listRes = await fetch('/api/brief?list=true');
+                const listData = await listRes.json();
+                if (listData.success) {
+                    setBriefs(listData.data);
+                }
+            } else {
+                alert(data.error || '삭제 실패');
+            }
+        } catch (err) {
+            console.error('Failed to delete brief:', err);
+            alert('삭제 중 오류 발생');
+        }
+    };
+
     return (
         <div className="container">
             {/* Header */}
@@ -90,14 +116,27 @@ export default function ArchivePage() {
                     </div>
                 ) : selectedBrief ? (
                     <>
-                        {/* Back Button */}
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => setSelectedBrief(null)}
-                            style={{ marginBottom: '1.5rem' }}
-                        >
-                            ← 목록으로 돌아가기
-                        </button>
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setSelectedBrief(null)}
+                            >
+                                ← 목록으로 돌아가기
+                            </button>
+
+                            <button
+                                className="btn"
+                                style={{ backgroundColor: '#ef4444', color: 'white' }}
+                                onClick={() => {
+                                    if (confirm('정말로 이 브리핑을 삭제하시겠습니까?')) {
+                                        handleDelete(selectedBrief.date);
+                                    }
+                                }}
+                            >
+                                🗑️ 삭제하기
+                            </button>
+                        </div>
 
                         {/* Brief Detail */}
                         <div className="brief-header">

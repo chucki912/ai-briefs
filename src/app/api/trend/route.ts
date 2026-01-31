@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IssueItem } from '@/types';
 import { generateTrendReport } from '@/lib/gemini';
-import { JSDOM } from 'jsdom';
+import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 
 export const maxDuration = 60; // Vercel Function Timeout (Seconds)
@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
                     if (!response.ok) return null;
 
                     const html = await response.text();
-                    const dom = new JSDOM(html, { url });
-                    const reader = new Readability(dom.window.document);
+                    const { window } = parseHTML(html);
+                    const reader = new Readability(window.document);
                     const article = reader.parse();
 
                     return article ? `

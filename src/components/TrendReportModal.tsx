@@ -400,10 +400,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                                 <span className="source-id">[{src.sid}]</span>
                                                 <div className="source-info">
                                                     <a href={src.url} target="_blank" rel="noopener noreferrer" className="source-title">
-                                                        {src.title}
+                                                        {src.title && src.title !== 'Google News RSS Feed' ? src.title : new URL(src.url).hostname}
                                                     </a>
                                                     <div className="source-meta">
-                                                        {src.publisher} • {src.date}
+                                                        {src.publisher} • {src.date} • {src.url}
                                                     </div>
                                                 </div>
                                             </div>
@@ -430,11 +430,48 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                         <button
                             className="btn btn-secondary"
                             onClick={() => {
-                                navigator.clipboard.writeText(report);
-                                alert('리포트(JSON/Text)가 클립보드에 복사되었습니다.');
+                                let textToCopy = report;
+                                if (parsedReport) {
+                                    try {
+                                        textToCopy = `[트렌드 리포트] ${parsedReport.report_meta.title || ''}\n\n`;
+                                        textToCopy += `기간: ${parsedReport.report_meta.time_window || '-'}\n`;
+                                        textToCopy += `관점: ${parsedReport.report_meta.lens || '-'}\n\n`;
+
+                                        textToCopy += `■ Executive Summary\n`;
+                                        parsedReport.executive_summary.signal_summary?.forEach(s => textToCopy += `- ${s.text}\n`);
+
+                                        if (parsedReport.key_developments?.length) {
+                                            textToCopy += `\n■ Key Developments\n`;
+                                            parsedReport.key_developments.forEach(d => {
+                                                textToCopy += `\n[${d.headline}]\n`;
+                                                d.facts?.forEach(f => textToCopy += `- (Fact) ${f.text}\n`);
+                                                d.analysis?.forEach(a => textToCopy += `- (Analysis) ${a.text}\n`);
+                                            });
+                                        }
+
+                                        if (parsedReport.implications) {
+                                            textToCopy += `\n■ Implications\n`;
+                                            parsedReport.implications.market_business?.forEach(s => textToCopy += `- [Market] ${s.text}\n`);
+                                            parsedReport.implications.tech_product?.forEach(s => textToCopy += `- [Tech] ${s.text}\n`);
+                                        }
+
+                                        if (parsedReport.sources?.length) {
+                                            textToCopy += `\n■ Sources\n`;
+                                            parsedReport.sources.forEach(s => {
+                                                textToCopy += `[${s.sid}] ${s.title} (${s.publisher})\n${s.url}\n`;
+                                            });
+                                        }
+                                    } catch (e) {
+                                        console.error('Text formatting failed', e);
+                                        textToCopy = report; // Fallback
+                                    }
+                                }
+
+                                navigator.clipboard.writeText(textToCopy);
+                                alert('리포트 텍스트가 복사되었습니다.');
                             }}
                         >
-                            📋 복사하기
+                            📋 텍스트로 복사
                         </button>
                         <button className="btn" onClick={onClose}>닫기</button>
                     </div>
@@ -616,13 +653,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                     padding: 0.75rem; background: var(--bg-hover); border-radius: 6px;
                 }
                 .source-id {
-                    font-weight: bold; color: #3b82f6; min-width: 3rem;
+                    font-weight: bold; color: #3b82f6; min-width: 3rem; flex-shrink: 0;
                 }
+                .source-info { overflow: hidden; }
                 .source-title {
                     font-weight: 600; text-decoration: none; color: var(--text-primary);
                     display: block; margin-bottom: 0.25rem;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                .source-title:hover { color: #3b82f6; }
+                .source-title:hover { color: #3b82f6; text-decoration: underline; }
                 .source-meta { color: var(--text-secondary); font-size: 0.85rem; }
 
                 /* Mobile Responsive */

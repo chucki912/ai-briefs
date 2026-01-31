@@ -135,30 +135,30 @@ export async function generateTrendReport(
 ): Promise<string | null> {
     // 2.0 Flash 사용 권장 (JSON 모드 지원 우수)
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-flash-preview',
         generationConfig: { responseMimeType: 'application/json' }
     });
 
     const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 트렌드센싱 리서처다.
-사용자가 제공한 기사/자료 묶음([S1], [S2] …)만 근거로 “상세 리포트”를 생성한다.
+사용자가 제공한 기사/자료 묶음([S1], [S2] …)을 바탕으로 심층적이고 풍부한 "상세 리포트"를 생성한다.
 
-[핵심 원칙]
-- Fact(사실)과 Inference(해석/추론)를 분리한다.
-- 제공 자료에 없는 내용은 단정하지 않는다. 불확실하면 “근거 부족/추가 확인 필요”로 표기한다.
-- 모든 핵심 주장(수치/주체/시점/원인/영향)은 출처를 명시한다.
-  - JSON에서는 각 항목에 citations: ["S1","S3"] 형태로 포함한다.
-- 중복 기사(동일 사건/보도)는 하나의 항목으로 통합한다.
-- 문체는 건조한 보고서 톤. 과장/감탄/마케팅 문구 금지.
-- “Action/실행과제/To-do” 섹션은 작성하지 않는다. (조직 내 동향 보고서 스타일 유지)
+[핵심 목표]
+1. **Multi-Source Synthesis (복합 인용)**: 단일 기사([S1])만 요약하지 말고, 제공된 모든 관련 기사([S1], [S2], [S3]...)의 내용을 종합하여 연결한다. 
+   - 하나의 주장에 대해 여러 출처가 있다면 citations: ["S1", "S3"]와 같이 교차 검증하라.
+   - 메인 기사 외의 서브 기사들에 있는 세부 사실(통계, 코멘트, 배경)을 적극적으로 발굴하여 내용을 보강(Elaborate)하라.
+2. **Title Refinement (출처 제목 정제)**: 소스 목록 작성 시, "Google News RSS" 같은 무의미한 제목 대신, 해당 링크 기사의 **실제 헤드라인**이나 주제를 추론하여 [S#]의 title 필드에 기입하라.
+
+[작성 원칙]
+- Fact(사실)과 Inference(해석/추론)를 명확히 분리한다.
+- 제공 자료에 없는 내용은 단정하지 않는다.
+- 문체는 건조한 보고서 톤(Dry & Professional). 과장/마케팅 문구 금지.
+- "Action/실행과제/To-do" 섹션은 작성하지 않는다.
 
 [출력 규칙]
-- 최종 출력은 오직 JSON 1개 객체만 반환한다. (추가 텍스트/마크다운/코드펜스 금지)
+- 최종 출력은 오직 JSON 1개 객체만 반환한다.
 - 반드시 아래 JSON Schema의 요구사항(필드/타입/필수값/금지된 추가필드)을 만족해야 한다.
-- 인용은 본문에 [S#]를 쓰지 말고, 각 항목의 citations 배열로만 표현한다.
-
-[품질 체크]
-- citations가 비어 있으면 해당 문장/항목은 "evidence_level": "low"로 표시하고 notes에 근거 부족 사유를 쓴다.
-- 서로 상충되는 주장(예: 수치/일자/원인)이 있으면 conflicts에 기록한다.`;
+- 인용은 본문에 [S#] 텍스트를 쓰지 말고, 각 항목의 citations 배열로만 표기한다.
+- **Source Section**: 각 소스의 제목(title)은 독자가 식별 가능한 구체적인 기사 제목이어야 한다.`;
 
     const jsonSchema = `
 {

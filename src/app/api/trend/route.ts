@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IssueItem } from '@/types';
 import { generateTrendReport } from '@/lib/gemini';
-import { JSDOM } from 'jsdom';
+// JSDOM will be dynamically imported to avoid ESM/CommonJS issues
+// import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 
 export const maxDuration = 60; // Vercel Function Timeout (Seconds)
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Trend API] 리포트 생성 요청: ${issue.headline}`);
+
+        // Dynamic import for JSDOM
+        const { JSDOM } = await import('jsdom');
 
         // 1. 소스 URL에서 본문 스크래핑 (병렬 처리)
         // 상위 3개 소스만 분석 (속도 및 토큰 제한 고려)

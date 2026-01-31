@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
                     const article = reader.parse();
 
                     return article ? `
-Article ID: [S${index + 1}]
+Article ID: [S${index + 1}] (Index: ${index})
 ---
 Title: ${article.title || 'Unknown Title'}
 Source: ${url}

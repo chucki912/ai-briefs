@@ -148,6 +148,11 @@ export async function generateTrendReport(
    - 메인 기사 외의 서브 기사들에 있는 세부 사실(통계, 코멘트, 배경)을 적극적으로 발굴하여 내용을 보강(Elaborate)하라.
 2. **Title Refinement (출처 제목 정제)**: 소스 목록 작성 시, "Google News RSS" 같은 무의미한 제목 대신, 해당 링크 기사의 **실제 헤드라인**이나 주제를 추론하여 [S#]의 title 필드에 기입하라.
 
+[CRITICAL - Source ID Integrity]
+- 입력된 소스 목록의 순서와 ID([S1], [S2]...)를 절대 변경하지 말라.
+- [S1]의 URL이 "A.com"이면, 결과 JSON의 sources 배열에서도 [S1]은 반드시 "A.com"이어야 한다.
+- 만약 특정 소스([S#])의 본문이 'Context'에 없다면, 해당 URL만으로 내용을 추론하거나 일반적인 사실로 처리하되, 엉뚱한 기사 내용을 매핑하지 말라.
+
 [작성 원칙]
 - Fact(사실)과 Inference(해석/추론)를 명확히 분리한다.
 - 제공 자료에 없는 내용은 단정하지 않는다.

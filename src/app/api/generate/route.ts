@@ -4,9 +4,26 @@ import { analyzeNewsAndGenerateInsights } from '@/lib/gemini';
 import { buildReport, buildEmptyReport } from '@/lib/generators/report-builder';
 import { saveBrief, getBriefByDate } from '@/lib/store';
 
-// 브리핑 생성 API
-export async function POST() {
+// 브리핑 생성 API (Vercel Cron 지원을 위해 GET 추가)
+export async function GET(request: Request) {
+    return handleGenerate(request);
+}
+
+export async function POST(request: Request) {
+    return handleGenerate(request);
+}
+
+async function handleGenerate(request: Request) {
     try {
+        // 보안: Vercel Cron Secret 확인 (설정된 경우)
+        const authHeader = request.headers.get('authorization');
+        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 401 }
+            );
+        }
+
         console.log('[Generate] 브리핑 생성 시작...');
 
         const today = new Date();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IssueItem } from '@/types';
 import { generateTrendReport } from '@/lib/gemini';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 
 export const maxDuration = 60; // Vercel Function Timeout (Seconds)
@@ -36,7 +36,16 @@ export async function POST(request: NextRequest) {
                     if (!response.ok) return null;
 
                     const html = await response.text();
-                    const dom = new JSDOM(html, { url });
+
+                    // [Fix] CSS/JS 파싱 에러 방지를 위해 관련 태그 제거
+                    const cleanHtml = html
+                        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+                    const virtualConsole = new VirtualConsole();
+                    virtualConsole.on("error", () => { }); // JSDOM 내부 에러 로그 억제
+
+                    const dom = new JSDOM(cleanHtml, { url, virtualConsole });
                     const reader = new Readability(dom.window.document);
                     const article = reader.parse();
 

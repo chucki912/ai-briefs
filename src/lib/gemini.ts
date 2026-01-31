@@ -126,16 +126,66 @@ JSON만 출력하세요.`;
     }
 }
 
-// 단일 테스트용 함수
-export async function testGeminiConnection(): Promise<boolean> {
+// ... (testGeminiConnection)
+
+// 트렌드 센싱 리포트 (Deep Dive) 생성
+export async function generateTrendReport(
+    issue: IssueItem,
+    context: string
+): Promise<string | null> {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // 2.0 Flash 사용 권장 (긴 컨텍스트 처리)
+
+    const prompt = `당신은 글로벌 AI 산업의 수석 분석가입니다. 
+제공된 뉴스 이슈와 추가 수집된 기사 본문(Context)을 바탕으로, 심층적인 "트렌드 센싱 리포트"를 작성해주세요.
+
+## 분석 대상 이슈
+- **헤드라인**: ${issue.headline}
+- **핵심 사실**: ${issue.keyFacts.join(', ')}
+- **초기 인사이트**: ${issue.insight}
+
+## 추가 수집된 기사 본문 (Context)
+${context || '(추가 본문 수집 실패, 위 핵심 사실을 바탕으로 내재된 지식을 활용하여 분석하세요)'}
+
+## 리포트 작성 가이드라인
+1. **전문성**: 업계 전문가가 읽을 법한 깊이 있는 통찰력을 제공하세요.
+2. **구조**: 아래 목차를 엄격히 준수하세요.
+3. **언어**: 한국어로 작성하되, 핵심 전문 용어는 영어 원문을 병기하세요.
+4. **서식**: 가독성 높은 Markdown 형식을 사용하세요 (볼드체, 리스트 등 활용).
+
+## 리포트 목차 (Output Format)
+
+### 1. Executive Summary (요약)
+- 이슈의 본질과 핵심 시사점을 3줄 요약으로 제시합니다.
+
+### 2. Context & History (배경 및 흐름)
+- 이 이슈가 발생하게 된 배경은 무엇인가?
+- 과거 유사 사례나 기술적 발전 과정은 어떠했는가?
+
+### 3. Key Players & Ecosystem (주요 플레이어 및 생태계)
+- 이 이슈를 주도하는 기업/인물은 누구이며, 그들의 의도는 무엇인가?
+- 경쟁사나 파트너 생태계에 어떤 영향을 미치는가?
+
+### 4. Technological & Business Impact (기술적/사업적 파급력)
+- 기술적 관점: 어떤 기술적 혁신이나 난제가 있는가?
+- 비즈니스 관점: 시장 판도를 어떻게 바꿀 것인가? (Winner & Loser)
+
+### 5. Future Outlook (향후 6-12개월 전망)
+- 단기 및 중기적으로 어떤 시나리오가 예상되는가?
+- 우리가 주목해야 할 다음 마일스톤은 무엇인가?
+
+### 6. Actionable Insight (대응 전략)
+- 관련 기업이나 투자자, 혹은 개발자는 지금 무엇을 준비해야 하는가?
+- 구체적인 실행 제언을 한 문장으로 강력하게 제시하세요.
+
+리포트를 작성해주세요.`;
+
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent('Say "Hello" in Korean');
+        const result = await model.generateContent(prompt);
         const response = await result.response;
-        console.log('[Gemini Test]', response.text());
-        return true;
+        return response.text();
     } catch (error) {
-        console.error('[Gemini Connection Error]', error);
-        return false;
+        console.error('[Trend Report Error]', error);
+        return null;
     }
 }
+

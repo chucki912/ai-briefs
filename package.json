@@ -12,12 +12,16 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@mozilla/readability": "^0.6.0",
+    "@types/jsdom": "^27.0.0",
     "@vercel/kv": "^3.0.0",
     "date-fns": "^4.1.0",
+    "jsdom": "^27.4.0",
     "next": "16.1.6",
     "node-cron": "^4.2.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
     "redis": "^5.10.0",
     "rss-parser": "^3.13.0"
   },

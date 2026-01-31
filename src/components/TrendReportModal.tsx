@@ -396,24 +396,26 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 </section>
                             )}
 
-                            {/* 5. Risks & Watchlist */}
-                            <div className="grid-2-col-wide">
+                            {/* 5. Risks & Watchlist - Stacked Vertically */}
+                            <div className="vertical-stack">
                                 {parsedReport.risks_and_uncertainties && (
-                                    <section className="report-section">
+                                    <section className="report-section full-width">
                                         <h3>⚠️ Risks & Uncertainties</h3>
-                                        {parsedReport.risks_and_uncertainties.map((risk, i) => (
-                                            <div key={i} className="risk-item">
-                                                <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
-                                                <ul>
-                                                    {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />) || <li>-</li>}
-                                                </ul>
-                                            </div>
-                                        ))}
+                                        <div className="risk-grid">
+                                            {parsedReport.risks_and_uncertainties.map((risk, i) => (
+                                                <div key={i} className="risk-item">
+                                                    <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
+                                                    <ul>
+                                                        {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />) || <li>-</li>}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </section>
                                 )}
 
                                 {parsedReport.watchlist && (
-                                    <section className="report-section">
+                                    <section className="report-section full-width">
                                         <h3>🔭 Watchlist (Monitoring)</h3>
                                         <div className="watchlist-table-container">
                                             <table className="watchlist-table">
@@ -665,13 +667,22 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                 /* Grid Layouts */
                 .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-                .grid-2-col-wide { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
+                .vertical-stack { display: flex; flex-direction: column; gap: 1rem; }
+                .report-section.full-width { width: 100%; margin-bottom: 3.5rem; }
+                
+                .risk-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                    gap: 1.5rem;
+                }
+                .risk-item {
+                    background: var(--bg-hover);
+                    padding: 1.25rem;
+                    border-radius: 8px;
+                    border-left: 4px solid #ef4444;
+                }
                 
                 .theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-                .theme-card {
-                    background: var(--bg-hover); padding: 1.5rem; border-radius: 8px;
-                    border-top: 4px solid #8b5cf6;
-                }
 
                 .implication-grid {
                     display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;

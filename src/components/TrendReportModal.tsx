@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { IssueItem } from '@/types';
 
 interface TrendReportModalProps {
     isOpen: boolean;
     onClose: () => void;
     report: string;
     loading: boolean;
+    issue?: IssueItem;
 }
 
 // JSON Schema Types
@@ -85,7 +87,7 @@ interface Inference {
     citations: string[];
 }
 
-export default function TrendReportModal({ isOpen, onClose, report, loading }: TrendReportModalProps) {
+export default function TrendReportModal({ isOpen, onClose, report, loading, issue }: TrendReportModalProps) {
     const [parsedReport, setParsedReport] = useState<TrendReportData | null>(null);
     const [parseError, setParseError] = useState(false);
 
@@ -114,6 +116,34 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
     }, [report, loading]);
 
     if (!isOpen) return null;
+
+    // Helper to get correct URL and Title for a source
+    const getSourceInfo = (src: { sid: string; url: string; title: string }) => {
+        let finalUrl = src.url;
+        let finalTitle = src.title;
+
+        // Try to match [S#] to the original issue sources if available
+        if (issue && issue.sources && issue.sources.length > 0) {
+            const match = src.sid.match(/^S(\d+)$/);
+            if (match) {
+                const index = parseInt(match[1], 10) - 1;
+                if (index >= 0 && index < issue.sources.length) {
+                    finalUrl = issue.sources[index];
+                }
+            }
+        }
+
+        // Title Cleanup
+        if (!finalTitle || finalTitle.includes('Google News') || finalTitle.includes('RSS Feed')) {
+            try {
+                finalTitle = new URL(finalUrl).hostname;
+            } catch {
+                finalTitle = finalUrl;
+            }
+        }
+
+        return { url: finalUrl, title: finalTitle };
+    };
 
     const Citation = ({ ids }: { ids: string[] }) => {
         if (!ids || !Array.isArray(ids) || ids.length === 0) return null;
@@ -395,19 +425,22 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                 <section className="report-section sources-section">
                                     <h3>📚 Sources</h3>
                                     <div className="sources-list">
-                                        {parsedReport.sources.map((src, i) => (
-                                            <div key={i} id={`source-${src.sid}`} className="source-item">
-                                                <span className="source-id">[{src.sid}]</span>
-                                                <div className="source-info">
-                                                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="source-title">
-                                                        {src.title && src.title !== 'Google News RSS Feed' ? src.title : new URL(src.url).hostname}
-                                                    </a>
-                                                    <div className="source-meta">
-                                                        {src.publisher} • {src.date} • {src.url}
+                                        {parsedReport.sources.map((src, i) => {
+                                            const { url, title } = getSourceInfo(src);
+                                            return (
+                                                <div key={i} id={`source-${src.sid}`} className="source-item">
+                                                    <span className="source-id">[{src.sid}]</span>
+                                                    <div className="source-info">
+                                                        <a href={url} target="_blank" rel="noopener noreferrer" className="source-title">
+                                                            {title}
+                                                        </a>
+                                                        <div className="source-meta">
+                                                            {src.publisher} • {src.date} • <span className="source-url">{url}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             )}
@@ -457,8 +490,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
 
                                         if (parsedReport.sources?.length) {
                                             textToCopy += `\n■ Sources\n`;
-                                            parsedReport.sources.forEach(s => {
-                                                textToCopy += `[${s.sid}] ${s.title} (${s.publisher})\n${s.url}\n`;
+                                            parsedReport.sources.forEach(src => {
+                                                const { url, title } = getSourceInfo(src);
+                                                textToCopy += `[${src.sid}] ${title} (${src.publisher})\n${url}\n`;
                                             });
                                         }
                                     } catch (e) {
@@ -663,6 +697,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                 }
                 .source-title:hover { color: #3b82f6; text-decoration: underline; }
                 .source-meta { color: var(--text-secondary); font-size: 0.85rem; }
+                .source-url {
+                    word-break: break-all;
+                    opacity: 0.8;
+                }
 
                 /* Mobile Responsive */
                 @media (max-width: 768px) {

@@ -136,11 +136,24 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 // Check bounds and existence
                 if (index >= 0 && index < issue.sources.length) {
                     finalUrl = issue.sources[index] || finalUrl;
+
+                    // [Consistency Fix] Force title to be the hostname of the real URL
+                    // This prevents "AI Title says X, but Link goes to Y" mismatch.
+                    try {
+                        if (finalUrl) {
+                            finalTitle = new URL(finalUrl).hostname;
+                        }
+                    } catch {
+                        finalTitle = finalUrl;
+                    }
+
+                    // Return early since we have enforced the title
+                    return { url: finalUrl, title: finalTitle };
                 }
             }
         }
 
-        // Title Cleanup
+        // Fallback checks for unmapped sources
         if (!finalTitle || finalTitle.includes('Google News') || finalTitle.includes('RSS Feed')) {
             try {
                 if (finalUrl) {
@@ -433,20 +446,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             {parsedReport.sources && (
                                 <section className="report-section sources-section">
                                     <h3>📚 Sources</h3>
-                                    <div className="sources-list">
+                                    <div className="sources-list compact">
                                         {parsedReport.sources.map((src, i) => {
                                             const { url, title } = getSourceInfo(src);
                                             return (
                                                 <div key={i} id={`source-${src.sid}`} className="source-item">
                                                     <span className="source-id">[{src.sid}]</span>
-                                                    <div className="source-info">
-                                                        <a href={url} target="_blank" rel="noopener noreferrer" className="source-title">
-                                                            {title}
-                                                        </a>
-                                                        <div className="source-meta">
-                                                            {src.publisher} • {src.date} • <span className="source-url">{url}</span>
-                                                        </div>
-                                                    </div>
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="source-link-abbrev">
+                                                        {title}
+                                                    </a>
+                                                    <span className="source-meta-inline">
+                                                        • {src.publisher} • {src.date}
+                                                    </span>
                                                 </div>
                                             );
                                         })}
@@ -689,25 +700,42 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     border: 0; border-top: 1px solid var(--border-color); margin: 3rem 0;
                 }
 
-                /* Sources */
-                .sources-list { font-size: 0.9rem; }
+                /* Sources - Compact Version */
+                .sources-list.compact {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
+                }
                 .source-item {
-                    display: flex; gap: 1rem; margin-bottom: 1rem;
-                    padding: 0.75rem; background: var(--bg-hover); border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.4rem 0.75rem;
+                    background: var(--bg-hover);
+                    border-radius: 6px;
+                    font-size: 0.85rem;
                 }
                 .source-id {
-                    font-weight: bold; color: #3b82f6; min-width: 3rem; flex-shrink: 0;
+                    font-weight: bold;
+                    color: #3b82f6;
+                    min-width: 2.5rem;
+                    flex-shrink: 0;
                 }
-                .source-info { overflow: hidden; }
-                .source-title {
-                    font-weight: 600; text-decoration: none; color: var(--text-primary);
-                    display: block; margin-bottom: 0.25rem;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                .source-link-abbrev {
+                    font-weight: 600;
+                    text-decoration: none;
+                    color: #3b82f6;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
-                .source-title:hover { color: #3b82f6; text-decoration: underline; }
-                .source-meta { color: var(--text-secondary); font-size: 0.85rem; }
-                .source-url {
-                    word-break: break-all;
+                .source-link-abbrev:hover {
+                    text-decoration: underline;
+                }
+                .source-meta-inline {
+                    color: var(--text-secondary);
+                    font-size: 0.8rem;
+                    white-space: nowrap;
                     opacity: 0.8;
                 }
 

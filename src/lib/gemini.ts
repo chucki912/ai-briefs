@@ -133,69 +133,195 @@ export async function generateTrendReport(
     issue: IssueItem,
     context: string
 ): Promise<string | null> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // 2.0 Flash 사용 권장 (긴 컨텍스트 처리)
+    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 트렌드센싱 리서처다.
+사용자가 제공한 기사/자료 묶음([S1], [S2] …)만 근거로 “상세 리포트”를 생성한다.
 
-    const prompt = `당신은 글로벌 AI 산업의 수석 분석가입니다. 
-제공된 뉴스 이슈와 추가 수집된 기사 본문(Context)을 바탕으로, 심층적인 "트렌드 센싱 리포트"를 작성해주세요.
+[핵심 원칙]
+- Fact(사실)과 Inference(해석/추론)를 분리한다.
+- 제공 자료에 없는 내용은 단정하지 않는다. 불확실하면 “근거 부족/추가 확인 필요”로 표기한다.
+- 모든 핵심 주장(수치/주체/시점/원인/영향)은 출처를 명시한다.
+  - JSON에서는 각 항목에 citations: ["S1","S3"] 형태로 포함한다.
+- 중복 기사(동일 사건/보도)는 하나의 항목으로 통합한다.
+- 문체는 건조한 보고서 톤. 과장/감탄/마케팅 문구 금지.
+- “Action/실행과제/To-do” 섹션은 작성하지 않는다. (조직 내 동향 보고서 스타일 유지)
 
-## 분석 대상 이슈
+[출력 규칙]
+- 최종 출력은 오직 JSON 1개 객체만 반환한다. (추가 텍스트/마크다운/코드펜스 금지)
+- 반드시 아래 JSON Schema의 요구사항(필드/타입/필수값/금지된 추가필드)을 만족해야 한다.
+- 인용은 본문에 [S#]를 쓰지 말고, 각 항목의 citations 배열로만 표현한다.
+
+[품질 체크]
+- citations가 비어 있으면 해당 문장/항목은 "evidence_level": "low"로 표시하고 notes에 근거 부족 사유를 쓴다.
+- 서로 상충되는 주장(예: 수치/일자/원인)이 있으면 conflicts에 기록한다.`;
+
+    const jsonSchema = {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_meta", "executive_summary", "key_developments", "themes", "implications", "risks_and_uncertainties", "watchlist", "sources", "quality"],
+        "properties": {
+            "report_meta": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "time_window", "coverage", "audience", "lens", "generated_at"],
+                "properties": {
+                    "title": { "type": "string" },
+                    "time_window": { "type": "string" },
+                    "coverage": { "type": "string" },
+                    "audience": { "type": "string" },
+                    "lens": { "type": "string" },
+                    "generated_at": { "type": "string" }
+                }
+            },
+            "executive_summary": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["signal_summary", "what_changed", "so_what"],
+                "properties": {
+                    "signal_summary": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                    "what_changed": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                    "so_what": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } }
+                }
+            },
+            "key_developments": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["headline", "facts", "analysis", "why_it_matters", "evidence_level", "citations"],
+                    "properties": {
+                        "headline": { "type": "string" },
+                        "facts": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "analysis": { "type": "array", "items": { "$ref": "#/$defs/inference" } },
+                        "why_it_matters": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
+                        "citations": { "type": "array", "items": { "type": "string" } },
+                        "notes": { "type": "string" }
+                    }
+                }
+            },
+            "themes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["theme", "drivers", "supporting_developments", "citations"],
+                    "properties": {
+                        "theme": { "type": "string" },
+                        "drivers": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "supporting_developments": { "type": "array", "items": { "type": "string" } },
+                        "citations": { "type": "array", "items": { "type": "string" } }
+                    }
+                }
+            },
+            "implications": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["market_business", "tech_product", "policy_regulation", "competitive_landscape"],
+                "properties": {
+                    "market_business": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                    "tech_product": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                    "policy_regulation": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                    "competitive_landscape": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } }
+                }
+            },
+            "risks_and_uncertainties": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["risk", "type", "impact_paths", "evidence_level", "citations"],
+                    "properties": {
+                        "risk": { "type": "string" },
+                        "type": { "type": "string", "enum": ["market", "tech", "regulatory", "supply_chain", "geopolitics", "execution", "other"] },
+                        "impact_paths": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
+                        "citations": { "type": "array", "items": { "type": "string" } },
+                        "notes": { "type": "string" }
+                    }
+                }
+            },
+            "watchlist": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["signal", "why", "how_to_monitor"],
+                    "properties": {
+                        "signal": { "type": "string" },
+                        "why": { "type": "string" },
+                        "how_to_monitor": { "type": "string" }
+                    }
+                }
+            },
+            "sources": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sid", "publisher", "date", "title", "url"],
+                    "properties": {
+                        "sid": { "type": "string" },
+                        "publisher": { "type": "string" },
+                        "date": { "type": "string" },
+                        "title": { "type": "string" },
+                        "url": { "type": "string" },
+                        "note": { "type": "string" }
+                    }
+                }
+            },
+            "quality": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["coverage_gaps", "conflicts", "low_evidence_points"],
+                "properties": {
+                    "coverage_gaps": { "type": "array", "items": { "type": "string" } },
+                    "conflicts": { "type": "array", "items": { "type": "string" } },
+                    "low_evidence_points": { "type": "array", "items": { "type": "string" } }
+                }
+            }
+        },
+        "$defs": {
+            "statement_with_citations": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["text", "citations"],
+                "properties": {
+                    "text": { "type": "string" },
+                    "citations": { "type": "array", "items": { "type": "string" } }
+                }
+            },
+            "inference": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["text", "basis", "citations"],
+                "properties": {
+                    "text": { "type": "string" },
+                    "basis": { "type": "string" },
+                    "citations": { "type": "array", "items": { "type": "string" } }
+                }
+            }
+        }
+    };
+
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+            responseMimeType: "application/json",
+        }
+    });
+
+    const userPrompt = `## 분석 대상 이슈
 - **헤드라인**: ${issue.headline}
 - **핵심 사실**: ${issue.keyFacts.join(', ')}
 - **초기 인사이트**: ${issue.insight}
 
-## 추가 수집된 기사 본문 (Context)
+## 자료 묶음 (Context)
 ${context || '(추가 본문 수집 실패, 위 핵심 사실을 바탕으로 내재된 지식을 활용하여 분석하세요)'}
 
-## 리포트 작성 규칙
-1. **JSON 형식**: 반드시 아래의 JSON 스키마를 엄격히 준수하여 출력하세요.
-2. **전문성**: 업계 전문가 수준의 깊이 있는 통찰력을 제공해야 합니다.
-3. **언어**: 한국어로 작성하되, 핵심 전문 용어는 영어 원문을 병기하세요.
-4. **출처**: 본문에 언급된 사실은 반드시 제공된 Context 내의 출처 기사(Source)를 인용하세요.
-
-## JSON 출력 스키마
-{
-  "report_meta": {
-    "title": "리포트 제목 (이슈의 요체를 담은 전문적인 제목)",
-    "time_window": "분석 기간 (예: 2024-2026)",
-    "lens": "분석 관점 (이 이슈를 바라보는 핵심 키워드/프레임워크)",
-    "generated_at": "현재 시간 ISO"
-  },
-  "executive_summary": {
-    "signal_summary": [{"text": "핵심 요약 문장", "citations": ["S1"]}],
-    "what_changed": [{"text": "변화된 사실", "citations": ["S1"]}],
-    "so_what": [{"text": "시사점", "citations": ["S2"]}]
-  },
-  "key_developments": [
-    {
-      "headline": "핵심 전개 상황 제목",
-      "facts": [{"text": "사실 관계 1", "citations": ["S1"]}],
-      "analysis": [{"text": "심층 분석 1", "basis": "근거 설명", "citations": ["S1", "S2"]}],
-      "why_it_matters": [{"text": "중요성 요약", "citations": ["S3"]}],
-      "evidence_level": "high",
-      "citations": ["S1", "S2"]
-    }
-  ],
-  "implications": {
-    "market_business": [{"text": "시장/사업적 파급효과", "citations": ["S1"]}],
-    "tech_product": [{"text": "기술/제품적 파급효과", "citations": ["S2"]}],
-    "policy_regulation": [{"text": "정책/규제적 파급효과", "citations": ["S3"]}],
-    "competitive_landscape": [{"text": "경쟁 구도 영향", "citations": ["S1"]}]
-  },
-  "sources": [
-    {
-      "sid": "S1",
-      "publisher": "매체명",
-      "date": "기사 날짜",
-      "title": "기사 제목",
-      "url": "기사 URL"
-    }
-  ]
-}
-
-JSON만 출력하세요. 마크다운 기호(\`\`\`) 없이 순수 JSON만 출력하세요.`;
+위 자료를 바탕으로 시스템 지침에 따라 JSON 리포트를 생성하세요.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent([systemPrompt, userPrompt]);
         const response = await result.response;
         return response.text();
     } catch (error) {

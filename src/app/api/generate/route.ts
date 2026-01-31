@@ -9,8 +9,10 @@ export async function POST() {
     try {
         console.log('[Generate] 브리핑 생성 시작...');
 
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0];
+        const now = new Date();
+        // Vercel Cron은 UTC 기준이므로, KST(UTC+9)로 변환하여 날짜 계산
+        const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+        const dateStr = kstDate.toISOString().split('T')[0];
 
         // 이미 오늘 브리핑이 있는지 확인
         const existingBrief = await getBriefByDate(dateStr);
@@ -29,7 +31,7 @@ export async function POST() {
 
         if (newsItems.length === 0) {
             console.log('[Generate] 수집된 뉴스가 없습니다.');
-            const emptyReport = buildEmptyReport(today);
+            const emptyReport = buildEmptyReport(kstDate);
             await saveBrief(emptyReport);
             return NextResponse.json({
                 success: true,
@@ -46,7 +48,7 @@ export async function POST() {
 
         // 3. 리포트 생성
         console.log('[Generate] Step 3: 리포트 생성 중...');
-        const report = buildReport(issues, today);
+        const report = buildReport(issues, kstDate);
 
         // 4. 데이터베이스 저장
         console.log('[Generate] Step 4: 저장 중...');

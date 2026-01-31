@@ -4,13 +4,20 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
-import { BriefReport } from '@/types';
+import TrendReportModal from '@/components/TrendReportModal';
+import { BriefReport, IssueItem } from '@/types';
 
 export default function HomePage() {
   const [brief, setBrief] = useState<BriefReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Trend Report State
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportContent, setReportContent] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
 
   // 브리핑 로드
   const loadBrief = async () => {
@@ -52,6 +59,34 @@ export default function HomePage() {
       setError('브리핑 생성 중 오류가 발생했습니다.');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // 트렌드 리포트 생성 (Deep Dive)
+  const handleDeepDive = async (issue: IssueItem) => {
+    setIsReportModalOpen(true);
+    setSelectedReportIssue(issue);
+    setReportContent(''); // Reset previous report
+    setReportLoading(true);
+
+    try {
+      const res = await fetch('/api/trend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issue }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setReportContent(data.data.report);
+      } else {
+        setReportContent('### ⚠️ 리포트 생성 실패\n\n' + (data.error || '알 수 없는 오류가 발생했습니다.'));
+      }
+    } catch (err) {
+      console.error('Trend Report Error:', err);
+      setReportContent('### ⚠️ 리포트 생성 실패\n\n서버 연결 중 오류가 발생했습니다.');
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -99,7 +134,12 @@ export default function HomePage() {
             {/* Issues */}
             {brief.issues.length > 0 ? (
               brief.issues.map((issue, index) => (
-                <IssueCard key={index} issue={issue} index={index} />
+                <IssueCard
+                  key={index}
+                  issue={issue}
+                  index={index}
+                  onDeepDive={handleDeepDive}
+                />
               ))
             ) : (
               <div className="empty-state">
@@ -142,6 +182,15 @@ export default function HomePage() {
       <footer className="footer">
         <p>© 2026 AI Daily Brief. 매일 오전 7시 자동 업데이트</p>
       </footer>
+
+      <TrendReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        report={reportContent}
+        loading={reportLoading}
+        issue={selectedReportIssue}
+        onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
+      />
     </div>
   );
 }

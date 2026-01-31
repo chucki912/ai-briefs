@@ -104,7 +104,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 const data = JSON.parse(jsonString);
 
                 // Override generated_at to be current time
-                if (data.report_meta) {
+                if (data && data.report_meta) {
                     data.report_meta.generated_at = new Date().toISOString();
                 }
 

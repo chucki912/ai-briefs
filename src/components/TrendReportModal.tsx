@@ -111,8 +111,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 // - Remove trailing commas before closing braces/brackets
                 jsonString = jsonString.replace(/,\s*([\}\]])/g, '$1');
 
-                // - Remove single-line comments that AI might sneak in
-                jsonString = jsonString.replace(/\/\/.*/g, '');
+                // [Fix] Dangerous comment removal removed. It was breaking URLs (https://...).
+                // Gemini in JSON mode doesn't output comments anyway.
 
                 // [Case 1 Fix] Remove stray quotes after arrays or objects that AI sometimes adds
                 // Example: ["S1"] " -> ["S1"]

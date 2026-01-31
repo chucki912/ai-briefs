@@ -10,6 +10,7 @@ interface TrendReportModalProps {
     report: string;
     loading: boolean;
     issue?: IssueItem;
+    onRetry?: () => void;
 }
 
 // JSON Schema Types
@@ -87,19 +88,31 @@ interface Inference {
     citations: string[];
 }
 
-export default function TrendReportModal({ isOpen, onClose, report, loading, issue }: TrendReportModalProps) {
+export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry }: TrendReportModalProps) {
     const [parsedReport, setParsedReport] = useState<TrendReportData | null>(null);
     const [parseError, setParseError] = useState(false);
 
     useEffect(() => {
         if (!loading && report) {
             try {
-                // Try to parse as JSON
-                // Clean up markdown code blocks if present
-                const cleanJson = report.replace(/```json\n|\n```/g, '').trim();
-                // Handle potential multiple JSON objects or text before/after
+                // Robust JSON extraction
+                let cleanJson = report.trim();
+
+                // 1. Remove Markdown code blocks
+                cleanJson = cleanJson.replace(/```json\n?|```/g, '').trim();
+
+                // 2. Extract the first { ... } block
                 const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-                const jsonString = jsonMatch ? jsonMatch[0] : cleanJson;
+                if (!jsonMatch) throw new Error('No JSON object found');
+
+                let jsonString = jsonMatch[0];
+
+                // 3. Basic Sanitization (Remove common AI-generated syntax errors)
+                // - Remove trailing commas before closing braces/brackets
+                jsonString = jsonString.replace(/,\s*([\}\]])/g, '$1');
+
+                // - Remove single-line comments that AI might sneak in
+                jsonString = jsonString.replace(/\/\/.*/g, '');
 
                 const data = JSON.parse(jsonString);
 
@@ -111,7 +124,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 setParsedReport(data);
                 setParseError(false);
             } catch (e) {
-                console.warn('Failed to parse report as JSON, falling back to Markdown', e);
+                console.warn('Failed to parse report as JSON:', e);
                 setParsedReport(null);
                 setParseError(true);
             }
@@ -247,9 +260,34 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             <div className="error-banner">
                                 <h3>⚠️ 리포트 형식을 불러올 수 없습니다.</h3>
                                 <p>원본 데이터 형식이 올바르지 않아 기본 텍스트 모드로 표시합니다.</p>
+                                {onRetry && (
+                                    <button
+                                        className="btn btn-retry"
+                                        onClick={onRetry}
+                                        style={{ marginTop: '1rem', backgroundColor: '#3b82f6', color: 'white' }}
+                                    >
+                                        🔄 다시 생성하기
+                                    </button>
+                                )}
                             </div>
                             <div className="markdown-content">
                                 <ReactMarkdown>{report}</ReactMarkdown>
+                            </div>
+                        </div>
+                    ) : report?.includes('⚠️ 리포트 생성 실패') ? (
+                        <div className="error-state">
+                            <div className="error-banner">
+                                <h3>⚠️ 리포트 생성에 실패했습니다.</h3>
+                                <p>{report.split('\n\n')[1] || '알 수 없는 오류가 발생했습니다.'}</p>
+                                {onRetry && (
+                                    <button
+                                        className="btn btn-retry"
+                                        onClick={onRetry}
+                                        style={{ marginTop: '1rem', backgroundColor: '#3b82f6', color: 'white' }}
+                                    >
+                                        🔄 다시 시도하기
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ) : parsedReport ? (

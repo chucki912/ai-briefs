@@ -248,6 +248,7 @@ export default function ArchivePage() {
                 report={reportContent}
                 loading={reportLoading}
                 issue={selectedReportIssue}
+                onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
             />
         </div>
     );

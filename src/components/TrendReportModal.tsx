@@ -179,23 +179,23 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                         <div className="report-content">
                             {/* 0. Meta Info */}
                             <div className="report-meta-card">
-                                <h1>{parsedReport.report_meta.title}</h1>
+                                <h1>{parsedReport.report_meta?.title}</h1>
                                 <div className="meta-grid">
                                     <div className="meta-item">
                                         <span className="label">기간</span>
-                                        <span className="value">{parsedReport.report_meta.time_window}</span>
+                                        <span className="value">{parsedReport.report_meta?.time_window}</span>
                                     </div>
                                     <div className="meta-item">
                                         <span className="label">관점</span>
-                                        <span className="value">{parsedReport.report_meta.lens}</span>
+                                        <span className="value">{parsedReport.report_meta?.lens}</span>
                                     </div>
                                     <div className="meta-item">
                                         <span className="label">타겟</span>
-                                        <span className="value">{parsedReport.report_meta.audience}</span>
+                                        <span className="value">{parsedReport.report_meta?.audience}</span>
                                     </div>
                                     <div className="meta-item">
                                         <span className="label">생성일</span>
-                                        <span className="value">{new Date(parsedReport.report_meta.generated_at).toLocaleDateString()}</span>
+                                        <span className="value">{parsedReport.report_meta?.generated_at ? new Date(parsedReport.report_meta.generated_at).toLocaleDateString() : '-'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -206,7 +206,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                 <div className="subsection">
                                     <h4>Signal Summary</h4>
                                     <ul>
-                                        {parsedReport.executive_summary.signal_summary.map((s, i) => (
+                                        {parsedReport.executive_summary?.signal_summary?.map((s, i) => (
                                             <StatementItem key={i} item={s} />
                                         ))}
                                     </ul>
@@ -215,7 +215,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                     <div className="subsection">
                                         <h4>What Changed</h4>
                                         <ul>
-                                            {parsedReport.executive_summary.what_changed.map((s, i) => (
+                                            {parsedReport.executive_summary?.what_changed?.map((s, i) => (
                                                 <StatementItem key={i} item={s} />
                                             ))}
                                         </ul>
@@ -223,7 +223,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                     <div className="subsection">
                                         <h4>So What</h4>
                                         <ul>
-                                            {parsedReport.executive_summary.so_what.map((s, i) => (
+                                            {parsedReport.executive_summary?.so_what?.map((s, i) => (
                                                 <StatementItem key={i} item={s} />
                                             ))}
                                         </ul>
@@ -237,7 +237,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                             <section className="report-section">
                                 <h3>🔍 Key Developments</h3>
                                 <div className="development-list">
-                                    {parsedReport.key_developments.map((dev, i) => (
+                                    {parsedReport.key_developments?.map((dev, i) => (
                                         <div key={i} className="development-card">
                                             <div className="dev-header">
                                                 <h4>{dev.headline}</h4>
@@ -248,12 +248,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                                 <div className="fact-box">
                                                     <h5>Facts</h5>
                                                     <ul>
-                                                        {dev.facts.map((f, fi) => <StatementItem key={fi} item={f} />)}
+                                                        {dev.facts?.map((f, fi) => <StatementItem key={fi} item={f} />)}
                                                     </ul>
                                                 </div>
                                                 <div className="analysis-box">
                                                     <h5>Analysis</h5>
-                                                    {dev.analysis.map((inf, ii) => (
+                                                    {dev.analysis?.map((inf, ii) => (
                                                         <div key={ii} className="inference-item">
                                                             <p className="inf-text">{inf.text}</p>
                                                             <p className="inf-basis">💡 {inf.basis}</p>
@@ -270,13 +270,13 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                             <section className="report-section">
                                 <h3>🌊 Emerging Themes</h3>
                                 <div className="theme-grid">
-                                    {parsedReport.themes.map((theme, i) => (
+                                    {parsedReport.themes?.map((theme, i) => (
                                         <div key={i} className="theme-card">
                                             <h4>{theme.theme}</h4>
                                             <div className="theme-drivers">
                                                 <h5>Drivers</h5>
                                                 <ul>
-                                                    {theme.drivers.map((d, di) => <StatementItem key={di} item={d} />)}
+                                                    {theme.drivers?.map((d, di) => <StatementItem key={di} item={d} />)}
                                                 </ul>
                                             </div>
                                         </div>
@@ -292,19 +292,19 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                 <div className="implication-grid">
                                     <div className="imp-col">
                                         <h4>Market & Business</h4>
-                                        <ul>{parsedReport.implications.market_business.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
+                                        <ul>{parsedReport.implications?.market_business?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
                                     </div>
                                     <div className="imp-col">
                                         <h4>Tech & Product</h4>
-                                        <ul>{parsedReport.implications.tech_product.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
+                                        <ul>{parsedReport.implications?.tech_product?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
                                     </div>
                                     <div className="imp-col">
                                         <h4>Competitive Landscape</h4>
-                                        <ul>{parsedReport.implications.competitive_landscape.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
+                                        <ul>{parsedReport.implications?.competitive_landscape?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
                                     </div>
                                     <div className="imp-col">
                                         <h4>Policy & Regulation</h4>
-                                        <ul>{parsedReport.implications.policy_regulation.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
+                                        <ul>{parsedReport.implications?.policy_regulation?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
                                     </div>
                                 </div>
                             </section>
@@ -313,11 +313,11 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                             <div className="grid-2-col-wide">
                                 <section className="report-section">
                                     <h3>⚠️ Risks & Uncertainties</h3>
-                                    {parsedReport.risks_and_uncertainties.map((risk, i) => (
+                                    {parsedReport.risks_and_uncertainties?.map((risk, i) => (
                                         <div key={i} className="risk-item">
                                             <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
                                             <ul>
-                                                {risk.impact_paths.map((p, pi) => <StatementItem key={pi} item={p} />)}
+                                                {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />)}
                                             </ul>
                                         </div>
                                     ))}
@@ -334,7 +334,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {parsedReport.watchlist.map((w, i) => (
+                                                {parsedReport.watchlist?.map((w, i) => (
                                                     <tr key={i}>
                                                         <td className="signal-cell">
                                                             <strong>{w.signal}</strong>
@@ -355,7 +355,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                             <section className="report-section sources-section">
                                 <h3>📚 Sources</h3>
                                 <div className="sources-list">
-                                    {parsedReport.sources.map((src, i) => (
+                                    {parsedReport.sources?.map((src, i) => (
                                         <div key={i} id={`source-${src.sid}`} className="source-item">
                                             <span className="source-id">[{src.sid}]</span>
                                             <div className="source-info">

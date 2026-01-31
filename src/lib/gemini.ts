@@ -163,7 +163,12 @@ export async function generateTrendReport(
 - 최종 출력은 오직 JSON 1개 객체만 반환한다.
 - 반드시 아래 JSON Schema의 요구사항(필드/타입/필수값/금지된 추가필드)을 만족해야 한다.
 - 인용은 본문에 [S#] 텍스트를 쓰지 말고, 각 항목의 citations 배열로만 표기한다.
-- **Source Section**: 각 소스의 제목(title)은 독자가 식별 가능한 구체적인 기사 제목이어야 한다.`;
+- **Source Section**: 각 소스의 제목(title)은 독자가 식별 가능한 구체적인 기사 제목이어야 한다.
+
+[JSON Syntax Warning]
+- 절대 trailing comma(마지막 항목 뒤 콤마)를 쓰지 말라.
+- 주석(//)이나 마크다운 코드 블록(\`\`\`json) 외의 사족을 절대 달지 말라.
+- 문자열 내에 double quote(")가 들어갈 경우 반드시 escape 처리(\\")하라.`;
 
     const jsonSchema = `
 {

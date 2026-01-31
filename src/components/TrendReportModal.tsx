@@ -715,16 +715,16 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 .sources-list.compact {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.4rem;
+                    gap: 0.2rem;
                 }
                 .source-item {
                     display: flex;
                     align-items: center;
-                    gap: 0.75rem;
-                    padding: 0.4rem 0.75rem;
+                    gap: 0.6rem;
+                    padding: 0.2rem 0.6rem;
                     background: var(--bg-hover);
-                    border-radius: 6px;
-                    font-size: 0.85rem;
+                    border-radius: 4px;
+                    font-size: 0.8rem;
                 }
                 .source-id {
                     font-weight: bold;

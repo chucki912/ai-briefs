@@ -76,10 +76,13 @@ Content: ${article.textContent}
 
         return NextResponse.json({ success: true, data: { report } });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Trend API Error]', error);
         return NextResponse.json(
-            { success: false, error: '서버 내부 오류가 발생했습니다.' },
+            {
+                success: false,
+                error: error.message || '서버 내부 오류가 발생했습니다.'
+            },
             { status: 500 }
         );
     }

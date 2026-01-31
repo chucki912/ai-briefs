@@ -114,6 +114,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 // - Remove single-line comments that AI might sneak in
                 jsonString = jsonString.replace(/\/\/.*/g, '');
 
+                // [Case 1 Fix] Remove stray quotes after arrays or objects that AI sometimes adds
+                // Example: ["S1"] " -> ["S1"]
+                jsonString = jsonString.replace(/(\]|\})\s*\"(\s*[\}\],])/g, '$1$2');
+
                 const data = JSON.parse(jsonString);
 
                 // Override generated_at to be current time
@@ -333,7 +337,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                         <div className="subsection">
                                             <h4>What Changed</h4>
                                             <ul>
-                                                {parsedReport.executive_summary.what_changed?.map((s, i) => (
+                                                {parsedReport.executive_summary?.what_changed?.map((s, i) => (
                                                     <StatementItem key={i} item={s} />
                                                 )) || <li>내용 없음</li>}
                                             </ul>
@@ -341,7 +345,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                         <div className="subsection">
                                             <h4>So What</h4>
                                             <ul>
-                                                {parsedReport.executive_summary.so_what?.map((s, i) => (
+                                                {parsedReport.executive_summary?.so_what?.map((s, i) => (
                                                     <StatementItem key={i} item={s} />
                                                 )) || <li>내용 없음</li>}
                                             </ul>
@@ -442,9 +446,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                         <div className="risk-grid">
                                             {parsedReport.risks_and_uncertainties.map((risk, i) => (
                                                 <div key={i} className="risk-item">
-                                                    <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
+                                                    <h5>{risk?.risk || 'N/A'} <span className="risk-type">({risk?.type || 'unknown'})</span></h5>
                                                     <ul>
-                                                        {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />) || <li>-</li>}
+                                                        {risk?.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />) || <li>-</li>}
                                                     </ul>
                                                 </div>
                                             ))}
@@ -467,10 +471,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                                     {parsedReport.watchlist.map((w, i) => (
                                                         <tr key={i}>
                                                             <td className="signal-cell">
-                                                                <strong>{w.signal}</strong>
-                                                                <div className="monitor-method">👉 {w.how_to_monitor}</div>
+                                                                <strong>{w?.signal || 'N/A'}</strong>
+                                                                <div className="monitor-method">👉 {w?.how_to_monitor || '-'}</div>
                                                             </td>
-                                                            <td>{w.why}</td>
+                                                            <td>{w?.why || '-'}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -544,8 +548,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                                         if (parsedReport.implications) {
                                             textToCopy += `\n■ Implications\n`;
-                                            parsedReport.implications.market_business?.forEach(s => textToCopy += `- [Market] ${s.text}\n`);
-                                            parsedReport.implications.tech_product?.forEach(s => textToCopy += `- [Tech] ${s.text}\n`);
+                                            parsedReport.implications.market_business?.forEach(s => textToCopy += `- [Market] ${s?.text || ''}\n`);
+                                            parsedReport.implications.tech_product?.forEach(s => textToCopy += `- [Tech] ${s?.text || ''}\n`);
+                                            parsedReport.implications.competitive_landscape?.forEach(s => textToCopy += `- [Comp] ${s?.text || ''}\n`);
+                                            parsedReport.implications.policy_regulation?.forEach(s => textToCopy += `- [Policy] ${s?.text || ''}\n`);
                                         }
 
                                         if (parsedReport.sources?.length) {

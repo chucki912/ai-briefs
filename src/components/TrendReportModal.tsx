@@ -116,13 +116,14 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
     if (!isOpen) return null;
 
     const Citation = ({ ids }: { ids: string[] }) => {
-        if (!ids || ids.length === 0) return null;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) return null;
         return (
             <span className="citations">
-                {ids.map(id => (
-                    <a key={id} href={`#source-${id}`} className="citation-tag" onClick={(e) => {
+                {ids.map((id, index) => (
+                    <a key={`${id}-${index}`} href={`#source-${id}`} className="citation-tag" onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById(`source-${id}`)?.scrollIntoView({ behavior: 'smooth' });
+                        const el = document.getElementById(`source-${id}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
                     }}>
                         {id}
                     </a>
@@ -131,14 +132,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
         );
     };
 
-    const StatementItem = ({ item }: { item: Statement | Fact }) => (
-        <li className="statement-item">
-            <span className="statement-text">{item.text}</span>
-            <Citation ids={item.citations} />
-        </li>
-    );
+    const StatementItem = ({ item }: { item: Statement | Fact }) => {
+        if (!item) return null;
+        return (
+            <li className="statement-item">
+                <span className="statement-text">{item.text}</span>
+                <Citation ids={item.citations} />
+            </li>
+        );
+    };
 
     const EvidenceBadge = ({ level }: { level: string }) => {
+        const safeLevel = (level || 'low').toLowerCase();
         const colors: Record<string, string> = {
             high: 'bg-green-100 text-green-800',
             medium: 'bg-yellow-100 text-yellow-800',
@@ -150,14 +155,24 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
             low: 'Low Confidence'
         };
 
-        const colorClass = colors[level] || 'bg-gray-100';
-        const label = labels[level] || level;
+        const colorClass = colors[safeLevel] || colors['low'];
+        const label = labels[safeLevel] || 'Unknown Confidence';
 
         return (
-            <span className={`evidence-badge ${level}`}>
+            <span className={`evidence-badge ${safeLevel} ${colorClass}`}>
                 {label}
             </span>
         );
+    };
+
+    // Helper to safely render date
+    const renderDate = (dateString?: string) => {
+        if (!dateString) return '-';
+        try {
+            return new Date(dateString).toLocaleDateString();
+        } catch {
+            return dateString;
+        }
     };
 
     return (
@@ -175,207 +190,237 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                             <p>심층 분석 중입니다... (약 30-60초 소요)</p>
                             <span className="loading-tip">💡 실제 기사 본문을 분석하고 있습니다.</span>
                         </div>
+                    ) : parseError ? (
+                        <div className="error-state">
+                            <div className="error-banner">
+                                <h3>⚠️ 리포트 형식을 불러올 수 없습니다.</h3>
+                                <p>원본 데이터 형식이 올바르지 않아 기본 텍스트 모드로 표시합니다.</p>
+                            </div>
+                            <div className="markdown-content">
+                                <ReactMarkdown>{report}</ReactMarkdown>
+                            </div>
+                        </div>
                     ) : parsedReport ? (
                         <div className="report-content">
                             {/* 0. Meta Info */}
-                            <div className="report-meta-card">
-                                <h1>{parsedReport.report_meta?.title}</h1>
-                                <div className="meta-grid">
-                                    <div className="meta-item">
-                                        <span className="label">기간</span>
-                                        <span className="value">{parsedReport.report_meta?.time_window}</span>
-                                    </div>
-                                    <div className="meta-item">
-                                        <span className="label">관점</span>
-                                        <span className="value">{parsedReport.report_meta?.lens}</span>
-                                    </div>
-                                    <div className="meta-item">
-                                        <span className="label">타겟</span>
-                                        <span className="value">{parsedReport.report_meta?.audience}</span>
-                                    </div>
-                                    <div className="meta-item">
-                                        <span className="label">생성일</span>
-                                        <span className="value">{parsedReport.report_meta?.generated_at ? new Date(parsedReport.report_meta.generated_at).toLocaleDateString() : '-'}</span>
+                            {parsedReport.report_meta && (
+                                <div className="report-meta-card">
+                                    <h1>{parsedReport.report_meta.title || '제목 없음'}</h1>
+                                    <div className="meta-grid">
+                                        <div className="meta-item">
+                                            <span className="label">기간</span>
+                                            <span className="value">{parsedReport.report_meta.time_window || '-'}</span>
+                                        </div>
+                                        <div className="meta-item">
+                                            <span className="label">관점</span>
+                                            <span className="value">{parsedReport.report_meta.lens || '-'}</span>
+                                        </div>
+                                        <div className="meta-item">
+                                            <span className="label">타겟</span>
+                                            <span className="value">{parsedReport.report_meta.audience || '-'}</span>
+                                        </div>
+                                        <div className="meta-item">
+                                            <span className="label">생성일</span>
+                                            <span className="value">{renderDate(parsedReport.report_meta.generated_at)}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* 1. Executive Summary */}
-                            <section className="report-section">
-                                <h3>🚀 Executive Summary</h3>
-                                <div className="subsection">
-                                    <h4>Signal Summary</h4>
-                                    <ul>
-                                        {parsedReport.executive_summary?.signal_summary?.map((s, i) => (
-                                            <StatementItem key={i} item={s} />
-                                        ))}
-                                    </ul>
-                                </div>
-                                <div className="grid-2-col">
+                            {parsedReport.executive_summary && (
+                                <section className="report-section">
+                                    <h3>🚀 Executive Summary</h3>
                                     <div className="subsection">
-                                        <h4>What Changed</h4>
+                                        <h4>Signal Summary</h4>
                                         <ul>
-                                            {parsedReport.executive_summary?.what_changed?.map((s, i) => (
+                                            {parsedReport.executive_summary.signal_summary?.map((s, i) => (
                                                 <StatementItem key={i} item={s} />
-                                            ))}
+                                            )) || <li>내용 없음</li>}
                                         </ul>
                                     </div>
-                                    <div className="subsection">
-                                        <h4>So What</h4>
-                                        <ul>
-                                            {parsedReport.executive_summary?.so_what?.map((s, i) => (
-                                                <StatementItem key={i} item={s} />
-                                            ))}
-                                        </ul>
+                                    <div className="grid-2-col">
+                                        <div className="subsection">
+                                            <h4>What Changed</h4>
+                                            <ul>
+                                                {parsedReport.executive_summary.what_changed?.map((s, i) => (
+                                                    <StatementItem key={i} item={s} />
+                                                )) || <li>내용 없음</li>}
+                                            </ul>
+                                        </div>
+                                        <div className="subsection">
+                                            <h4>So What</h4>
+                                            <ul>
+                                                {parsedReport.executive_summary.so_what?.map((s, i) => (
+                                                    <StatementItem key={i} item={s} />
+                                                )) || <li>내용 없음</li>}
+                                            </ul>
+                                        </div>
                                     </div>
-                                </div>
-                            </section>
+                                </section>
+                            )}
 
                             <hr className="divider" />
 
                             {/* 2. Key Developments */}
-                            <section className="report-section">
-                                <h3>🔍 Key Developments</h3>
-                                <div className="development-list">
-                                    {parsedReport.key_developments?.map((dev, i) => (
-                                        <div key={i} className="development-card">
-                                            <div className="dev-header">
-                                                <h4>{dev.headline}</h4>
-                                                <EvidenceBadge level={dev.evidence_level} />
-                                            </div>
+                            {parsedReport.key_developments && parsedReport.key_developments.length > 0 && (
+                                <section className="report-section">
+                                    <h3>🔍 Key Developments</h3>
+                                    <div className="development-list">
+                                        {parsedReport.key_developments.map((dev, i) => (
+                                            <div key={i} className="development-card">
+                                                <div className="dev-header">
+                                                    <h4>{dev.headline}</h4>
+                                                    <EvidenceBadge level={dev.evidence_level} />
+                                                </div>
 
-                                            <div className="dev-body">
-                                                <div className="fact-box">
-                                                    <h5>Facts</h5>
-                                                    <ul>
-                                                        {dev.facts?.map((f, fi) => <StatementItem key={fi} item={f} />)}
-                                                    </ul>
-                                                </div>
-                                                <div className="analysis-box">
-                                                    <h5>Analysis</h5>
-                                                    {dev.analysis?.map((inf, ii) => (
-                                                        <div key={ii} className="inference-item">
-                                                            <p className="inf-text">{inf.text}</p>
-                                                            <p className="inf-basis">💡 {inf.basis}</p>
-                                                        </div>
-                                                    ))}
+                                                <div className="dev-body">
+                                                    <div className="fact-box">
+                                                        <h5>Facts</h5>
+                                                        <ul>
+                                                            {dev.facts?.map((f, fi) => <StatementItem key={fi} item={f} />) || <li>내용 없음</li>}
+                                                        </ul>
+                                                    </div>
+                                                    <div className="analysis-box">
+                                                        <h5>Analysis</h5>
+                                                        {dev.analysis?.map((inf, ii) => (
+                                                            <div key={ii} className="inference-item">
+                                                                <p className="inf-text">{inf.text}</p>
+                                                                <p className="inf-basis">💡 {inf.basis}</p>
+                                                            </div>
+                                                        )) || <p className="text-sm text-gray-500">분석 내용 없음</p>}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* 3. Themes */}
-                            <section className="report-section">
-                                <h3>🌊 Emerging Themes</h3>
-                                <div className="theme-grid">
-                                    {parsedReport.themes?.map((theme, i) => (
-                                        <div key={i} className="theme-card">
-                                            <h4>{theme.theme}</h4>
-                                            <div className="theme-drivers">
-                                                <h5>Drivers</h5>
-                                                <ul>
-                                                    {theme.drivers?.map((d, di) => <StatementItem key={di} item={d} />)}
-                                                </ul>
+                            {parsedReport.themes && parsedReport.themes.length > 0 && (
+                                <section className="report-section">
+                                    <h3>🌊 Emerging Themes</h3>
+                                    <div className="theme-grid">
+                                        {parsedReport.themes.map((theme, i) => (
+                                            <div key={i} className="theme-card">
+                                                <h4>{theme.theme}</h4>
+                                                <div className="theme-drivers">
+                                                    <h5>Drivers</h5>
+                                                    <ul>
+                                                        {theme.drivers?.map((d, di) => <StatementItem key={di} item={d} />) || <li>내용 없음</li>}
+                                                    </ul>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             <hr className="divider" />
 
                             {/* 4. Implications */}
-                            <section className="report-section">
-                                <h3>🎯 Implications</h3>
-                                <div className="implication-grid">
-                                    <div className="imp-col">
-                                        <h4>Market & Business</h4>
-                                        <ul>{parsedReport.implications?.market_business?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
+                            {parsedReport.implications && (
+                                <section className="report-section">
+                                    <h3>🎯 Implications</h3>
+                                    <div className="implication-grid">
+                                        <div className="imp-col">
+                                            <h4>Market & Business</h4>
+                                            <ul>{parsedReport.implications.market_business?.map((s, i) => <StatementItem key={i} item={s} />) || <li>-</li>}</ul>
+                                        </div>
+                                        <div className="imp-col">
+                                            <h4>Tech & Product</h4>
+                                            <ul>{parsedReport.implications.tech_product?.map((s, i) => <StatementItem key={i} item={s} />) || <li>-</li>}</ul>
+                                        </div>
+                                        <div className="imp-col">
+                                            <h4>Competitive Landscape</h4>
+                                            <ul>{parsedReport.implications.competitive_landscape?.map((s, i) => <StatementItem key={i} item={s} />) || <li>-</li>}</ul>
+                                        </div>
+                                        <div className="imp-col">
+                                            <h4>Policy & Regulation</h4>
+                                            <ul>{parsedReport.implications.policy_regulation?.map((s, i) => <StatementItem key={i} item={s} />) || <li>-</li>}</ul>
+                                        </div>
                                     </div>
-                                    <div className="imp-col">
-                                        <h4>Tech & Product</h4>
-                                        <ul>{parsedReport.implications?.tech_product?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
-                                    </div>
-                                    <div className="imp-col">
-                                        <h4>Competitive Landscape</h4>
-                                        <ul>{parsedReport.implications?.competitive_landscape?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
-                                    </div>
-                                    <div className="imp-col">
-                                        <h4>Policy & Regulation</h4>
-                                        <ul>{parsedReport.implications?.policy_regulation?.map((s, i) => <StatementItem key={i} item={s} />)}</ul>
-                                    </div>
-                                </div>
-                            </section>
+                                </section>
+                            )}
 
                             {/* 5. Risks & Watchlist */}
                             <div className="grid-2-col-wide">
-                                <section className="report-section">
-                                    <h3>⚠️ Risks & Uncertainties</h3>
-                                    {parsedReport.risks_and_uncertainties?.map((risk, i) => (
-                                        <div key={i} className="risk-item">
-                                            <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
-                                            <ul>
-                                                {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />)}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </section>
+                                {parsedReport.risks_and_uncertainties && (
+                                    <section className="report-section">
+                                        <h3>⚠️ Risks & Uncertainties</h3>
+                                        {parsedReport.risks_and_uncertainties.map((risk, i) => (
+                                            <div key={i} className="risk-item">
+                                                <h5>{risk.risk} <span className="risk-type">({risk.type})</span></h5>
+                                                <ul>
+                                                    {risk.impact_paths?.map((p, pi) => <StatementItem key={pi} item={p} />) || <li>-</li>}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </section>
+                                )}
 
-                                <section className="report-section">
-                                    <h3>🔭 Watchlist (Monitoring)</h3>
-                                    <div className="watchlist-table-container">
-                                        <table className="watchlist-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Signal</th>
-                                                    <th>Why Monitor</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {parsedReport.watchlist?.map((w, i) => (
-                                                    <tr key={i}>
-                                                        <td className="signal-cell">
-                                                            <strong>{w.signal}</strong>
-                                                            <div className="monitor-method">👉 {w.how_to_monitor}</div>
-                                                        </td>
-                                                        <td>{w.why}</td>
+                                {parsedReport.watchlist && (
+                                    <section className="report-section">
+                                        <h3>🔭 Watchlist (Monitoring)</h3>
+                                        <div className="watchlist-table-container">
+                                            <table className="watchlist-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Signal</th>
+                                                        <th>Why Monitor</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </section>
+                                                </thead>
+                                                <tbody>
+                                                    {parsedReport.watchlist.map((w, i) => (
+                                                        <tr key={i}>
+                                                            <td className="signal-cell">
+                                                                <strong>{w.signal}</strong>
+                                                                <div className="monitor-method">👉 {w.how_to_monitor}</div>
+                                                            </td>
+                                                            <td>{w.why}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </section>
+                                )}
                             </div>
 
                             <hr className="divider" />
 
                             {/* Sources */}
-                            <section className="report-section sources-section">
-                                <h3>📚 Sources</h3>
-                                <div className="sources-list">
-                                    {parsedReport.sources?.map((src, i) => (
-                                        <div key={i} id={`source-${src.sid}`} className="source-item">
-                                            <span className="source-id">[{src.sid}]</span>
-                                            <div className="source-info">
-                                                <a href={src.url} target="_blank" rel="noopener noreferrer" className="source-title">
-                                                    {src.title}
-                                                </a>
-                                                <div className="source-meta">
-                                                    {src.publisher} • {src.date}
+                            {parsedReport.sources && (
+                                <section className="report-section sources-section">
+                                    <h3>📚 Sources</h3>
+                                    <div className="sources-list">
+                                        {parsedReport.sources.map((src, i) => (
+                                            <div key={i} id={`source-${src.sid}`} className="source-item">
+                                                <span className="source-id">[{src.sid}]</span>
+                                                <div className="source-info">
+                                                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="source-title">
+                                                        {src.title}
+                                                    </a>
+                                                    <div className="source-meta">
+                                                        {src.publisher} • {src.date}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                         </div>
-                    ) : (
+                    ) : (parseError || report) ? (
                         <div className="markdown-content">
                             {/* Fallback for Markdown or Legacy support */}
                             <ReactMarkdown>{report}</ReactMarkdown>
+                        </div>
+                    ) : (
+                        <div className="loading-state">
+                            <p>리포트 내용이 없습니다.</p>
                         </div>
                     )}
                 </div>
@@ -427,6 +472,21 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                     box-shadow: 0 0 20px rgba(0,0,0,0.05);
                     min-height: 100%;
                 }
+
+                .error-state {
+                    padding: 3rem;
+                    text-align: center;
+                }
+                .error-banner {
+                    background-color: #fee2e2;
+                    border: 1px solid #ef4444;
+                    color: #b91c1c;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin-bottom: 2rem;
+                }
+                .error-banner h3 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+                .error-banner p { margin: 0; font-size: 0.9rem; }
 
                 /* Meta Card */
                 .report-meta-card {
@@ -586,6 +646,17 @@ export default function TrendReportModal({ isOpen, onClose, report, loading }: T
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     height: 100%; gap: 1rem; color: var(--text-secondary); padding: 3rem;
                 }
+                 .markdown-content {
+                    padding: 2rem;
+                    line-height: 1.6;
+                    color: var(--text-primary);
+                }
+                .markdown-content :global(h1), .markdown-content :global(h2), .markdown-content :global(h3) {
+                    margin-top: 1.5rem;
+                    margin-bottom: 1rem;
+                    color: var(--text-primary);
+                }
+                .markdown-content :global(p) { margin-bottom: 1rem; }
             `}</style>
         </div>
     );

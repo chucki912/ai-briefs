@@ -133,102 +133,332 @@ export async function generateTrendReport(
     issue: IssueItem,
     context: string
 ): Promise<string | null> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // 2.0 Flash 사용 권장 (긴 컨텍스트 처리)
+    // 2.0 Flash 사용 권장 (JSON 모드 지원 우수)
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: { responseMimeType: 'application/json' }
+    });
 
-    const prompt = `너는 트렌드센싱(T&I) 리포트 작성자다. 사용자가 제공한 기사/자료 묶음을 기반으로 "상세 리포트"를 아래 형식으로만 출력하라.
+    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 트렌드센싱 리서처다.
+사용자가 제공한 기사/자료 묶음([S1], [S2] …)만 근거로 “상세 리포트”를 생성한다.
 
-[작성 원칙]
-- Fact(사실)과 Inference(해석/추론)를 분리해서 작성한다.
-- 기사에 없는 내용은 단정하지 않는다. 필요한 경우 “근거 부족”이라고 명시한다.
-- 모든 핵심 주장(수치/주체/시점/원인/영향)은 출처 태그 [S#]를 최소 1개 이상 붙인다.
-- 중복 기사(동일 사건 반복 보도)는 하나의 시그널로 통합해 서술한다.
-- 문체는 건조한 보고서 메모 톤. 문장 끝은 “~함/~있음/~가능성이 있음” 위주.
-- 과장, 감탄, 마케팅 문구 금지. 결론을 과도하게 확정하지 말 것.
-- 불확실성은 명시(예: “가능성 있음”, “추가 확인 필요”).
+[핵심 원칙]
+- Fact(사실)과 Inference(해석/추론)를 분리한다.
+- 제공 자료에 없는 내용은 단정하지 않는다. 불확실하면 “근거 부족/추가 확인 필요”로 표기한다.
+- 모든 핵심 주장(수치/주체/시점/원인/영향)은 출처를 명시한다.
+  - JSON에서는 각 항목에 citations: ["S1","S3"] 형태로 포함한다.
+- 중복 기사(동일 사건/보도)는 하나의 항목으로 통합한다.
+- 문체는 건조한 보고서 톤. 과장/감탄/마케팅 문구 금지.
+- “Action/실행과제/To-do” 섹션은 작성하지 않는다. (조직 내 동향 보고서 스타일 유지)
 
-[입력 기대 형태]
-- 기사/자료는 [S1], [S2] ... 형태로 ID가 부여되어 제공된다(제목/매체/날짜/URL/요지/발췌 등).
-- 본문에서는 해당 ID로만 인용한다.
+[출력 규칙]
+- 최종 출력은 오직 JSON 1개 객체만 반환한다. (추가 텍스트/마크다운/코드펜스 금지)
+- 반드시 아래 JSON Schema의 요구사항(필드/타입/필수값/금지된 추가필드)을 만족해야 한다.
+- 인용은 본문에 [S#]를 쓰지 말고, 각 항목의 citations 배열로만 표현한다.
 
-[출력 형식: Markdown 고정 / 순서 변경 금지]
-# ${issue.headline}
+[품질 체크]
+- citations가 비어 있으면 해당 문장/항목은 "evidence_level": "low"로 표시하고 notes에 근거 부족 사유를 쓴다.
+- 서로 상충되는 주장(예: 수치/일자/원인)이 있으면 conflicts에 기록한다.`;
 
-## 0) Meta
-- 기간: ${new Date().toLocaleDateString('ko-KR')} 기준
-- 커버리지: 글로벌 및 주요 기술 시장
-- 독자: 기술 전략 전문가 및 의사결정권자
-- 관점(Lens): 기술-비즈니스 융합 관점
+    const jsonSchema = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/industry-trend-brief.schema.json",
+  "title": "Industry Trend Brief (Trend Sensing) - Deep Dive",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_meta",
+    "executive_summary",
+    "key_developments",
+    "themes",
+    "implications",
+    "risks_and_uncertainties",
+    "watchlist",
+    "sources",
+    "quality"
+  ],
+  "properties": {
+    "report_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "time_window", "coverage", "audience", "lens", "generated_at"],
+      "properties": {
+        "title": { "type": "string", "minLength": 3 },
+        "time_window": { "type": "string", "minLength": 3 },
+        "coverage": { "type": "string", "minLength": 2 },
+        "audience": { "type": "string", "minLength": 2 },
+        "lens": { "type": "string", "minLength": 1 },
+        "generated_at": {
+          "type": "string",
+          "description": "ISO 8601 datetime",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
+        }
+      }
+    },
 
-## 1) Signal Summary (5 lines)
-- (5줄 이내로 핵심 시그널을 요약. 각 줄 끝에 [S#] 최소 1개)
+    "executive_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_summary", "what_changed", "so_what"],
+      "properties": {
+        "signal_summary": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        },
+        "what_changed": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        },
+        "so_what": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        }
+      }
+    },
 
-## 2) What happened (Facts)
-- (사실만 5~10개 bullet. 각 bullet 끝에 [S#])
-- (서술 예: 발표/출시/인수/정책/지표 변동/고객 사례 등)
+    "key_developments": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["headline", "facts", "analysis", "why_it_matters", "evidence_level", "citations"],
+        "properties": {
+          "headline": { "type": "string", "minLength": 5 },
+          "facts": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": { "$ref": "#/$defs/fact" }
+          },
+          "analysis": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": { "$ref": "#/$defs/inference" }
+          },
+          "why_it_matters": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": { "$ref": "#/$defs/statement_with_citations" }
+          },
+          "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
+          "citations": { "$ref": "#/$defs/citations" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
 
-## 3) Why now (Drivers)
-- (촉발 요인 3~5개. 기술/시장/규제/공급망/자본 중 선택. 각 bullet 끝에 [S#])
-- (기사 근거가 약하면 “근거 부족” 명시)
+    "themes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["theme", "drivers", "supporting_developments", "citations"],
+        "properties": {
+          "theme": { "type": "string", "minLength": 4 },
+          "drivers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": { "$ref": "#/$defs/statement_with_citations" }
+          },
+          "supporting_developments": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": { "type": "string" }
+          },
+          "citations": { "$ref": "#/$defs/citations" }
+        }
+      }
+    },
 
-## 4) So what (Implications)
-### 4-1) Market / Business
-- (3~6 bullet, [S#] 포함, 필요 시 Inference 표기)
+    "implications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["market_business", "tech_product", "policy_regulation", "competitive_landscape"],
+      "properties": {
+        "market_business": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        },
+        "tech_product": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        },
+        "policy_regulation": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        },
+        "competitive_landscape": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/statement_with_citations" }
+        }
+      }
+    },
 
-### 4-2) Tech / Product
-- (3~6 bullet, [S#] 포함)
+    "risks_and_uncertainties": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["risk", "type", "impact_paths", "evidence_level", "citations"],
+        "properties": {
+          "risk": { "type": "string", "minLength": 6 },
+          "type": { "type": "string", "enum": ["market", "tech", "regulatory", "supply_chain", "geopolitics", "execution", "other"] },
+          "impact_paths": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": { "$ref": "#/$defs/statement_with_citations" }
+          },
+          "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
+          "citations": { "$ref": "#/$defs/citations" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
 
-### 4-3) Policy / Regulation
-- (1~4 bullet, [S#] 포함)
+    "watchlist": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["signal", "why", "how_to_monitor"],
+        "properties": {
+          "signal": { "type": "string", "minLength": 4 },
+          "why": { "type": "string", "minLength": 4 },
+          "how_to_monitor": { "type": "string", "minLength": 4 }
+        }
+      }
+    },
 
-### 4-4) Competitive Landscape
-- (승자/패자/포지셔닝 변화 가능성. 2~5 bullet, [S#] 포함)
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sid", "publisher", "date", "title", "url"],
+        "properties": {
+          "sid": { "type": "string", "pattern": "^S[0-9]+$" },
+          "publisher": { "type": "string" },
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
 
-## 5) Scenarios (3)
-### Base
-- 요약: (1줄)
-- 트리거 지표: (2개)
-- 영향: (2개)
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_gaps", "conflicts", "low_evidence_points"],
+      "properties": {
+        "coverage_gaps": { "type": "array", "items": { "type": "string" } },
+        "conflicts": { "type": "array", "items": { "type": "string" } },
+        "low_evidence_points": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
 
-### Upside
-- 요약: (1줄)
-- 트리거 지표: (2개)
-- 영향: (2개)
+  "$defs": {
+    "citations": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^S[0-9]+$" },
+      "minItems": 0,
+      "maxItems": 8,
+      "uniqueItems": true
+    },
+    "statement_with_citations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "citations"],
+      "properties": {
+        "text": { "type": "string", "minLength": 6 },
+        "citations": { "$ref": "#/$defs/citations" }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "citations"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 6,
+          "description": "기사에서 직접 확인 가능한 사실만"
+        },
+        "citations": { "$ref": "#/$defs/citations" }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "basis", "citations"],
+      "properties": {
+        "text": { "type": "string", "minLength": 6, "description": "사실 기반의 해석/추론" },
+        "basis": {
+          "type": "string",
+          "minLength": 6,
+          "description": "추론 근거(어떤 사실로부터 왜 이런 해석이 가능한지)"
+        },
+        "citations": { "$ref": "#/$defs/citations" }
+      }
+    }
+  }
+}
+`;
 
-### Downside
-- 요약: (1줄)
-- 트리거 지표: (2개)
-- 영향: (2개)
+    const prompt = `${systemPrompt}
 
-## 6) What to do (Actions)
-### 0~2주
-- (3~6 bullet, 실행 단위로 구체화)
+# JSON Schema
+\`\`\`json
+${jsonSchema}
+\`\`\`
 
-### 1~3개월
-- (3~6 bullet)
-
-### 6~12개월
-- (3~6 bullet)
-
-## 7) Watchlist (Monitoring Signals)
-- (6~10개. “무엇을/왜/어떻게 관측” 형태로 짧게)
-
-## 8) Source Traceability
-- (자동 생성된 [S#] 매핑 정보를 여기에 기입)
+# 분석 대상 이슈 및 소스 매핑
+- 헤드라인: ${issue.headline}
+- 핵심 사실: ${issue.keyFacts.join(', ')}
 ${issue.sources.map((url, i) => `- [S${i + 1}] ${url}`).join('\n')}
 
----
-
-[분석 대상 데이터]
-${context || '(수집된 본문 없음, 위 핵심 사실 기반 작성)'}`;
-
+[분석 대상 데이터 상세 (Context)]
+${context || '(수집된 본문 없음. 위 핵심 사실과 외부 지식을 활용하여 작성하되 근거 부족 시 명시 바람)'}`;
 
     try {
         const result = await model.generateContent(prompt);
         const response = await result.response;
+        // JSON 문자열 반환
         return response.text();
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;
     }
 }
+
 

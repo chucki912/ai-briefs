@@ -125,16 +125,17 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
     // Helper to get correct URL and Title for a source
     const getSourceInfo = (src: { sid: string; url: string; title: string }) => {
-        let finalUrl = src.url;
-        let finalTitle = src.title;
+        let finalUrl = src?.url || '';
+        let finalTitle = src?.title || '';
 
         // Try to match [S#] to the original issue sources if available
-        if (issue && issue.sources && issue.sources.length > 0) {
+        if (issue?.sources?.length && src?.sid) {
             const match = src.sid.match(/^S(\d+)$/);
             if (match) {
                 const index = parseInt(match[1], 10) - 1;
+                // Check bounds and existence
                 if (index >= 0 && index < issue.sources.length) {
-                    finalUrl = issue.sources[index];
+                    finalUrl = issue.sources[index] || finalUrl;
                 }
             }
         }
@@ -142,7 +143,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         // Title Cleanup
         if (!finalTitle || finalTitle.includes('Google News') || finalTitle.includes('RSS Feed')) {
             try {
-                finalTitle = new URL(finalUrl).hostname;
+                if (finalUrl) {
+                    finalTitle = new URL(finalUrl).hostname;
+                }
             } catch {
                 finalTitle = finalUrl;
             }

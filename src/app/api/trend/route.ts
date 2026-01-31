@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         // 상위 3개 소스만 분석 (속도 및 토큰 제한 고려)
         const targetSources = issue.sources.slice(0, 3);
         const articles = await Promise.all(
-            targetSources.map(async (url) => {
+            targetSources.map(async (url, index) => {
                 try {
                     const response = await fetch(url, {
                         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AIBriefBot/1.0)' },
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
                     const article = reader.parse();
 
                     return article ? `
+Article ID: [S${index + 1}]
 ---
 Title: ${article.title || 'Unknown Title'}
 Source: ${url}

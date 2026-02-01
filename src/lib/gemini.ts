@@ -155,6 +155,10 @@ export async function generateTrendReport(
    - Market, Tech, Comp, Policy 4개 영역으로 나누어 구조적 변화를 분석한다.
    - 단기 현상보다 중장기적인 방향성을 제시한다.
 
+[메타데이터 가이드]
+- **time_window**: 분석 대상 기사들이 다루는 시점을 명시한다. (예: "2026년 2월") 반드시 사용자 프롬프트에서 제공된 현재 날짜 정보를 참고하여 정확하게 작성한다.
+- **generated_at**: 리포트가 생성된 정확한 시간을 ISO 8601 형식으로 작성한다.
+
 [출력 규칙]
 - 최종 출력은 정의된 JSON Schema를 만족하는 1개의 객체여야 한다.
 - 필드 내 텍스트는 마크다운 형식을 쓰지 말고 일반 텍스트로만 작성한다.`;
@@ -407,10 +411,19 @@ export async function generateTrendReport(
         }
     });
 
-    const userPrompt = `## 분석 대상 이슈
+    const nowDate = new Date();
+    const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    const kstIsoStr = nowDate.toISOString();
+
+    const userPrompt = `## 현재 날짜 및 시간 (KST)
+- **일시**: ${kstDateStr}
+- **ISO**: ${kstIsoStr}
+
+## 분석 대상 이슈
 - **헤드라인**: ${issue.headline}
 - **핵심 사실**: ${issue.keyFacts.join(', ')}
 - **초기 인사이트**: ${issue.insight}
+- **관련 출처**: ${issue.sources.join(', ')}
 
 ## 자료 묶음 (Context)
 ${context || '(추가 본문 수집 실패, 위 핵심 사실을 바탕으로 내재된 지식을 활용하여 분석하세요)'}

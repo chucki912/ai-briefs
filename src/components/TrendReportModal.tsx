@@ -99,12 +99,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         if (!loading && report) {
             try {
                 let cleanJson = report.trim();
+                // Remove Markdown code blocks
                 cleanJson = cleanJson.replace(/```json\n?|```/g, '').trim();
+
+                // Extract only the JSON part
                 const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) throw new Error('No JSON object found');
                 let jsonString = jsonMatch[0];
+
+                // Attempt to clean common JSON issues without breaking valid strings
+                // 1. Remove trailing commas
                 jsonString = jsonString.replace(/,\s*([\}\]])/g, '$1');
-                jsonString = jsonString.replace(/(\]|\})\s*\"(\s*[\}\],])/g, '$1$2');
+
                 const data = JSON.parse(jsonString);
                 setParsedReport(data);
                 setParseError(false);
@@ -129,16 +135,16 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         let textToCopy = report;
         if (parsedReport) {
             try {
-                textToCopy = `[트렌드 리포트] ${parsedReport.report_meta.title || ''}\n\n`;
-                textToCopy += `분석대상: ${parsedReport.report_meta.coverage || '-'}\n`;
-                textToCopy += `타겟: ${parsedReport.report_meta.audience || '-'}\n`;
-                textToCopy += `기간: ${parsedReport.report_meta.time_window || '-'}\n`;
-                textToCopy += `관점: ${parsedReport.report_meta.lens || '-'}\n\n`;
+                textToCopy = `[트렌드 리포트] ${parsedReport.report_meta?.title || ''}\n\n`;
+                textToCopy += `분석대상: ${parsedReport.report_meta?.coverage || '-'}\n`;
+                textToCopy += `타겟: ${parsedReport.report_meta?.audience || '-'}\n`;
+                textToCopy += `기간: ${parsedReport.report_meta?.time_window || '-'}\n`;
+                textToCopy += `관점: ${parsedReport.report_meta?.lens || '-'}\n\n`;
 
                 textToCopy += `■ Executive Summary\n`;
-                parsedReport.executive_summary.signal_summary?.forEach(s => textToCopy += `- [Signal] ${s.text}\n`);
-                parsedReport.executive_summary.what_changed?.forEach(s => textToCopy += `- [Change] ${s.text}\n`);
-                parsedReport.executive_summary.so_what?.forEach(s => textToCopy += `- [So What] ${s.text}\n`);
+                parsedReport.executive_summary?.signal_summary?.forEach(s => textToCopy += `- [Signal] ${s.text}\n`);
+                parsedReport.executive_summary?.what_changed?.forEach(s => textToCopy += `- [Change] ${s.text}\n`);
+                parsedReport.executive_summary?.so_what?.forEach(s => textToCopy += `- [So What] ${s.text}\n`);
 
                 if (parsedReport.key_developments?.length) {
                     textToCopy += `\n■ Key Developments\n`;
@@ -159,10 +165,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                 if (parsedReport.implications) {
                     textToCopy += `\n■ Implications\n`;
-                    parsedReport.implications.market_business?.forEach(s => textToCopy += `- [Market] ${s?.text || ''}\n`);
-                    parsedReport.implications.tech_product?.forEach(s => textToCopy += `- [Tech] ${s?.text || ''}\n`);
-                    parsedReport.implications.competitive_landscape?.forEach(s => textToCopy += `- [Comp] ${s?.text || ''}\n`);
-                    parsedReport.implications.policy_regulation?.forEach(s => textToCopy += `- [Policy] ${s?.text || ''}\n`);
+                    parsedReport.implications?.market_business?.forEach(s => textToCopy += `- [Market] ${s?.text || ''}\n`);
+                    parsedReport.implications?.tech_product?.forEach(s => textToCopy += `- [Tech] ${s?.text || ''}\n`);
+                    parsedReport.implications?.competitive_landscape?.forEach(s => textToCopy += `- [Comp] ${s?.text || ''}\n`);
+                    parsedReport.implications?.policy_regulation?.forEach(s => textToCopy += `- [Policy] ${s?.text || ''}\n`);
                 }
 
                 if (parsedReport.risks_and_uncertainties?.length) {
@@ -216,11 +222,11 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     ) : parsedReport ? (
                         <div className="report-content">
                             <div className="report-meta-box">
-                                <h1 className="report-title">{parsedReport.report_meta.title}</h1>
+                                <h1 className="report-title">{parsedReport.report_meta?.title}</h1>
                                 <div className="report-badge-row">
-                                    <span className="badge">대상: {parsedReport.report_meta.coverage}</span>
-                                    <span className="badge">기간: {parsedReport.report_meta.time_window}</span>
-                                    <span className="badge">관점: {parsedReport.report_meta.lens}</span>
+                                    <span className="badge">대상: {parsedReport.report_meta?.coverage}</span>
+                                    <span className="badge">기간: {parsedReport.report_meta?.time_window}</span>
+                                    <span className="badge">관점: {parsedReport.report_meta?.lens}</span>
                                 </div>
                             </div>
 
@@ -229,15 +235,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 <div className="summary-group">
                                     <h4>[Signal Summary]</h4>
                                     <ul className="report-list">
-                                        {parsedReport.executive_summary.signal_summary?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                        {parsedReport.executive_summary?.signal_summary?.map((s, i) => <li key={i}>{s.text}</li>)}
                                     </ul>
                                     <h4>[What Changed]</h4>
                                     <ul className="report-list">
-                                        {parsedReport.executive_summary.what_changed?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                        {parsedReport.executive_summary?.what_changed?.map((s, i) => <li key={i}>{s.text}</li>)}
                                     </ul>
                                     <h4>[So What]</h4>
                                     <ul className="report-list">
-                                        {parsedReport.executive_summary.so_what?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                        {parsedReport.executive_summary?.so_what?.map((s, i) => <li key={i}>{s.text}</li>)}
                                     </ul>
                                 </div>
                             </section>
@@ -279,19 +285,19 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 <div className="implications-grid">
                                     <div className="implication-box">
                                         <strong>[Market & Business]</strong>
-                                        <ul>{parsedReport.implications.market_business?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                        <ul>{parsedReport.implications?.market_business?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
                                     </div>
                                     <div className="implication-box">
                                         <strong>[Tech & Product]</strong>
-                                        <ul>{parsedReport.implications.tech_product?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                        <ul>{parsedReport.implications?.tech_product?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
                                     </div>
                                     <div className="implication-box">
                                         <strong>[Competitive Landscape]</strong>
-                                        <ul>{parsedReport.implications.competitive_landscape?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                        <ul>{parsedReport.implications?.competitive_landscape?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
                                     </div>
                                     <div className="implication-box">
                                         <strong>[Policy & Regulation]</strong>
-                                        <ul>{parsedReport.implications.policy_regulation?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                        <ul>{parsedReport.implications?.policy_regulation?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
                                     </div>
                                 </div>
                             </section>
@@ -340,18 +346,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                             <section className="report-section quality-section">
                                 <h2 className="section-title">■ Analysis Quality</h2>
-                                {parsedReport.quality.coverage_gaps?.length > 0 && (
+                                {parsedReport.quality?.coverage_gaps?.length && parsedReport.quality.coverage_gaps.length > 0 ? (
                                     <div className="quality-item">
                                         <strong>Coverage Gaps:</strong>
                                         <ul>{parsedReport.quality.coverage_gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
                                     </div>
-                                )}
-                                {parsedReport.quality.conflicts?.length > 0 && (
+                                ) : null}
+                                {parsedReport.quality?.conflicts?.length && parsedReport.quality.conflicts.length > 0 ? (
                                     <div className="quality-item">
                                         <strong>Conflicts:</strong>
                                         <ul>{parsedReport.quality.conflicts.map((c, i) => <li key={i}>{c}</li>)}</ul>
                                     </div>
-                                )}
+                                ) : null}
                             </section>
                         </div>
                     ) : (

@@ -5,12 +5,6 @@ import { IssueItem } from '@/types';
 interface IssueCardProps {
     issue: IssueItem;
     index: number;
-}
-
-// ... (interfaces)
-interface IssueCardProps {
-    issue: IssueItem;
-    index: number;
     onDeepDive?: (issue: IssueItem) => void;
 }
 

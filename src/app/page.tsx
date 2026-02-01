@@ -121,7 +121,7 @@ export default function HomePage() {
             {/* Brief Header */}
             <div className="brief-header">
               <div className="brief-date">
-                {brief.date.replace(/-/g, '년 ').replace(/-/g, '월 ')}일 ({brief.dayOfWeek})
+                {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일 ({brief.dayOfWeek})
               </div>
               <div className="brief-title">
                 LLM이 찾아주는 데일리 AI 이슈 by Chuck Choi

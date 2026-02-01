@@ -305,8 +305,10 @@ export async function generateTrendReport(
 
     const model = genAI.getGenerativeModel({
         model: 'gemini-2.0-flash',
+        systemInstruction: systemPrompt,
         generationConfig: {
             responseMimeType: "application/json",
+            responseSchema: jsonSchema as any,
         }
     });
 
@@ -321,9 +323,16 @@ ${context || '(추가 본문 수집 실패, 위 핵심 사실을 바탕으로 �
 위 자료를 바탕으로 시스템 지침에 따라 JSON 리포트를 생성하세요.`;
 
     try {
-        const result = await model.generateContent([systemPrompt, userPrompt]);
+        console.log('[Trend API] Gemini 분석 시작...');
+        const result = await model.generateContent(userPrompt);
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+
+        console.log(`[Trend API] Gemini 분석 완료 (길이: ${text.length}자)`);
+        // 로깅을 위해 첫 200자만 출력 (너무 길면 로그 가독성 저하)
+        console.log(`[Trend API] 응답 데이터 앞부분: ${text.substring(0, 500)}`);
+
+        return text;
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;

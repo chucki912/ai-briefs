@@ -156,12 +156,10 @@ export async function generateTrendReport(
 
     const jsonSchema = {
         "type": "object",
-        "additionalProperties": false,
         "required": ["report_meta", "executive_summary", "key_developments", "themes", "implications", "risks_and_uncertainties", "watchlist", "sources", "quality"],
         "properties": {
             "report_meta": {
                 "type": "object",
-                "additionalProperties": false,
                 "required": ["title", "time_window", "coverage", "audience", "lens", "generated_at"],
                 "properties": {
                     "title": { "type": "string" },
@@ -174,25 +172,84 @@ export async function generateTrendReport(
             },
             "executive_summary": {
                 "type": "object",
-                "additionalProperties": false,
                 "required": ["signal_summary", "what_changed", "so_what"],
                 "properties": {
-                    "signal_summary": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                    "what_changed": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                    "so_what": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } }
+                    "signal_summary": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    },
+                    "what_changed": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    },
+                    "so_what": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    }
                 }
             },
             "key_developments": {
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "additionalProperties": false,
                     "required": ["headline", "facts", "analysis", "why_it_matters", "evidence_level", "citations"],
                     "properties": {
                         "headline": { "type": "string" },
-                        "facts": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                        "analysis": { "type": "array", "items": { "$ref": "#/$defs/inference" } },
-                        "why_it_matters": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "facts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["text", "citations"],
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "citations": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        },
+                        "analysis": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["text", "basis", "citations"],
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "basis": { "type": "string" },
+                                    "citations": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        },
+                        "why_it_matters": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["text", "citations"],
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "citations": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        },
                         "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
                         "citations": { "type": "array", "items": { "type": "string" } },
                         "notes": { "type": "string" }
@@ -203,11 +260,20 @@ export async function generateTrendReport(
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "additionalProperties": false,
                     "required": ["theme", "drivers", "supporting_developments", "citations"],
                     "properties": {
                         "theme": { "type": "string" },
-                        "drivers": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "drivers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["text", "citations"],
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "citations": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        },
                         "supporting_developments": { "type": "array", "items": { "type": "string" } },
                         "citations": { "type": "array", "items": { "type": "string" } }
                     }
@@ -215,25 +281,73 @@ export async function generateTrendReport(
             },
             "implications": {
                 "type": "object",
-                "additionalProperties": false,
                 "required": ["market_business", "tech_product", "policy_regulation", "competitive_landscape"],
                 "properties": {
-                    "market_business": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                    "tech_product": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                    "policy_regulation": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
-                    "competitive_landscape": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } }
+                    "market_business": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    },
+                    "tech_product": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    },
+                    "policy_regulation": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    },
+                    "competitive_landscape": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "citations"],
+                            "properties": {
+                                "text": { "type": "string" },
+                                "citations": { "type": "array", "items": { "type": "string" } }
+                            }
+                        }
+                    }
                 }
             },
             "risks_and_uncertainties": {
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "additionalProperties": false,
                     "required": ["risk", "type", "impact_paths", "evidence_level", "citations"],
                     "properties": {
                         "risk": { "type": "string" },
                         "type": { "type": "string", "enum": ["market", "tech", "regulatory", "supply_chain", "geopolitics", "execution", "other"] },
-                        "impact_paths": { "type": "array", "items": { "$ref": "#/$defs/statement_with_citations" } },
+                        "impact_paths": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["text", "citations"],
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "citations": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        },
                         "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
                         "citations": { "type": "array", "items": { "type": "string" } },
                         "notes": { "type": "string" }
@@ -244,7 +358,6 @@ export async function generateTrendReport(
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "additionalProperties": false,
                     "required": ["signal", "why", "how_to_monitor"],
                     "properties": {
                         "signal": { "type": "string" },
@@ -257,7 +370,6 @@ export async function generateTrendReport(
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "additionalProperties": false,
                     "required": ["sid", "publisher", "date", "title", "url"],
                     "properties": {
                         "sid": { "type": "string" },
@@ -271,33 +383,11 @@ export async function generateTrendReport(
             },
             "quality": {
                 "type": "object",
-                "additionalProperties": false,
                 "required": ["coverage_gaps", "conflicts", "low_evidence_points"],
                 "properties": {
                     "coverage_gaps": { "type": "array", "items": { "type": "string" } },
                     "conflicts": { "type": "array", "items": { "type": "string" } },
                     "low_evidence_points": { "type": "array", "items": { "type": "string" } }
-                }
-            }
-        },
-        "$defs": {
-            "statement_with_citations": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["text", "citations"],
-                "properties": {
-                    "text": { "type": "string" },
-                    "citations": { "type": "array", "items": { "type": "string" } }
-                }
-            },
-            "inference": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["text", "basis", "citations"],
-                "properties": {
-                    "text": { "type": "string" },
-                    "basis": { "type": "string" },
-                    "citations": { "type": "array", "items": { "type": "string" } }
                 }
             }
         }

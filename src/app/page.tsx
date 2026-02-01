@@ -42,20 +42,30 @@ export default function HomePage() {
   };
 
   // 브리핑 생성
-  const generateBrief = async () => {
+  const generateBrief = async (force = false) => {
     try {
+      console.log(`[Client] 브리핑 생성 요청 (force: ${force})`);
       setGenerating(true);
       setError(null);
 
-      const res = await fetch('/api/generate', { method: 'POST' });
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force })
+      });
+
       const data = await res.json();
+      console.log('[Client] 브리핑 생성 응답:', data);
 
       if (data.success) {
         setBrief(data.data);
+        console.log('[Client] 브리핑 데이터 업데이트 완료');
       } else {
+        console.error('[Client] 브리핑 생성 실패:', data.error);
         setError(data.error || '브리핑 생성에 실패했습니다.');
       }
     } catch (err) {
+      console.error('[Client] 브리핑 생성 중 예외 발생:', err);
       setError('브리핑 생성 중 오류가 발생했습니다.');
     } finally {
       setGenerating(false);
@@ -126,8 +136,16 @@ export default function HomePage() {
               <div className="brief-title">
                 LLM이 찾아주는 데일리 AI 이슈 by Chuck Choi
               </div>
-              <div className="brief-meta">
-                총 {brief.totalIssues}개 이슈 | 생성: {new Date(brief.generatedAt).toLocaleString('ko-KR')}
+              <div className="brief-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>총 {brief.totalIssues}개 이슈 | 생성: {new Date(brief.generatedAt).toLocaleString('ko-KR')}</span>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                  onClick={() => generateBrief(true)}
+                  disabled={generating}
+                >
+                  {generating ? '재생성 중...' : '✨ 다시 생성'}
+                </button>
               </div>
             </div>
 
@@ -160,7 +178,7 @@ export default function HomePage() {
             </p>
             <button
               className="btn"
-              onClick={generateBrief}
+              onClick={() => generateBrief()}
               disabled={generating}
             >
               {generating ? (

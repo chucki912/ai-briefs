@@ -68,6 +68,18 @@ export async function DELETE(request: NextRequest) {
             );
         }
 
+        // 오늘 날짜 계산 (KST 기준)
+        const nowDate = new Date();
+        const todayStr = nowDate.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+
+        // 오늘 날짜가 아니면 삭제 거부
+        if (date !== todayStr) {
+            return NextResponse.json(
+                { success: false, error: '오늘 이전의 브리핑은 삭제할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
+
         const success = await deleteBrief(date);
 
         if (success) {

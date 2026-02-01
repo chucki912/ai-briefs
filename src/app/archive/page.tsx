@@ -158,17 +158,19 @@ export default function ArchivePage() {
                                 ← 목록으로 돌아가기
                             </button>
 
-                            <button
-                                className="btn"
-                                style={{ backgroundColor: '#ef4444', color: 'white' }}
-                                onClick={() => {
-                                    if (confirm('정말로 이 브리핑을 삭제하시겠습니까?')) {
-                                        handleDelete(selectedBrief.date);
-                                    }
-                                }}
-                            >
-                                🗑️ 삭제하기
-                            </button>
+                            {selectedBrief.date === new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0] && (
+                                <button
+                                    className="btn"
+                                    style={{ backgroundColor: '#ef4444', color: 'white' }}
+                                    onClick={() => {
+                                        if (confirm('정말로 이 브리핑을 삭제하시겠습니까?')) {
+                                            handleDelete(selectedBrief.date);
+                                        }
+                                    }}
+                                >
+                                    🗑️ 삭제하기
+                                </button>
+                            )}
                         </div>
 
                         {/* Brief Detail */}

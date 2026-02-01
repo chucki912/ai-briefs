@@ -5,24 +5,31 @@ import { buildReport, buildEmptyReport } from '@/lib/generators/report-builder';
 import { saveBrief, getBriefByDate } from '@/lib/store';
 
 // 브리핑 생성 API
-export async function POST() {
+export async function POST(request: Request) {
     try {
         console.log('[Generate] 브리핑 생성 시작...');
 
-        const now = new Date();
-        // Vercel Cron은 UTC 기준이므로, KST(UTC+9)로 변환하여 날짜 계산
-        const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-        const dateStr = kstDate.toISOString().split('T')[0];
+        const body = await request.json().catch(() => ({}));
+        const force = body.force === true;
 
-        // 이미 오늘 브리핑이 있는지 확인
-        const existingBrief = await getBriefByDate(dateStr);
-        if (existingBrief) {
-            console.log('[Generate] 오늘 브리핑이 이미 존재합니다.');
-            return NextResponse.json({
-                success: true,
-                data: existingBrief,
-                message: '이미 생성된 브리핑이 있습니다.'
-            });
+        const nowDate = new Date();
+        // Asia/Seoul 시간대로 YYYY-MM-DD 형식 추출
+        const dateStr = nowDate.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+        const kstDate = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+
+        // 이미 오늘 브리핑이 있는지 확인 (force가 아닐 때만)
+        if (!force) {
+            const existingBrief = await getBriefByDate(dateStr);
+            if (existingBrief) {
+                console.log('[Generate] 오늘 브리핑이 이미 존재합니다.');
+                return NextResponse.json({
+                    success: true,
+                    data: existingBrief,
+                    message: '이미 생성된 브리핑이 있습니다.'
+                });
+            }
+        } else {
+            console.log('[Generate] 강제 재생성 모드 활성화');
         }
 
         // 1. 뉴스 수집

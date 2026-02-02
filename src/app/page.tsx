@@ -122,52 +122,78 @@ export default function HomePage() {
       {/* Main Content */}
       <main>
         {loading ? (
-          <div className="loading">
-            <div className="spinner" />
-            <span>브리핑을 불러오는 중...</span>
+          <div className="loading-container">
+            <div className="premium-spinner" />
+            <span className="loading-text">인텔리전스 데이터를 구성 중입니다...</span>
           </div>
         ) : brief ? (
           <>
-            {/* Brief Header */}
-            <div className="brief-header">
-              <div className="brief-date">
-                {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일 ({brief.dayOfWeek})
-              </div>
-              <div className="brief-title">
-                LLM이 찾아주는 데일리 AI 이슈 by Chuck Choi
-              </div>
-              <div className="brief-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>총 {brief.totalIssues}개 이슈 | 생성: {new Date(brief.generatedAt).toLocaleString('ko-KR')}</span>
-                <button
-                  className="btn btn-secondary"
-                  style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-                  onClick={() => generateBrief(true)}
-                  disabled={generating}
-                >
-                  {generating ? '재생성 중...' : '✨ 다시 생성'}
-                </button>
+            {/* Brief Header - Hero Section */}
+            <div className="hero-section">
+              <div className="hero-content">
+                <div className="date-badge">
+                  <span className="calendar-icon">📅</span>
+                  {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
+                </div>
+                <h1 className="hero-title">
+                  AI Daily <span className="highlight">Intelligence</span>
+                </h1>
+                <p className="hero-subtitle">
+                  글로벌 AI 산업의 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
+                </p>
+                <div className="hero-meta">
+                  <div className="meta-item">
+                    <span className="meta-label">Total Signals</span>
+                    <span className="meta-value">{brief.totalIssues} Issues</span>
+                  </div>
+                  <div className="meta-divider" />
+                  <div className="meta-item">
+                    <span className="meta-label">Generated At</span>
+                    <span className="meta-value">{new Date(brief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} KST</span>
+                  </div>
+                  <div className="meta-filler" />
+                  <button
+                    className="regenerate-button"
+                    onClick={() => generateBrief(true)}
+                    disabled={generating}
+                  >
+                    {generating ? (
+                      <>
+                        <div className="mini-spinner" />
+                        분석 중...
+                      </>
+                    ) : (
+                      <>
+                        <span className="sparkle">✨</span>
+                        새로고침
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Issues */}
-            {brief.issues.length > 0 ? (
-              brief.issues.map((issue, index) => (
-                <IssueCard
-                  key={index}
-                  issue={issue}
-                  index={index}
-                  onDeepDive={handleDeepDive}
-                />
-              ))
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">📭</div>
-                <h2 className="empty-title">금일 수집된 주요 이슈가 없습니다</h2>
-                <p className="empty-description">
-                  내일 다시 확인해주세요.
-                </p>
-              </div>
-            )}
+            {/* Issues Grid */}
+            <div className="issues-container">
+              {brief.issues.length > 0 ? (
+                brief.issues.map((issue, index) => (
+                  <IssueCard
+                    key={index}
+                    issue={issue}
+                    index={index}
+                    onDeepDive={handleDeepDive}
+                  />
+                ))
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon">📭</div>
+                  <h2 className="empty-title">금일 수집된 주요 이슈가 없습니다</h2>
+                  <p className="empty-description">
+                    내일 다시 확인해주세요.
+                  </p>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <div className="empty-state">

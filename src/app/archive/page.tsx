@@ -126,11 +126,11 @@ export default function ArchivePage() {
             {/* Header */}
             <header className="header">
                 <Link href="/" className="logo">
-                    🤖 AI Daily Brief
+                    🤖 AI Intelligence
                 </Link>
                 <nav className="nav">
                     <Link href="/" className="nav-link">
-                        오늘의 브리핑
+                        Intelligence
                     </Link>
                     <ThemeToggle />
                 </nav>
@@ -138,85 +138,98 @@ export default function ArchivePage() {
 
             {/* Main Content */}
             <main>
-                <h1 style={{ marginBottom: '2rem', fontSize: '1.5rem' }}>
-                    📚 브리핑 아카이브
-                </h1>
+                <div className="archive-header animate-in">
+                    <h1 className="archive-title">
+                        Knowledge <span className="highlight">Archive</span>
+                    </h1>
+                    <p className="archive-subtitle">
+                        지난 인텔리전스 리포트를 확인하고 산업의 흐름을 추적하세요.
+                    </p>
+                </div>
 
                 {loading ? (
-                    <div className="loading">
-                        <div className="spinner" />
-                        <span>아카이브를 불러오는 중...</span>
+                    <div className="loading-container">
+                        <div className="premium-spinner" />
+                        <span className="loading-text">아카이브를 불러오는 중...</span>
                     </div>
                 ) : selectedBrief ? (
                     <>
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                        <div className="action-row animate-in">
                             <button
-                                className="btn btn-secondary"
+                                className="back-button"
                                 onClick={() => setSelectedBrief(null)}
                             >
-                                ← 목록으로 돌아가기
+                                <span className="icon">←</span> 전체 목록
                             </button>
 
-                            {selectedBrief.date === new Date(new Date().getTime() + (9 * 60 * 60 * 1000)).toISOString().split('T')[0] && (
+                            {selectedBrief.date === new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) && (
                                 <button
-                                    className="btn"
-                                    style={{ backgroundColor: '#ef4444', color: 'white' }}
+                                    className="delete-button"
                                     onClick={() => {
                                         if (confirm('정말로 이 브리핑을 삭제하시겠습니까?')) {
                                             handleDelete(selectedBrief.date);
                                         }
                                     }}
                                 >
-                                    🗑️ 삭제하기
+                                    🗑️ 삭제
                                 </button>
                             )}
                         </div>
 
-                        {/* Brief Detail */}
-                        <div className="brief-header">
-                            <div className="brief-date">
-                                {formatDate(selectedBrief.date)} ({selectedBrief.dayOfWeek})
-                            </div>
-                            <div className="brief-title">
-                                LLM이 찾아주는 데일리 AI 이슈 by Chuck Choi
-                            </div>
-                            <div className="brief-meta">
-                                총 {selectedBrief.totalIssues}개 이슈
+                        {/* Brief Detail - Reuse Hero Style if possible or consistent header */}
+                        <div className="hero-section detail-hero animate-in">
+                            <div className="hero-content">
+                                <div className="date-badge">
+                                    {formatDate(selectedBrief.date)} ({selectedBrief.dayOfWeek})
+                                </div>
+                                <h2 className="detail-title">Daily Intelligence Report</h2>
+                                <div className="hero-meta">
+                                    <div className="meta-item">
+                                        <span className="meta-label">Issues Analyzed</span>
+                                        <span className="meta-value">{selectedBrief.totalIssues} Signals</span>
+                                    </div>
+                                    <div className="meta-divider" />
+                                    <div className="meta-item">
+                                        <span className="meta-label">Historical Record</span>
+                                        <span className="meta-value">Archived</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {selectedBrief.issues.map((issue, index) => (
-                            <IssueCard
-                                key={index}
-                                issue={issue}
-                                index={index}
-                                onDeepDive={handleDeepDive}
-                            />
-                        ))}
+                        <div className="issues-container">
+                            {selectedBrief.issues.map((issue, index) => (
+                                <IssueCard
+                                    key={index}
+                                    issue={issue}
+                                    index={index}
+                                    onDeepDive={handleDeepDive}
+                                />
+                            ))}
+                        </div>
                     </>
                 ) : briefs.length > 0 ? (
-                    <ul className="archive-list">
+                    <div className="archive-grid animate-in">
                         {briefs.map((brief) => (
-                            <li key={brief.id}>
-                                <a
-                                    href="#"
-                                    className="archive-item"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        loadBriefDetail(brief.date);
-                                    }}
-                                >
-                                    <span className="archive-date">
-                                        {formatDate(brief.date)} ({brief.dayOfWeek})
-                                    </span>
-                                    <span className="archive-meta">
-                                        {brief.totalIssues}개 이슈
-                                    </span>
-                                </a>
-                            </li>
+                            <a
+                                key={brief.id}
+                                href="#"
+                                className="premium-archive-card"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    loadBriefDetail(brief.date);
+                                }}
+                            >
+                                <div className="archive-card-date">{formatDate(brief.date)}</div>
+                                <div className="archive-card-day">{brief.dayOfWeek}</div>
+                                <div className="archive-card-footer">
+                                    <span className="count">{brief.totalIssues} Signals</span>
+                                    <span className="arrow">→</span>
+                                </div>
+                            </a>
                         ))}
-                    </ul>
+                    </div>
                 ) : (
                     <div className="empty-state">
                         <div className="empty-icon">📂</div>
@@ -231,9 +244,11 @@ export default function ArchivePage() {
                 )}
 
                 {loadingDetail && (
-                    <div className="loading">
-                        <div className="spinner" />
-                        <span>브리핑을 불러오는 중...</span>
+                    <div className="modal-overlay">
+                        <div className="loading-container">
+                            <div className="premium-spinner" />
+                            <span className="loading-text">리포트를 구성 중입니다...</span>
+                        </div>
                     </div>
                 )}
             </main>
@@ -242,12 +257,141 @@ export default function ArchivePage() {
             <footer className="footer">
                 <p>© 2026 AI Daily Brief. 90일간 보관</p>
             </footer>
+
             <TrendReportModal
                 isOpen={isReportModalOpen}
                 onClose={() => setIsReportModalOpen(false)}
                 report={reportContent}
                 loading={reportLoading}
             />
+
+            <style jsx>{`
+                .archive-header {
+                    margin-bottom: 4rem;
+                    text-align: center;
+                }
+                .archive-title {
+                    font-size: 3rem;
+                    font-weight: 900;
+                    margin-bottom: 1rem;
+                    letter-spacing: -0.04em;
+                }
+                .archive-title .highlight {
+                    color: var(--accent-color);
+                }
+                .archive-subtitle {
+                    color: var(--text-secondary);
+                    font-size: 1.1rem;
+                }
+                .archive-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    gap: 1.5rem;
+                }
+                .premium-archive-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 20px;
+                    padding: 1.5rem;
+                    text-decoration: none;
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .premium-archive-card:hover {
+                    transform: translateY(-5px);
+                    border-color: var(--accent-color);
+                    box-shadow: var(--shadow-md);
+                }
+                .archive-card-date {
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: var(--text-primary);
+                }
+                .archive-card-day {
+                    font-size: 0.9rem;
+                    color: var(--text-muted);
+                    font-weight: 600;
+                    margin-bottom: 1rem;
+                }
+                .archive-card-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: auto;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border-color);
+                }
+                .archive-card-footer .count {
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    color: var(--accent-color);
+                }
+                .archive-card-footer .arrow {
+                    transition: transform 0.2s;
+                }
+                .premium-archive-card:hover .arrow {
+                    transform: translateX(4px);
+                }
+                .action-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 2rem;
+                }
+                .back-button, .delete-button {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-color);
+                    border-radius: 12px;
+                    padding: 8px 16px;
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                }
+                .back-button:hover {
+                    background: var(--bg-card);
+                    border-color: var(--accent-color);
+                }
+                .delete-button {
+                    color: var(--error-color);
+                }
+                .delete-button:hover {
+                    background: var(--error-color);
+                    color: white;
+                    border-color: var(--error-color);
+                }
+                .detail-hero {
+                    background: var(--bg-secondary);
+                    padding: 3rem 0;
+                    border-radius: 32px;
+                    border: 1px solid var(--border-color);
+                    margin-bottom: 3rem;
+                }
+                .detail-title {
+                    font-size: 2rem;
+                    font-weight: 900;
+                    margin-bottom: 2rem;
+                    letter-spacing: -0.02em;
+                }
+                .modal-overlay {
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
+                    display: flex; justify-content: center; align-items: center;
+                    z-index: 1000;
+                }
+                .animate-in {
+                    animation: fadeInUp 0.6s ease-out forwards;
+                }
+                @keyframes fadeInUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `}</style>
         </div>
     );
 }
+

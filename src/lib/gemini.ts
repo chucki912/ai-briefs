@@ -35,20 +35,25 @@ export async function analyzeNewsAndGenerateInsights(
 
 // 주제별 뉴스 클러스터링
 function clusterNewsByTopic(newsItems: NewsItem[]): NewsItem[][] {
-    // 간단한 클러스터링: 제목의 주요 단어로 그룹화
     const clusters = new Map<string, NewsItem[]>();
 
     for (const item of newsItems) {
-        // 주요 기업명/기술명으로 클러스터링
         const keyTerms = [
-            'OpenAI', 'Anthropic', 'Google', 'Meta', 'Microsoft', 'NVIDIA',
-            'GPT', 'Claude', 'Gemini', 'Llama', 'xAI',
-            'regulation', 'chip', 'GPU', 'safety'
+            // 초거대 모델/기업
+            'OpenAI', 'Anthropic', 'Google', 'Meta', 'Microsoft', 'NVIDIA', 'Apple AI', 'xAI', 'Mistral',
+            // 주요 모델/기술
+            'GPT', 'Claude', 'Gemini', 'Llama', 'Sora', 'Reasoning', 'o1', 'o3',
+            // 산업/응용
+            'Agent', 'Robot', 'Physical Intelligence', 'Quantum', 'Semiconductor', 'HBM',
+            // 규제/윤리
+            'Regulation', 'Safety', 'Copyright', 'Policy', 'Lawsuit'
         ];
 
-        let cluster = 'general';
+        let cluster = 'Global Trends';
+        const titleAndDesc = (item.title + ' ' + item.description).toLowerCase();
+
         for (const term of keyTerms) {
-            if (item.title.toLowerCase().includes(term.toLowerCase())) {
+            if (titleAndDesc.includes(term.toLowerCase())) {
                 cluster = term;
                 break;
             }
@@ -60,7 +65,7 @@ function clusterNewsByTopic(newsItems: NewsItem[]): NewsItem[][] {
         clusters.get(cluster)!.push(item);
     }
 
-    // 크기순 정렬하여 반환
+    // 크기순 및 중요 키워드 우선 정렬
     return Array.from(clusters.values())
         .sort((a, b) => b.length - a.length);
 }
@@ -161,7 +166,9 @@ export async function generateTrendReport(
 
 [출력 규칙]
 - 최종 출력은 정의된 JSON Schema를 만족하는 1개의 객체여야 한다.
-- 필드 내 텍스트는 마크다운 형식을 쓰지 말고 일반 텍스트로만 작성한다.`;
+- 필드 내 텍스트는 마크다운 형식을 쓰지 말고 일반 텍스트로만 작성한다.
+- **출처 URL 정확성**: \`sources\` 섹션의 \`url\` 필드는 반드시 제공된 [관련 출처] 또는 [자료 묶음]에 있는 URL을 **토씨 하나 틀리지 않고 그대로** 복사하여 사용한다. 절대 스스로 URL을 생성하거나 수정하지 않는다.
+- **SID 매칭**: 각 정보의 \`citations\` 배열에는 해당 정보의 근거가 되는 소스의 \`sid\`(예: "S1", "S2")를 넣는다. 이 \`sid\`는 \`sources\` 객체 배열에 정의된 것과 일치해야 한다. \`sources\` 객체의 \`url\`도 원본과 완벽히 일치해야 한다.`;
 
     const jsonSchema = {
         "type": "object",
@@ -403,7 +410,7 @@ export async function generateTrendReport(
     };
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-pro-preview',
         systemInstruction: systemPrompt,
         generationConfig: {
             responseMimeType: "application/json",
@@ -423,7 +430,8 @@ export async function generateTrendReport(
 - **헤드라인**: ${issue.headline}
 - **핵심 사실**: ${issue.keyFacts.join(', ')}
 - **초기 인사이트**: ${issue.insight}
-- **관련 출처**: ${issue.sources.join(', ')}
+- **관련 출처**: 
+${issue.sources.map((url, i) => `  [S${i + 1}] ${url}`).join('\n')}
 
 ## 자료 묶음 (Context)
 ${context || '(추가 본문 수집 실패, 위 핵심 사실을 바탕으로 내재된 지식을 활용하여 분석하세요)'}

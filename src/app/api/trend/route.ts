@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
             targetSources.map(async (url) => {
                 try {
                     const response = await fetch(url, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AIBriefBot/1.0)' },
-                        signal: AbortSignal.timeout(5000) // 5초 타임아웃
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+                        signal: AbortSignal.timeout(15000) // 15초 타임아웃으로 연장
                     });
 
                     if (!response.ok) return null;

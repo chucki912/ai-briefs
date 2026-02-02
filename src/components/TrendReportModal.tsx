@@ -13,6 +13,16 @@ interface TrendReportModalProps {
     onRetry?: () => void;
 }
 
+// URL을 축약된 형태로 변환하는 헬퍼 함수
+const formatUrl = (url: string) => {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname.replace(/^www\./, '');
+    } catch (e) {
+        return url;
+    }
+};
+
 // JSON Schema Types
 interface TrendReportData {
     report_meta: {
@@ -330,18 +340,24 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                             <section className="report-section">
                                 <h2 className="section-title">■ Sources</h2>
-                                <ul className="source-list">
+                                <div className="source-chips">
                                     {parsedReport.sources?.map((src, i) => {
                                         const { url, title } = getSourceInfo(src);
                                         return (
-                                            <li key={i}>
-                                                <a href={url} target="_blank" rel="noopener noreferrer">
-                                                    [{src.sid}] {title} ({src.publisher})
-                                                </a>
-                                            </li>
+                                            <a
+                                                key={i}
+                                                href={url}
+                                                className="source-chip"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title={`[${src.sid}] ${title} (${src.publisher})\n${url}`}
+                                            >
+                                                <span className="source-sid">{src.sid}</span>
+                                                <span className="source-host">{formatUrl(url)}</span>
+                                            </a>
                                         );
                                     })}
-                                </ul>
+                                </div>
                             </section>
 
                             <section className="report-section quality-section">
@@ -454,9 +470,41 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 .watch-signal { font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-color); }
                 .watch-why, .watch-how { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
                 
-                .source-list { list-style: none; padding: 0; font-size: 0.85rem; }
-                .source-list li { margin-bottom: 0.6rem; }
-                .source-list a { color: var(--accent-color); text-decoration: none; }
+                .source-chips {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+                .source-chip {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: var(--bg-body);
+                    border: 1px solid var(--border-color);
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    font-size: 0.8rem;
+                    color: var(--text-primary);
+                    transition: all 0.2s;
+                }
+                .source-chip:hover {
+                    background: var(--accent-light);
+                    border-color: var(--accent-color);
+                    transform: translateY(-1px);
+                }
+                .source-sid {
+                    background: var(--accent-color);
+                    color: white;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    padding: 1px 4px;
+                    border-radius: 3px;
+                }
+                .source-host {
+                    color: var(--accent-color);
+                    font-weight: 500;
+                }
                 
                 .quality-item { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; }
 

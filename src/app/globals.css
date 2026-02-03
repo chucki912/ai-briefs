@@ -221,7 +221,7 @@ body {
   align-items: center;
   gap: 8px;
   background: var(--text-primary);
-  color: white;
+  color: var(--bg-primary);
   border: none;
   padding: 10px 20px;
   border-radius: 14px;

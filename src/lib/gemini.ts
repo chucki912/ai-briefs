@@ -131,343 +131,103 @@ JSON만 출력하세요.`;
     }
 }
 
-// ... (testGeminiConnection)
-
-// 1단계: Deep Research (Flash 모델 사용 - 속도 최적화)
-export async function performDeepResearch(issue: IssueItem): Promise<any | null> {
-    const systemPrompt = `너는 최고의 AI 트렌드 리서처다.
-주어진 이슈에 대해 **Google Search**를 사용하여 심층 정보를 수집하고, 다음 단계의 "리포트 작성자"가 사용할 수 있는 **상세한 조사 노트(Research Context)**를 작성하라.
-
-[지침]
-- **모델**: 속도가 빠른 정보를 수집하는 것이 목표다.
-- **검색**: 핵심 키워드 위주로 실시간 검색을 수행하라. (최소 3개 이상의 신뢰할 수 있는 소스)
-- **출력**: 리포트 형식이 아니라, **팩트와 데이터 위주의 구조화된 데이터**여야 한다.
-
-[출력 형식 (JSON)]
-{
-  "summary": "핵심 내용 3줄 요약",
-  "key_facts": ["팩트 1", "팩트 2", ...],
-  "timeline": ["날짜 - 사건", ...],
-  "expert_opinions": ["전문가/기업 반응"],
-  "sources": [
-    { "title": "...", "url": "...", "date": "..." }
-  ]
-}`;
-
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash', // Fast model for research
-        systemInstruction: systemPrompt,
-        tools: [{ googleSearch: {} } as any],
-        generationConfig: {
-            responseMimeType: "application/json",
-        }
-    });
-
-    const userPrompt = `
-## 분석 대상
-- 헤드라인: ${issue.headline}
-- 키워드: ${issue.keyFacts.join(', ')}
-
-위 이슈에 대해 상세한 리서치를 수행하고 JSON으로 결과를 반환해.`;
-
+// API 연결 테스트
+export async function testGeminiConnection(): Promise<boolean> {
     try {
-        console.log('[Gemini] Deep Research (Flash) starting...');
-        const result = await model.generateContent(userPrompt);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent('Hello');
         const response = await result.response;
-        console.log('[Gemini] Deep Research completed.');
-
-        return JSON.parse(response.text());
+        return !!response.text();
     } catch (error) {
-        console.error('[Research Error]', error);
-        return null;
+        console.error('[Gemini Connection Test Failed]', error);
+        return false;
     }
 }
 
-// 2단계: 리포트 작성 (Pro 모델 사용 - 지능 최적화)
-export async function synthesizeReport(issue: IssueItem, researchResult: any): Promise<string | null> {
-    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 전문 트렌드센싱 리서치 전문가다.
-1단계에서 수집된 **Research Context**를 바탕으로, 최종적으로 배포될 고품질의 **인텔리전스 리포트**를 작성하라.
+
+// 트렌드 센싱 리포트 (Deep Dive) 생성 - Vercel Pro (300s) Optimized
+// Vercel Pro 업그레이드로 인해 Job Splitting이 불필요해져 Monolithic으로 원복.
+// 단, 400 Bad Request (Search + Schema) 해결을 위해 "Search Enable, Schema Disable" & Manual Parsing 적용.
+export async function generateTrendReport(
+    issue: IssueItem,
+    context: string // Not strictly used if Search is active
+): Promise<string | null> {
+    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 전문 트렌드센싱 리서치 전문가다. 
+모든 리포트는 **반드시 한국어**로 작성해야 하며, 정보 밀도가 매우 높고 전략적인 관점이 담긴 "인텔리전스 리포트" 스타일을 유지한다.
 
 [핵심 문체 지침]
-- **한국어 작성 필수**: 모든 내용은 한국어로 작성 (기술 용어 원어 병기).
-- **고밀도 압축**: 시장의 구조적 변화와 기술적 함의를 압축적으로 전달.
-- **전략적 통찰**: 단순 사실 나열이 아닌, 산업 생태계에 미치는 영향 분석.
-- **건조하고 권위 있는 어조**: "진입함", "보여줌" 등 명사형/건조한 어미 사용.
+- **한국어 작성 필수**: 모든 필드의 내용은 한국어로 작성한다. (기술 용어나 기업명은 원어 병기 가능)
+- **고밀도 압축(High Density)**: 단순 요약이 아닌, 시장의 구조적 변화와 기술적 함의를 한 문장에 압축하여 전달한다.
+- **전략적 통찰(Strategic Insight)**: 사실 전달을 넘어, 그것이 산업 생태계(ecosystem)나 경쟁 구도에 미치는 영향을 포함한다.
+- **건조하고 객관적인 보고서 톤**: 수식어를 배제하고 담백하면서도 권위 있는 어조를 유지한다. (예: "진입함", "측면이 강함", "전략을 취함" 등)
 
-[자료 활용]
-- 제공된 **Research Context**의 내용을 메인으로 활용하라.
-- 추가적인 일반 상식 수준의 추론은 가능하지만, **추가적인 Google Search는 수행하지 않는다** (시간 절약).
-- 출처(Sources)는 Research Context에 있는 것을 그대로 인용(Citations)하라.
+[Deep Research 지침]
+- **Google Search 활용**: 제공된 정보를 넘어, **Google Search 도구**를 적극적으로 사용하여 해당 이슈와 관련된 최신 뉴스, 기술 문서, 전문가 분석을 실시간으로 조사한다.
+- **다각적 검증**: 5개 이상의 신뢰할 수 있는 출처를 검색하여 교차 검증한다.
+- **최신성 확보**: 리포트 생성 시점(Generated At) 기준 가장 최신의 업데이트 내용을 반영한다.
 
 [출력 규칙]
-- 정의된 JSON Schema를 엄격히 따를 것.`;
-
-    const jsonSchema = {
-        "type": "object",
-        "required": ["report_meta", "executive_summary", "key_developments", "themes", "implications", "risks_and_uncertainties", "watchlist", "sources", "quality"],
-        "properties": {
-            "report_meta": {
-                "type": "object",
-                "required": ["title", "time_window", "coverage", "audience", "lens", "generated_at"],
-                "properties": {
-                    "title": { "type": "string" },
-                    "time_window": { "type": "string" },
-                    "coverage": { "type": "string" },
-                    "audience": { "type": "string" },
-                    "lens": { "type": "string" },
-                    "generated_at": { "type": "string" }
-                }
-            },
-            "executive_summary": {
-                "type": "object",
-                "required": ["signal_summary", "what_changed", "so_what"],
-                "properties": {
-                    "signal_summary": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    },
-                    "what_changed": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    },
-                    "so_what": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    }
-                }
-            },
-            "key_developments": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["headline", "facts", "analysis", "why_it_matters", "evidence_level", "citations"],
-                    "properties": {
-                        "headline": { "type": "string" },
-                        "facts": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["text", "citations"],
-                                "properties": {
-                                    "text": { "type": "string" },
-                                    "citations": { "type": "array", "items": { "type": "string" } }
-                                }
-                            }
-                        },
-                        "analysis": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["text", "basis", "citations"],
-                                "properties": {
-                                    "text": { "type": "string" },
-                                    "basis": { "type": "string" },
-                                    "citations": { "type": "array", "items": { "type": "string" } }
-                                }
-                            }
-                        },
-                        "why_it_matters": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["text", "citations"],
-                                "properties": {
-                                    "text": { "type": "string" },
-                                    "citations": { "type": "array", "items": { "type": "string" } }
-                                }
-                            }
-                        },
-                        "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
-                        "citations": { "type": "array", "items": { "type": "string" } },
-                        "notes": { "type": "string" }
-                    }
-                }
-            },
-            "themes": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["theme", "drivers", "supporting_developments", "citations"],
-                    "properties": {
-                        "theme": { "type": "string" },
-                        "drivers": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["text", "citations"],
-                                "properties": {
-                                    "text": { "type": "string" },
-                                    "citations": { "type": "array", "items": { "type": "string" } }
-                                }
-                            }
-                        },
-                        "supporting_developments": { "type": "array", "items": { "type": "string" } },
-                        "citations": { "type": "array", "items": { "type": "string" } }
-                    }
-                }
-            },
-            "implications": {
-                "type": "object",
-                "required": ["market_business", "tech_product", "policy_regulation", "competitive_landscape"],
-                "properties": {
-                    "market_business": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    },
-                    "tech_product": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    },
-                    "policy_regulation": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    },
-                    "competitive_landscape": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["text", "citations"],
-                            "properties": {
-                                "text": { "type": "string" },
-                                "citations": { "type": "array", "items": { "type": "string" } }
-                            }
-                        }
-                    }
-                }
-            },
-            "risks_and_uncertainties": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["risk", "type", "impact_paths", "evidence_level", "citations"],
-                    "properties": {
-                        "risk": { "type": "string" },
-                        "type": { "type": "string", "enum": ["market", "tech", "regulatory", "supply_chain", "geopolitics", "execution", "other"] },
-                        "impact_paths": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["text", "citations"],
-                                "properties": {
-                                    "text": { "type": "string" },
-                                    "citations": { "type": "array", "items": { "type": "string" } }
-                                }
-                            }
-                        },
-                        "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
-                        "citations": { "type": "array", "items": { "type": "string" } },
-                        "notes": { "type": "string" }
-                    }
-                }
-            },
-            "watchlist": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["signal", "why", "how_to_monitor"],
-                    "properties": {
-                        "signal": { "type": "string" },
-                        "why": { "type": "string" },
-                        "how_to_monitor": { "type": "string" }
-                    }
-                }
-            },
-            "sources": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["sid", "publisher", "date", "title", "url"],
-                    "properties": {
-                        "sid": { "type": "string" },
-                        "publisher": { "type": "string" },
-                        "date": { "type": "string" },
-                        "title": { "type": "string" },
-                        "url": { "type": "string" },
-                        "note": { "type": "string" }
-                    }
-                }
-            },
-            "quality": {
-                "type": "object",
-                "required": ["coverage_gaps", "conflicts", "low_evidence_points"],
-                "properties": {
-                    "coverage_gaps": { "type": "array", "items": { "type": "string" } },
-                    "conflicts": { "type": "array", "items": { "type": "string" } },
-                    "low_evidence_points": { "type": "array", "items": { "type": "string" } }
-                }
-            }
-        }
-    };
+- **순수 JSON 데이터만 반환**: Markdown 포맷(\`\`\`json)을 포함하여 출력하되, 내용은 정의된 JSON Schema를 따라야 한다.
+- **참고**: Google API 제한으로 인해 JSON 강제 모드(Schema)를 껐으므로, 반드시 형식을 지켜야 한다.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3-pro-preview', // Pro model for synthesis
+        model: 'gemini-3-pro-preview', // Pro Model (High Reasoning)
         systemInstruction: systemPrompt,
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: jsonSchema as any,
-        }
+        tools: [{ googleSearch: {} } as any], // Search ENABLED
+        // responseSchema: DISABLED to avoid 400 error with Search
     });
 
-    const userPrompt = `
-## 이슈 정보
-- 헤드라인: ${issue.headline}
+    const nowDate = new Date();
+    const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    const kstIsoStr = nowDate.toISOString();
 
-## Research Context (1단계 결과)
-${JSON.stringify(researchResult, null, 2)}
+    const userPrompt = `## 현재 날짜 및 시간 (KST)
+- **일시**: ${kstDateStr}
+- **ISO**: ${kstIsoStr}
 
-위 Context를 바탕으로 **최종 인텔리전스 리포트**를 작성해.`;
+## 분석 필요 이슈 (Deep Dive Request)
+- **헤드라인**: ${issue.headline}
+- **핵심 사실**: ${issue.keyFacts.join(', ')}
+- **초기 인사이트**: ${issue.insight}
+- **참고 키워드**: ${issue.framework}
+
+## 사용자 요청
+위 이슈에 대해 **Google Search를 사용하여 심층 조사(Deep Research)**를 수행하고, 확보된 최신 정보를 바탕으로 포괄적인 인텔리전스 리포트를 작성해줘.
+기존에 알고 있는 지식뿐만 아니라, **반드시 검색 결과**를 근거로 사용하여 분석의 깊이와 신뢰도를 확보해야 한다.
+
+## JSON Schema (이 형식을 준수할 것)
+{
+  "report_meta": { "title": "string", "time_window": "string", "coverage": "string", "audience": "string", "lens": "string", "generated_at": "string" },
+  "executive_summary": { "signal_summary": [{"text": "string", "citations": []}], "what_changed": [{"text": "string", "citations": []}], "so_what": [{"text": "string", "citations": []}] },
+  "key_developments": [{"headline": "string", "facts": [{"text": "string", "citations": []}], "analysis": [{"text": "string", "basis": "string", "citations": []}], "why_it_matters": [{"text": "string", "citations": []}], "evidence_level": "high/medium/low", "citations": []}],
+  "themes": [{"theme": "string", "drivers": [{"text": "string", "citations": []}], "supporting_developments": [], "citations": []}],
+  "implications": { "market_business": [{"text": "string", "citations": []}], "tech_product": [{"text": "string", "citations": []}], "policy_regulation": [{"text": "string", "citations": []}], "competitive_landscape": [{"text": "string", "citations": []}] },
+  "risks_and_uncertainties": [{"risk": "string", "type": "market/tech/etc", "impact_paths": [{"text": "string", "citations": []}], "evidence_level": "high/medium/low", "citations": []}],
+  "watchlist": [{"signal": "string", "why": "string", "how_to_monitor": "string"}],
+  "sources": [{"sid": "string", "publisher": "string", "date": "string", "title": "string", "url": "string"}],
+  "quality": { "coverage_gaps": [], "conflicts": [], "low_evidence_points": [] }
+}`;
 
     try {
-        console.log('[Gemini] Synthesis (Pro) starting...');
+        console.log('[Trend API] Gemini Deep Research 분석 시작 (Pro/Monolithic)...');
         const result = await model.generateContent(userPrompt);
         const response = await result.response;
-        console.log('[Gemini] Synthesis completed.');
+        const text = response.text();
 
-        return response.text();
+        console.log(`[Trend API] Gemini 분석 완료 (길이: ${text.length}자)`);
+
+        // Grounding Metadata 로깅
+        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+        if (groundingMetadata) {
+            console.log('[Trend API] Grounding Metadata found:', JSON.stringify(groundingMetadata, null, 2));
+        }
+
+        // Manual validation/extraction since schema is off
+        const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        return jsonMatch ? jsonMatch[0] : text;
+
     } catch (error) {
-        console.error('[Synthesis Error]', error);
+        console.error('[Trend Report Error]', error);
         return null;
     }
 }

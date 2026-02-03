@@ -117,8 +117,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         };
     }, []);
 
-    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 중입니다... (데이터 양에 따라 1-2분 소요)');
-    const [currentStep, setCurrentStep] = useState<'research' | 'synthesize'>('research');
+    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
 
     useEffect(() => {
         if (!loading && report && !issue) {
@@ -126,21 +125,19 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         } else if (isOpen && loading && issue) {
             const fetchTrendReport = async () => {
                 setIsPolling(true);
-                setCurrentStep('research');
-                setStatusMessage('1단계: 심층 리서치 진행 중... (자료 수집)');
-
+                setStatusMessage('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
                 try {
-                    // 1. Research 시작 요청
+                    // 1. 작업 시작 요청
                     const startRes = await fetch('/api/trend-report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ issue, step: 'research' })
+                        body: JSON.stringify({ issue })
                     });
 
-                    if (!startRes.ok) throw new Error('Failed to start research');
+                    if (!startRes.ok) throw new Error('Failed to start report generation');
                     const { data: { jobId } } = await startRes.json();
 
-                    // Polling Loop
+                    // 2. 작업 상태 폴링 (Polling)
                     pollIntervalRef.current = setInterval(async () => {
                         try {
                             const statusRes = await fetch(`/api/trend-report/status?jobId=${jobId}`);
@@ -148,62 +145,21 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                             const { data: statusData } = await statusRes.json();
 
-                            // 1단계 완료 -> 2단계 시작
-                            if (statusData.status === 'research_completed') {
-                                if (currentStep === 'research') {
-                                    clearInterval(pollIntervalRef.current!);
-                                    console.log('Research complete. Starting synthesis...');
-
-                                    setCurrentStep('synthesize');
-                                    setStatusMessage('2단계: 리포트 작성 중... (최종 분석)');
-
-                                    // 2단계 요청 (Synthesis)
-                                    const synthRes = await fetch('/api/trend-report', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ jobId, step: 'synthesize' })
-                                    });
-
-                                    if (!synthRes.ok) throw new Error('Failed to start synthesis');
-
-                                    // Polling 재개 (기존 인터벌 사용 또는 새 인터벌)
-                                    // 여기서는 간편하게 interval을 다시 설정
-                                    pollIntervalRef.current = setInterval(async () => {
-                                        try {
-                                            const sRes = await fetch(`/api/trend-report/status?jobId=${jobId}`);
-                                            if (!sRes.ok) return;
-                                            const { data: sData } = await sRes.json();
-
-                                            if (sData.status === 'completed') {
-                                                clearInterval(pollIntervalRef.current!);
-                                                processReport(sData.report);
-                                                setIsPolling(false);
-                                            } else if (sData.status === 'failed') {
-                                                throw new Error(sData.error);
-                                            }
-                                        } catch (e) {
-                                            console.error('Polling error (Synthesis)', e);
-                                        }
-                                    }, 2000);
-                                }
-                            } else if (statusData.status === 'failed') {
-                                throw new Error(statusData.error);
-                            } else if (statusData.status === 'completed') {
-                                // 혹시 이미 완료된 경우
-                                clearInterval(pollIntervalRef.current!);
+                            if (statusData.status === 'completed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 processReport(statusData.report);
                                 setIsPolling(false);
+                            } else if (statusData.status === 'failed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                setParseError(true);
+                                alert('리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
+                                setIsPolling(false);
+                                onClose();
                             }
-
                         } catch (e) {
                             console.error('Polling error', e);
-                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                            setParseError(true);
-                            alert('리포트 생성 중 오류 발생');
-                            setIsPolling(false);
-                            onClose();
                         }
-                    }, 2000);
+                    }, 2000); // 2초 간격 확인
 
                 } catch (e) {
                     console.error('Error starting trend report', e);
@@ -327,7 +283,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         <div className="loading-state">
                             <div className="spinner"></div>
                             <p>{statusMessage}</p>
-                            <span className="loading-tip">💡 Flash 모델로 자료를 수집하고 Pro 모델로 심층 분석합니다.</span>
+                            <span className="loading-tip">💡 다수의 관련 기사를 실시간으로 수집 및 분석하고 있습니다.</span>
                         </div>
                     ) : parsedReport ? (
                         <div className="report-content">

@@ -19,18 +19,16 @@ interface StorageAdapter {
 // 1. 파일 시스템 스토리지 (로컬 개발용)
 class FileSystemStorage implements StorageAdapter {
     private dataDir: string;
-    private kvStore = new Map<string, { value: any, expiry: number }>();
+    private kvDir: string;
 
     constructor() {
         this.dataDir = path.join(process.cwd(), 'data', 'briefs');
+        this.kvDir = path.join(process.cwd(), 'data', 'kv');
     }
 
     private async ensureDir() {
-        try {
-            await fs.access(this.dataDir);
-        } catch {
-            await fs.mkdir(this.dataDir, { recursive: true });
-        }
+        try { await fs.access(this.dataDir); } catch { await fs.mkdir(this.dataDir, { recursive: true }); }
+        try { await fs.access(this.kvDir); } catch { await fs.mkdir(this.kvDir, { recursive: true }); }
     }
 
     async saveBrief(report: BriefReport): Promise<void> {
@@ -97,18 +95,34 @@ class FileSystemStorage implements StorageAdapter {
     }
 
     async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
-        const expiry = ttlSeconds ? Date.now() + (ttlSeconds * 1000) : Infinity;
-        this.kvStore.set(key, { value, expiry });
+        await this.ensureDir();
+        const safeKey = key.replace(/:/g, '_');
+        const filePath = path.join(this.kvDir, `${safeKey}.json`);
+
+        const data = {
+            value,
+            expiry: ttlSeconds ? Date.now() + (ttlSeconds * 1000) : Infinity
+        };
+
+        await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
     }
 
     async kvGet<T>(key: string): Promise<T | null> {
-        const item = this.kvStore.get(key);
-        if (!item) return null;
-        if (Date.now() > item.expiry) {
-            this.kvStore.delete(key);
+        const safeKey = key.replace(/:/g, '_');
+        const filePath = path.join(this.kvDir, `${safeKey}.json`);
+
+        try {
+            const fileContent = await fs.readFile(filePath, 'utf-8');
+            const data = JSON.parse(fileContent);
+
+            if (Date.now() > data.expiry) {
+                await fs.unlink(filePath).catch(() => { });
+                return null;
+            }
+            return data.value as T;
+        } catch {
             return null;
         }
-        return item.value as T;
     }
 }
 

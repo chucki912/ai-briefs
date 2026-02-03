@@ -282,7 +282,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         <div className="loading-state">
                             <div className="spinner"></div>
                             <p>심층 분석 중입니다... (데이터 양에 따라 1-2분 소요)</p>
-                            <span className="loading-tip">💡 약 14만 자의 기사를 분석하고 있습니다.</span>
+                            <span className="loading-tip">💡 다수의 관련 기사를 실시간으로 수집 및 분석하고 있습니다.</span>
                         </div>
                     ) : parsedReport ? (
                         <div className="report-content">

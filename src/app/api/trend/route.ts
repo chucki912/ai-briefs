@@ -3,32 +3,30 @@ import { IssueItem } from '@/types';
 import { generateTrendReport } from '@/lib/gemini';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
+import { kv } from '@vercel/kv';
+import { waitUntil } from '@vercel/functions';
 
-export const maxDuration = 60; // Vercel Function Timeout (Seconds)
+export const maxDuration = 60; // 60초 (Hobby Plan 한계)
 
-export async function POST(request: NextRequest) {
+// 비동기 작업 처리 함수
+async function processTrendReport(jobId: string, issue: IssueItem) {
     try {
-        const body = await request.json();
-        const { issue } = body as { issue: IssueItem };
+        console.log(`[Job:${jobId}] 백그라운드 작업 시작: ${issue.headline}`);
 
-        if (!issue) {
-            return NextResponse.json(
-                { success: false, error: '이슈 정보가 제공되지 않았습니다.' },
-                { status: 400 }
-            );
-        }
+        // 1. 소스 URL 스크래핑 (최대한 많이, 꼼꼼하게)
+        // 사용자의 요청대로 소스 제한 없이, 충분한 타임아웃으로 수행
+        const targetSources = issue.sources;
+        console.log(`[Job:${jobId}] 총 ${targetSources.length}개 소스 스크래핑 시작`);
 
-        console.log(`[Trend API] 리포트 생성 요청: ${issue.headline}`);
-
-        // 1. 소스 URL에서 본문 스크래핑 (병렬 처리)
-        // 상위 3개 소스만 분석 (속도 및 토큰 제한 고려)
-        const targetSources = issue.sources.slice(0, 3);
         const articles = await Promise.all(
             targetSources.map(async (url) => {
                 try {
                     const response = await fetch(url, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-                        signal: AbortSignal.timeout(15000) // 15초 타임아웃으로 연장
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        },
+                        // 충분한 대기 시간 설정 (품질 우선)
+                        signal: AbortSignal.timeout(20000)
                     });
 
                     if (!response.ok) return null;
@@ -38,13 +36,15 @@ export async function POST(request: NextRequest) {
                     const reader = new Readability(window.document);
                     const article = reader.parse();
 
-                    return article ? `
+                    if (!article?.textContent || article.textContent.length < 200) return null;
+
+                    return `
 ---
 Title: ${article.title || 'Unknown Title'}
 Source: ${url}
 Content: ${article.textContent}
 ---
-` : null;
+`;
                 } catch (error) {
                     console.error(`[Scrape Error] ${url}:`, error);
                     return null;
@@ -52,32 +52,55 @@ Content: ${article.textContent}
             })
         );
 
-        // 유효한 기사 본문 합치기
-        const context = articles.filter(Boolean).join('\n');
+        const validArticles = articles.filter(Boolean);
+        const context = validArticles.join('\n');
 
-        if (!context) {
-            console.warn('[Trend API] 스크래핑 실패, 기본 정보로만 분석합니다.');
-        } else {
-            console.log(`[Trend API] 스크래핑 완료: ${context.length}자 확보`);
-        }
+        console.log(`[Job:${jobId}] 스크래핑 완료: 유효 기사 ${validArticles.length}개, 총 ${context.length}자`);
 
-        // 2. Gemini를 사용하여 리포트 생성
+        // 2. Gemini 심층 분석 (Gemini 3 Pro)
         const report = await generateTrendReport(issue, context);
 
-        if (!report) {
-            return NextResponse.json(
-                { success: false, error: '리포트 생성에 실패했습니다 (AI 응답 오류).' },
-                { status: 500 }
-            );
+        if (report) {
+            // 성공 시 결과 저장 (1시간 유지)
+            await kv.set(`trend_job:${jobId}`, { status: 'completed', report }, { ex: 3600 });
+            console.log(`[Job:${jobId}] 작업 성공 및 저장 완료`);
+        } else {
+            throw new Error('리포트 생성 실패 (Empty Output)');
         }
 
-        return NextResponse.json({ success: true, data: { report } });
+    } catch (error) {
+        console.error(`[Job:${jobId}] 작업 실패:`, error);
+        await kv.set(`trend_job:${jobId}`, { status: 'failed', error: '리포트 생성 중 오류가 발생했습니다.' }, { ex: 3600 });
+    }
+}
+
+export async function POST(request: NextRequest) {
+    try {
+        const body = await request.json();
+        const { issue } = body as { issue: IssueItem };
+
+        if (!issue) {
+            return NextResponse.json({ success: false, error: 'Issue data required' }, { status: 400 });
+        }
+
+        // 고유 Job ID 생성
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // 초기 상태 저장
+        await kv.set(`trend_job:${jobId}`, { status: 'processing' }, { ex: 3600 });
+
+        // 백그라운드 작업 시작 (Vercel waitUntil 활용)
+        // waitUntil을 사용하면 응답을 보낸 후에도 함수가 계속 실행됨
+        waitUntil(processTrendReport(jobId, issue));
+
+        // 즉시 응답 반환
+        return NextResponse.json({
+            success: true,
+            data: { jobId, status: 'processing', message: '리포트 생성이 시작되었습니다.' }
+        });
 
     } catch (error) {
-        console.error('[Trend API Error]', error);
-        return NextResponse.json(
-            { success: false, error: '서버 내부 오류가 발생했습니다.' },
-            { status: 500 }
-        );
+        console.error('[API Error]', error);
+        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }

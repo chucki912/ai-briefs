@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { IssueItem } from '@/types';
 
@@ -105,35 +105,85 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const [parseError, setParseError] = useState(false);
     const [showCopyToast, setShowCopyToast] = useState(false);
 
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
     useEffect(() => {
-        if (!loading && report) {
-            try {
-                let cleanJson = report.trim();
-                // Remove Markdown code blocks
-                cleanJson = cleanJson.replace(/```json\n?|```/g, '').trim();
-
-                // Extract only the JSON part
-                const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON object found');
-                let jsonString = jsonMatch[0];
-
-                // Attempt to clean common JSON issues without breaking valid strings
-                // 1. Remove trailing commas
-                jsonString = jsonString.replace(/,\s*([\}\]])/g, '$1');
-
-                const data = JSON.parse(jsonString);
-                setParsedReport(data);
-                setParseError(false);
-            } catch (e) {
-                console.warn('Failed to parse report as JSON:', e);
-                setParsedReport(null);
-                setParseError(true);
+        // 클린업 함수 정의
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
             }
-        } else {
-            setParsedReport(null);
-            setParseError(false);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!loading && report && !issue) {
+            // 이미 로드된 리포트 (Archive 페이지 등에서 전달된 경우)
+            processReport(report);
+        } else if (isOpen && loading && issue) {
+            // 새로운 리포트 생성 요청 (Polling 시작)
+            const fetchTrendReport = async () => {
+                try {
+                    // 1. 작업 시작 요청
+                    const startRes = await fetch('/api/trend', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ issue })
+                    });
+
+                    if (!startRes.ok) throw new Error('Failed to start report generation');
+                    const { data: { jobId } } = await startRes.json();
+
+                    // 2. 작업 상태 폴링 (Polling)
+                    pollIntervalRef.current = setInterval(async () => {
+                        try {
+                            const statusRes = await fetch(`/api/trend/status?jobId=${jobId}`);
+                            if (!statusRes.ok) return;
+
+                            const { data: statusData } = await statusRes.json();
+
+                            if (statusData.status === 'completed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                processReport(statusData.report);
+                            } else if (statusData.status === 'failed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                setParseError(true);
+                                alert('리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
+                                onClose();
+                            }
+                        } catch (e) {
+                            console.error('Polling error', e);
+                        }
+                    }, 2000); // 2초 간격 확인
+
+                } catch (e) {
+                    console.error('Error starting trend report', e);
+                    setParseError(true);
+                    onClose();
+                }
+            };
+
+            fetchTrendReport();
         }
-    }, [report, loading]);
+    }, [isOpen, loading, issue, report]);
+
+    // 리포트 파싱 헬퍼
+    const processReport = (jsonStr: string) => {
+        try {
+            let cleanJson = jsonStr.trim();
+            cleanJson = cleanJson.replace(/```json\n?|```/g, '').trim();
+            const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON object found');
+            let finalJson = jsonMatch[0].replace(/,\s*([\}\]])/g, '$1');
+
+            setParsedReport(JSON.parse(finalJson));
+            setParseError(false);
+        } catch (e) {
+            console.warn('Failed to parse report:', e);
+            setParsedReport(null);
+            setParseError(true);
+        }
+    };
 
     const getSourceInfo = (src: any) => {
         let url = src.url || '#';

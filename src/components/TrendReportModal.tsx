@@ -106,6 +106,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const [showCopyToast, setShowCopyToast] = useState(false);
 
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [isPolling, setIsPolling] = useState(false);
 
     useEffect(() => {
         // 클린업 함수 정의
@@ -123,6 +124,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         } else if (isOpen && loading && issue) {
             // 새로운 리포트 생성 요청 (Polling 시작)
             const fetchTrendReport = async () => {
+                setIsPolling(true); // 폴링 시작 시 로딩 상태 강제
                 try {
                     // 1. 작업 시작 요청
                     const startRes = await fetch('/api/trend', {
@@ -145,10 +147,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             if (statusData.status === 'completed') {
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 processReport(statusData.report);
+                                setIsPolling(false); // 완료 시 폴링 해제
                             } else if (statusData.status === 'failed') {
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 setParseError(true);
                                 alert('리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
+                                setIsPolling(false);
                                 onClose();
                             }
                         } catch (e) {
@@ -159,6 +163,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 } catch (e) {
                     console.error('Error starting trend report', e);
                     setParseError(true);
+                    setIsPolling(false);
                     onClose();
                 }
             };
@@ -273,11 +278,11 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 </div>
 
                 <div className="modal-body">
-                    {loading ? (
+                    {loading || isPolling ? (
                         <div className="loading-state">
                             <div className="spinner"></div>
-                            <p>심층 분석 중입니다... (약 30-60초 소요)</p>
-                            <span className="loading-tip">💡 실제 기사 본문을 분석하고 있습니다.</span>
+                            <p>심층 분석 중입니다... (데이터 양에 따라 1-2분 소요)</p>
+                            <span className="loading-tip">💡 약 14만 자의 기사를 분석하고 있습니다.</span>
                         </div>
                     ) : parsedReport ? (
                         <div className="report-content">

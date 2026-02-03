@@ -38,13 +38,13 @@ async function processTrendReport(jobId: string, issue: IssueItem) {
 
                     if (!article?.textContent || article.textContent.length < 200) return null;
 
+                    // 텍스트 최적화: 불필요한 공백 제거 및 길이 제한 (최대 3만 자)
+                    const cleanContent = article.textContent
+                        .replace(/\n\s*\n/g, '\n') // 연속된 줄바꿈 제거
+                        .slice(0, 30000); // 기사당 최대 30,000자로 제한 (약 10,000 토큰)
+
                     return `
----
-Title: ${article.title || 'Unknown Title'}
-Source: ${url}
-Content: ${article.textContent}
----
-`;
+---\nTitle: ${article.title || 'Unknown Title'}\nSource: ${url}\nContent: ${cleanContent}\n---\n`;
                 } catch (error) {
                     console.error(`[Scrape Error] ${url}:`, error);
                     return null;
@@ -53,9 +53,10 @@ Content: ${article.textContent}
         );
 
         const validArticles = articles.filter(Boolean);
-        const context = validArticles.join('\n');
+        // 전체 컨텍스트 길이도 안전장치로 제한 (약 15만 자)
+        const context = validArticles.join('\n').slice(0, 150000);
 
-        console.log(`[Job:${jobId}] 스크래핑 완료: 유효 기사 ${validArticles.length}개, 총 ${context.length}자`);
+        console.log(`[Job:${jobId}] 스크래핑 완료: 유효 기사 ${validArticles.length}개, 총 길이 ${context.length}자 (제한적용)`);
 
         // 2. Gemini 심층 분석 (Gemini 3 Pro)
         const report = await generateTrendReport(issue, context);

@@ -133,35 +133,74 @@ JSON만 출력하세요.`;
 
 // ... (testGeminiConnection)
 
-// 트렌드 센싱 리포트 (Deep Dive) 생성
-export async function generateTrendReport(
-    issue: IssueItem,
-    context: string // Now used for extra context if any, but primary source is Google Search
-): Promise<string | null> {
-    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 전문 트렌드센싱 리서치 전문가다. 
-모든 리포트는 **반드시 한국어**로 작성해야 하며, 정보 밀도가 매우 높고 전략적인 관점이 담긴 "인텔리전스 리포트" 스타일을 유지한다.
+// 1단계: Deep Research (Flash 모델 사용 - 속도 최적화)
+export async function performDeepResearch(issue: IssueItem): Promise<any | null> {
+    const systemPrompt = `너는 최고의 AI 트렌드 리서처다.
+주어진 이슈에 대해 **Google Search**를 사용하여 심층 정보를 수집하고, 다음 단계의 "리포트 작성자"가 사용할 수 있는 **상세한 조사 노트(Research Context)**를 작성하라.
+
+[지침]
+- **모델**: 속도가 빠른 정보를 수집하는 것이 목표다.
+- **검색**: 핵심 키워드 위주로 실시간 검색을 수행하라. (최소 3개 이상의 신뢰할 수 있는 소스)
+- **출력**: 리포트 형식이 아니라, **팩트와 데이터 위주의 구조화된 데이터**여야 한다.
+
+[출력 형식 (JSON)]
+{
+  "summary": "핵심 내용 3줄 요약",
+  "key_facts": ["팩트 1", "팩트 2", ...],
+  "timeline": ["날짜 - 사건", ...],
+  "expert_opinions": ["전문가/기업 반응"],
+  "sources": [
+    { "title": "...", "url": "...", "date": "..." }
+  ]
+}`;
+
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash', // Fast model for research
+        systemInstruction: systemPrompt,
+        tools: [{ googleSearch: {} } as any],
+        generationConfig: {
+            responseMimeType: "application/json",
+        }
+    });
+
+    const userPrompt = `
+## 분석 대상
+- 헤드라인: ${issue.headline}
+- 키워드: ${issue.keyFacts.join(', ')}
+
+위 이슈에 대해 상세한 리서치를 수행하고 JSON으로 결과를 반환해.`;
+
+    try {
+        console.log('[Gemini] Deep Research (Flash) starting...');
+        const result = await model.generateContent(userPrompt);
+        const response = await result.response;
+        console.log('[Gemini] Deep Research completed.');
+
+        return JSON.parse(response.text());
+    } catch (error) {
+        console.error('[Research Error]', error);
+        return null;
+    }
+}
+
+// 2단계: 리포트 작성 (Pro 모델 사용 - 지능 최적화)
+export async function synthesizeReport(issue: IssueItem, researchResult: any): Promise<string | null> {
+    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 전문 트렌드센싱 리서치 전문가다.
+1단계에서 수집된 **Research Context**를 바탕으로, 최종적으로 배포될 고품질의 **인텔리전스 리포트**를 작성하라.
 
 [핵심 문체 지침]
-- **한국어 작성 필수**: 모든 필드의 내용은 한국어로 작성한다. (기술 용어나 기업명은 원어 병기 가능)
-- **고밀도 압축(High Density)**: 단순 요약이 아닌, 시장의 구조적 변화와 기술적 함의를 한 문장에 압축하여 전달한다.
-- **전략적 통찰(Strategic Insight)**: "A가 B를 발표했다"는 사실 전달을 넘어, 그것이 산업 생태계(ecosystem)나 경쟁 구도에 미치는 영향을 포함한다.
-- **전문 용어 활용**: Cross-Embodiment, Scaling Law, VLA, Physical Intelligence 등 최신 산업/기술 용어를 적극 활용하여 전문성을 높인다.
-- **주체 선명성**: 주요 기업명, 인물, 기술 모델명을 명확히 명시한다. (예: Physical Intelligence(π²), π0 모델 등)
-- **건조하고 객관적인 보고서 톤**: 수식어를 배제하고 담백하면서도 권위 있는 어조를 유지한다. (예: "진입함", "측면이 강함", "전략을 취함" 등)
+- **한국어 작성 필수**: 모든 내용은 한국어로 작성 (기술 용어 원어 병기).
+- **고밀도 압축**: 시장의 구조적 변화와 기술적 함의를 압축적으로 전달.
+- **전략적 통찰**: 단순 사실 나열이 아닌, 산업 생태계에 미치는 영향 분석.
+- **건조하고 권위 있는 어조**: "진입함", "보여줌" 등 명사형/건조한 어미 사용.
 
-[Deep Research 지침]
-- **Google Search 활용**: 제공된 정보를 넘어, **Google Search 도구**를 사용하여 핵심 정보 위주로 신속하게 조사한다.
-- **다각적 검증**: 3개 내외의 신뢰할 수 있는 출처를 검색하여 교차 검증한다. (Vercel Timeout 방지를 위해 과도한 검색 지양)
-- **최신성 확보**: 리포트 생성 시점(Generated At) 기준 가장 최신의 업데이트 내용을 반영한다.
-
-[메타데이터 가이드]
-- **time_window**: 분석 대상 기사들이 다루는 시점을 명시한다. (예: "2026년 2월") 반드시 사용자 프롬프트에서 제공된 현재 날짜 정보를 참고하여 정확하게 작성한다.
-- **generated_at**: 리포트가 생성된 정확한 시간을 ISO 8601 형식으로 작성한다.
+[자료 활용]
+- 제공된 **Research Context**의 내용을 메인으로 활용하라.
+- 추가적인 일반 상식 수준의 추론은 가능하지만, **추가적인 Google Search는 수행하지 않는다** (시간 절약).
+- 출처(Sources)는 Research Context에 있는 것을 그대로 인용(Citations)하라.
 
 [출력 규칙]
-- 최종 출력은 정의된 JSON Schema를 만족하는 1개의 객체여야 한다.
-- 필드 내 텍스트는 마크다운 형식을 쓰지 말고 일반 텍스트로만 작성한다.
-- **출처(Sources)**: Google Search를 통해 발견한 실제 출처를 \`sources\` 배열에 포함하고, 본문에서 \`citations\`로 참조한다.`;
+- 정의된 JSON Schema를 엄격히 따를 것.`;
 
     const jsonSchema = {
         "type": "object",
@@ -403,51 +442,32 @@ export async function generateTrendReport(
     };
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-pro-preview', // Pro model for synthesis
         systemInstruction: systemPrompt,
-        tools: [{ googleSearch: {} } as any], // Enable Google Search Grounding (cast to any for TS)
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: jsonSchema as any,
         }
     });
 
-    const nowDate = new Date();
-    const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-    const kstIsoStr = nowDate.toISOString();
+    const userPrompt = `
+## 이슈 정보
+- 헤드라인: ${issue.headline}
 
-    const userPrompt = `## 현재 날짜 및 시간 (KST)
-- **일시**: ${kstDateStr}
-- **ISO**: ${kstIsoStr}
+## Research Context (1단계 결과)
+${JSON.stringify(researchResult, null, 2)}
 
-## 분석 필요 이슈 (Deep Dive Request)
-- **헤드라인**: ${issue.headline}
-- **핵심 사실**: ${issue.keyFacts.join(', ')}
-- **초기 인사이트**: ${issue.insight}
-- **참고 키워드**: ${issue.framework}
-
-## 사용자 요청
-위 이슈에 대해 **Google Search를 사용하여 심층 조사(Deep Research)**를 수행하고, 확보된 최신 정보를 바탕으로 포괄적이지만 간결한 인텔리전스 리포트를 작성해줘.
-(Vercel 함수 제한 시간을 고려하여, 불필요한 서술을 줄이고 핵심 위주로 빠르게 작성할 것)
-기존에 알고 있는 지식뿐만 아니라, **반드시 검색 결과**를 근거로 사용하여 분석의 깊이와 신뢰도를 확보해야 한다.`;
+위 Context를 바탕으로 **최종 인텔리전스 리포트**를 작성해.`;
 
     try {
-        console.log('[Trend API] Gemini Deep Research 분석 시작...');
+        console.log('[Gemini] Synthesis (Pro) starting...');
         const result = await model.generateContent(userPrompt);
         const response = await result.response;
-        const text = response.text();
+        console.log('[Gemini] Synthesis completed.');
 
-        console.log(`[Trend API] Gemini 분석 완료 (길이: ${text.length}자)`);
-
-        // Grounding Metadata 로깅 (검색이 실제로 수행되었는지 확인)
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        if (groundingMetadata) {
-            console.log('[Trend API] Grounding Metadata found:', JSON.stringify(groundingMetadata, null, 2));
-        }
-
-        return text;
+        return response.text();
     } catch (error) {
-        console.error('[Trend Report Error]', error);
+        console.error('[Synthesis Error]', error);
         return null;
     }
 }

@@ -1,58 +1,87 @@
 import { NextResponse } from 'next/server';
-import { generateTrendReport } from '@/lib/gemini';
-import { kvSet } from '@/lib/store';
+import { performDeepResearch, synthesizeReport } from '@/lib/gemini';
+import { kvSet, kvGet } from '@/lib/store';
 import { IssueItem } from '@/types';
 import { waitUntil } from '@vercel/functions';
 
-// Vercel Pro limit (300s), but explicitly setting to avoid timeouts on shorter plans
-export const maxDuration = 60; // 60 seconds should be enough for Gemini Deep Research
+export const maxDuration = 60; // Each step must finish within 60s
 
-// 1. 작업 시작 (POST)
 export async function POST(req: Request) {
     try {
-        const { issue } = await req.json() as { issue: IssueItem };
+        const body = await req.json();
+        const { issue, jobId, step = 'research' } = body as { issue: IssueItem; jobId?: string; step: 'research' | 'synthesize' };
 
-        if (!issue) {
-            return NextResponse.json({ error: 'Issue data is required' }, { status: 400 });
+        // 1단계: Research (Flash Model)
+        if (step === 'research') {
+            if (!issue) return NextResponse.json({ error: 'Issue is required for research' }, { status: 400 });
+
+            const newJobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Set initial status
+            await kvSet(`trend_job:${newJobId}`, { status: 'researching', progress: 10 }, 3600);
+
+            // Run Research in background
+            waitUntil((async () => {
+                try {
+                    const researchResult = await performDeepResearch(issue);
+                    if (researchResult) {
+                        await kvSet(`trend_job:${newJobId}`, {
+                            status: 'research_completed',
+                            progress: 50,
+                            researchResult,
+                            issue // Save issue for next step context if needed
+                        }, 3600);
+                    } else {
+                        throw new Error('Research returned null');
+                    }
+                } catch (error: any) {
+                    console.error(`[Job ${newJobId}] Research Failed:`, error);
+                    await kvSet(`trend_job:${newJobId}`, { status: 'failed', error: error.message }, 3600);
+                }
+            })());
+
+            return NextResponse.json({ success: true, data: { jobId: newJobId, message: 'Research started' } });
         }
 
-        const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // 2단계: Synthesis (Pro Model)
+        if (step === 'synthesize') {
+            if (!jobId) return NextResponse.json({ error: 'Job ID is required for synthesis' }, { status: 400 });
 
-        // 초기 상태 저장
-        await kvSet(`trend_job:${jobId}`, { status: 'processing', progress: 10 }, 3600);
-
-        // 비동기 작업 시작 (waitUntil 사용)
-        waitUntil((async () => {
-            try {
-                // deep research via Gemini Grounding (No manual scraping needed)
-                const report = await generateTrendReport(issue, '');
-
-                if (report) {
-                    await kvSet(`trend_job:${jobId}`, {
-                        status: 'completed',
-                        progress: 100,
-                        report
-                    }, 3600);
-                } else {
-                    throw new Error('Report generation returned null');
-                }
-
-            } catch (error: any) {
-                console.error(`[Job ${jobId}] Failed:`, error);
-                await kvSet(`trend_job:${jobId}`, {
-                    status: 'failed',
-                    error: error.message
-                }, 3600);
+            // Ensure we have research result
+            const jobData: any = await kvGet(`trend_job:${jobId}`);
+            if (!jobData || !jobData.researchResult) {
+                return NextResponse.json({ error: 'Research result not found or expired' }, { status: 404 });
             }
-        })());
 
-        return NextResponse.json({
-            success: true,
-            data: { jobId, message: 'Deep Research started available in background' }
-        });
+            // Update status
+            await kvSet(`trend_job:${jobId}`, { ...jobData, status: 'synthesizing', progress: 60 }, 3600);
+
+            // Run Synthesis in background
+            waitUntil((async () => {
+                try {
+                    const report = await synthesizeReport(jobData.issue || issue, jobData.researchResult);
+                    if (report) {
+                        await kvSet(`trend_job:${jobId}`, {
+                            status: 'completed', // Final completion
+                            progress: 100,
+                            report
+                        }, 3600);
+                    } else {
+                        throw new Error('Synthesis returned null');
+                    }
+                } catch (error: any) {
+                    console.error(`[Job ${jobId}] Synthesis Failed:`, error);
+                    await kvSet(`trend_job:${jobId}`, { status: 'failed', error: error.message }, 3600);
+                }
+            })());
+
+            return NextResponse.json({ success: true, data: { jobId, message: 'Synthesis started' } });
+        }
+
+        return NextResponse.json({ error: 'Invalid step' }, { status: 400 });
 
     } catch (error) {
-        console.error('Error starting trend report:', error);
+        console.error('Error in trend report API:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

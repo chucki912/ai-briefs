@@ -179,23 +179,34 @@ export default function ArchivePage() {
                             )}
                         </div>
 
-                        {/* Brief Detail - Reuse Hero Style if possible or consistent header */}
-                        <div className="hero-section detail-hero animate-in">
+                        {/* Brief Detail - Styled to match Home Page */}
+                        <div className="hero-section animate-in">
                             <div className="hero-content">
                                 <div className="date-badge">
-                                    {formatDate(selectedBrief.date)} ({selectedBrief.dayOfWeek})
+                                    <span className="calendar-icon">📅</span>
+                                    {selectedBrief.date.split('-')[0]}년 {selectedBrief.date.split('-')[1]}월 {selectedBrief.date.split('-')[2]}일
                                 </div>
-                                <h2 className="detail-title">Daily Intelligence Report</h2>
+                                <h1 className="hero-title">
+                                    AI Daily <span className="highlight">Intelligence</span>
+                                </h1>
+                                <p className="hero-subtitle">
+                                    글로벌 AI 산업의 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
+                                </p>
                                 <div className="hero-meta">
                                     <div className="meta-item">
-                                        <span className="meta-label">Issues Analyzed</span>
-                                        <span className="meta-value">{selectedBrief.totalIssues} Signals</span>
+                                        <span className="meta-label">Total Signals</span>
+                                        <span className="meta-value">{selectedBrief.totalIssues} Issues</span>
                                     </div>
                                     <div className="meta-divider" />
                                     <div className="meta-item">
-                                        <span className="meta-label">Historical Record</span>
-                                        <span className="meta-value">Archived</span>
+                                        <span className="meta-label">Generated At</span>
+                                        <span className="meta-value">
+                                            {selectedBrief.generatedAt
+                                                ? new Date(selectedBrief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' KST'
+                                                : 'Archived'}
+                                        </span>
                                     </div>
+                                    <div className="meta-filler" />
                                 </div>
                             </div>
                         </div>

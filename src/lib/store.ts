@@ -5,7 +5,7 @@ import { kv } from '@vercel/kv';
 
 // 스토리지 인터페이스 정의
 // 스토리지 인터페이스 정의
-interface StorageAdapter {
+export interface StorageAdapter {
     saveBrief(report: BriefReport): Promise<void>;
     getBriefByDate(date: string): Promise<BriefReport | null>;
     getLatestBrief(): Promise<BriefReport | null>;
@@ -333,7 +333,7 @@ class RedisStorage implements StorageAdapter {
 }
 
 // 환경에 따른 스토리지 선택 factory
-function getStorage(): StorageAdapter {
+export function getStorage(): StorageAdapter {
     // 1. Vercel KV (전용 SDK 사용)
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         return new VercelKvStorage();

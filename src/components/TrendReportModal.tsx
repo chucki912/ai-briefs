@@ -127,7 +127,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 setIsPolling(true); // 폴링 시작 시 로딩 상태 강제
                 try {
                     // 1. 작업 시작 요청
-                    const startRes = await fetch('/api/trend', {
+                    const startRes = await fetch('/api/trend-report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ issue })
@@ -139,7 +139,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     // 2. 작업 상태 폴링 (Polling)
                     pollIntervalRef.current = setInterval(async () => {
                         try {
-                            const statusRes = await fetch(`/api/trend/status?jobId=${jobId}`);
+                            const statusRes = await fetch(`/api/trend-report/status?jobId=${jobId}`);
                             if (!statusRes.ok) return;
 
                             const { data: statusData } = await statusRes.json();

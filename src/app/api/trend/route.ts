@@ -3,7 +3,7 @@ import { IssueItem } from '@/types';
 import { generateTrendReport } from '@/lib/gemini';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
-import { kv } from '@vercel/kv';
+import { kvSet, kvGet } from '@/lib/store';
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 60; // 60초 (Hobby Plan 한계)
@@ -62,7 +62,7 @@ Content: ${article.textContent}
 
         if (report) {
             // 성공 시 결과 저장 (1시간 유지)
-            await kv.set(`trend_job:${jobId}`, { status: 'completed', report }, { ex: 3600 });
+            await kvSet(`trend_job:${jobId}`, { status: 'completed', report }, 3600);
             console.log(`[Job:${jobId}] 작업 성공 및 저장 완료`);
         } else {
             throw new Error('리포트 생성 실패 (Empty Output)');
@@ -70,7 +70,7 @@ Content: ${article.textContent}
 
     } catch (error) {
         console.error(`[Job:${jobId}] 작업 실패:`, error);
-        await kv.set(`trend_job:${jobId}`, { status: 'failed', error: '리포트 생성 중 오류가 발생했습니다.' }, { ex: 3600 });
+        await kvSet(`trend_job:${jobId}`, { status: 'failed', error: '리포트 생성 중 오류가 발생했습니다.' }, 3600);
     }
 }
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         // 초기 상태 저장
-        await kv.set(`trend_job:${jobId}`, { status: 'processing' }, { ex: 3600 });
+        await kvSet(`trend_job:${jobId}`, { status: 'processing' }, 3600);
 
         // 백그라운드 작업 시작 (Vercel waitUntil 활용)
         // waitUntil을 사용하면 응답을 보낸 후에도 함수가 계속 실행됨

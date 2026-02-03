@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kvGet } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Job ID missing' }, { status: 400 });
         }
 
-        const jobData = await kv.get(`trend_job:${jobId}`);
+        const jobData = await kvGet(`trend_job:${jobId}`);
 
         if (!jobData) {
             return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });

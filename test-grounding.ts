@@ -11,7 +11,7 @@ async function testGrounding() {
 
     const model = genAI.getGenerativeModel({
         model: modelName,
-        tools: [{ googleSearch: {} }],
+        tools: [{ googleSearch: {} } as any],
     });
 
     const prompt = 'What are the latest updates on OpenAI o3 model? Summarize the key features today.';

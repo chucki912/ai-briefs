@@ -25,6 +25,7 @@ export default function ArchivePage() {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportContent, setReportContent] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
+    const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
 
     // 브리핑 목록 로드
     useEffect(() => {
@@ -97,6 +98,7 @@ export default function ArchivePage() {
     // 트렌드 리포트 생성 (Deep Dive)
     const handleDeepDive = async (issue: IssueItem) => {
         setIsReportModalOpen(true);
+        setSelectedReportIssue(issue);
         setReportContent(''); // Reset previous report
         setReportLoading(true);
 
@@ -263,6 +265,8 @@ export default function ArchivePage() {
                 onClose={() => setIsReportModalOpen(false)}
                 report={reportContent}
                 loading={reportLoading}
+                issue={selectedReportIssue}
+                onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
             />
 
             <style jsx>{`

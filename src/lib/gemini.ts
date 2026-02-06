@@ -124,7 +124,7 @@ JSON만 출력하세요.`;
         if (parsed.relevantSourceIndices && Array.isArray(parsed.relevantSourceIndices)) {
             selectedSources = parsed.relevantSourceIndices
                 .map((idx: number) => cluster[idx - 1]?.url)
-                .filter(url => url !== undefined);
+                .filter((url: string) => url !== undefined);
         }
 
         // 🔧 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증

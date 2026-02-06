@@ -100,27 +100,7 @@ export default function ArchivePage() {
         setIsReportModalOpen(true);
         setSelectedReportIssue(issue);
         setReportContent(''); // Reset previous report
-        setReportLoading(true);
-
-        try {
-            const res = await fetch('/api/trend', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ issue }),
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                setReportContent(data.data.report);
-            } else {
-                setReportContent('### ⚠️ 리포트 생성 실패\n\n' + (data.error || '알 수 없는 오류가 발생했습니다.'));
-            }
-        } catch (err) {
-            console.error('Trend Report Error:', err);
-            setReportContent('### ⚠️ 리포트 생성 실패\n\n서버 연결 중 오류가 발생했습니다.');
-        } finally {
-            setReportLoading(false);
-        }
+        setReportLoading(true); // Signal to Modal to start generation
     };
 
     return (
@@ -278,6 +258,7 @@ export default function ArchivePage() {
                 loading={reportLoading}
                 issue={selectedReportIssue}
                 onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
+                onGenerationComplete={() => setReportLoading(false)}
             />
 
             <style jsx>{`

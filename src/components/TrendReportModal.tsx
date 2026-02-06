@@ -11,6 +11,7 @@ interface TrendReportModalProps {
     loading: boolean;
     issue?: IssueItem;
     onRetry?: () => void;
+    onGenerationComplete?: () => void;
 }
 
 // URL을 축약된 형태로 변환하는 헬퍼 함수
@@ -100,8 +101,9 @@ interface Inference {
     citations: string[];
 }
 
-export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry }: TrendReportModalProps) {
+export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry, onGenerationComplete }: TrendReportModalProps) {
     const [parsedReport, setParsedReport] = useState<TrendReportData | null>(null);
+    const [localReport, setLocalReport] = useState<string>('');
     const [parseError, setParseError] = useState(false);
     const [showCopyToast, setShowCopyToast] = useState(false);
 
@@ -149,11 +151,13 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 processReport(statusData.report);
                                 setIsPolling(false);
+                                onGenerationComplete?.();
                             } else if (statusData.status === 'failed') {
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 setParseError(true);
                                 alert('리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
                                 setIsPolling(false);
+                                onGenerationComplete?.();
                                 onClose();
                             }
                         } catch (e) {
@@ -165,6 +169,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     console.error('Error starting trend report', e);
                     setParseError(true);
                     setIsPolling(false);
+                    onGenerationComplete?.();
                     onClose();
                 }
             };
@@ -173,21 +178,255 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         }
     }, [isOpen, loading, issue, report]);
 
-    // 리포트 파싱 헬퍼
-    const processReport = (jsonStr: string) => {
+    // 레거시 JSON 파싱 시도 + 실패 시 Markdown 구조 파싱 (Hybrid Helper)
+    const processReport = (inputStr: string) => {
+        setLocalReport(inputStr); // Fallback storage
+
+        // 1. Try standard JSON parse
         try {
-            let cleanJson = jsonStr.trim();
+            let cleanJson = inputStr.trim();
             cleanJson = cleanJson.replace(/```json\n?|```/g, '').trim();
             const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error('No JSON object found');
-            let finalJson = jsonMatch[0].replace(/,\s*([\}\]])/g, '$1');
 
-            setParsedReport(JSON.parse(finalJson));
-            setParseError(false);
+            if (jsonMatch) {
+                let finalJson = jsonMatch[0].replace(/,\s*([\}\]])/g, '$1');
+                setParsedReport(JSON.parse(finalJson));
+                setParseError(false);
+                return;
+            }
         } catch (e) {
-            console.warn('Failed to parse report:', e);
+            // JSON parsing failed, proceed to Markdown parsing
+        }
+
+        // 2. Fallback: Parse Markdown Structure to TrendReportData
+        try {
+            const parsedData = parseMarkdownToStructure(inputStr);
+            if (parsedData) {
+                setParsedReport(parsedData);
+                setParseError(false);
+            } else {
+                throw new Error('Failed to parse Markdown structure');
+            }
+        } catch (e) {
+            console.warn('Final parsing failed:', e);
             setParsedReport(null);
             setParseError(true);
+        }
+    };
+
+    // Markdown 텍스트를 구조화된 데이터로 변환하는 파서
+    const parseMarkdownToStructure = (md: string): TrendReportData | null => {
+        try {
+            const data: any = {
+                report_meta: {},
+                executive_summary: { signal_summary: [], what_changed: [], so_what: [] },
+                key_developments: [],
+                themes: [],
+                implications: { market_business: [], tech_product: [], competitive_landscape: [], policy_regulation: [] },
+                risks_and_uncertainties: [],
+                watchlist: [],
+                sources: [],
+                quality: {}
+            };
+
+            // 1. Meta Extraction
+            const titleMatch = md.match(/#\s*\[트렌드 리포트\]\s*(.*)/);
+            if (titleMatch) data.report_meta.title = titleMatch[1].trim();
+
+            const metaSection = md.split('■ Executive Summary')[0];
+            const coverage = metaSection.match(/분석대상:\s*(.*)/);
+            const audience = metaSection.match(/타겟:\s*(.*)/);
+            const timeWindow = metaSection.match(/기간:\s*(.*)/);
+            const lens = metaSection.match(/관점:\s*(.*)/);
+
+            if (coverage) data.report_meta.coverage = coverage[1].trim();
+            if (audience) data.report_meta.audience = audience[1].trim();
+            if (timeWindow) data.report_meta.time_window = timeWindow[1].trim();
+            if (lens) data.report_meta.lens = lens[1].trim();
+            data.report_meta.generated_at = new Date().toISOString();
+
+            // 2. Sections Splitting
+            const sections = md.split(/##?\s*■/);
+
+            sections.forEach(section => {
+                const cleanSection = section.trim();
+
+                // Executive Summary
+                if (cleanSection.startsWith('Executive Summary')) {
+                    const lines = cleanSection.split('\n');
+                    lines.forEach(line => {
+                        if (line.includes('[Signal]')) data.executive_summary.signal_summary.push({ text: line.replace(/.*\[Signal\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
+                        if (line.includes('[Change]')) data.executive_summary.what_changed.push({ text: line.replace(/.*\[Change\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
+                        if (line.includes('[So What]')) data.executive_summary.so_what.push({ text: line.replace(/.*\[So What\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
+                    });
+                }
+
+                // Key Developments
+                if (cleanSection.startsWith('Key Developments')) {
+                    const devBlocks = cleanSection.split('###');
+                    devBlocks.shift(); // remove header
+                    devBlocks.forEach(block => {
+                        const lines = block.trim().split('\n');
+                        const headline = lines[0].replace(/\[|\]/g, '').trim();
+                        const facts: any[] = [];
+                        const analysis: any[] = [];
+
+                        lines.slice(1).forEach(line => {
+                            if (line.includes('(Fact)')) facts.push({ text: line.replace(/-\s*\(Fact\)/, '').trim() });
+                            if (line.includes('(Analysis)')) {
+                                const parts = line.split('(Basis:');
+                                const text = parts[0].replace(/-\s*\(Analysis\)/, '').trim();
+                                // 🔧 FIX #2: 빈 Basis 처리 - 기본값 제공
+                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
+                                if (!basis || basis.length < 3) {
+                                    basis = '구조적 분석 기반';
+                                }
+                                analysis.push({ text, basis });
+                            }
+                        });
+
+                        if (headline) {
+                            data.key_developments.push({
+                                headline,
+                                facts,
+                                analysis,
+                                evidence_level: 'high' // Default default
+                            });
+                        }
+                    });
+                }
+
+                // Core Themes
+                if (cleanSection.startsWith('Core Themes')) {
+                    const themeBlocks = cleanSection.split('###');
+                    themeBlocks.shift();
+                    themeBlocks.forEach(block => {
+                        const lines = block.trim().split('\n');
+                        const themeName = lines[0].replace(/\[|\]/g, '').trim();
+                        const drivers: any[] = [];
+
+                        lines.slice(1).forEach(line => {
+                            if (line.includes('(Driver)')) drivers.push({ text: line.replace(/-\s*\(Driver\)/, '').trim() });
+                        });
+
+                        if (themeName) {
+                            data.themes.push({ theme: themeName, drivers });
+                        }
+                    });
+                }
+
+                // Implications
+                if (cleanSection.startsWith('Implications')) {
+                    const lines = cleanSection.split('\n');
+                    lines.forEach(line => {
+                        const cleanLine = line.replace(/\*\*/g, '').trim(); // Remove bolding
+                        if (cleanLine.includes('[Market]')) data.implications.market_business.push({ text: cleanLine.replace(/.*\[Market\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('[Tech]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*\[Tech\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('[Comp]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*\[Comp\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('[Policy]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*\[Policy\]/, '').replace(/^-/, '').trim() });
+                    });
+                }
+
+                // Risks (🔧 FIX #3: 대소문자 불일치 리스크 태그 정규화)
+                if (cleanSection.startsWith('Risks & Uncertainties')) {
+                    const lines = cleanSection.split('\n');
+                    lines.forEach(line => {
+                        const cleanLine = line.replace(/\*\*/g, '').trim();
+                        let type = '';
+                        let risk = '';
+
+                        // Case-insensitive matching for risk tags, but storing as lowercase as per QA standard
+                        const upperLine = cleanLine.toUpperCase();
+                        if (upperLine.includes('[TECH]')) { type = 'tech'; risk = cleanLine.replace(/.*\[(?:TECH|tech)\]/i, '').replace(/^-/, '').trim(); }
+                        else if (upperLine.includes('[MARKET]')) { type = 'market'; risk = cleanLine.replace(/.*\[(?:MARKET|market)\]/i, '').replace(/^-/, '').trim(); }
+                        else if (upperLine.includes('[REG]')) { type = 'reg'; risk = cleanLine.replace(/.*\[(?:REG|reg)\]/i, '').replace(/^-/, '').trim(); }
+
+                        if (type && risk) {
+                            data.risks_and_uncertainties.push({ type, risk, evidence_level: 'medium', impact_paths: [] });
+                        }
+                    });
+                }
+
+                // Watchlist Parser (Enhanced for Why/How extraction)
+                if (cleanSection.startsWith('Watchlist')) {
+                    const blocks = cleanSection.split(/\r?\n(?=-)/); // Split by list items starting with -
+                    blocks.forEach(block => {
+                        const cleanBlock = block.replace(/Watchlist/i, '').trim();
+                        if (!cleanBlock) return;
+
+                        // 1. Extract Signal (first line or bolded part)
+                        const signalMatch = cleanBlock.match(/-\s*\*\*(.*?)\*\*/); // Expecting - **Signal Name**
+                        const signalText = signalMatch ? signalMatch[1] : cleanBlock.split('\n')[0].replace(/^-/, '').trim();
+
+                        // 2. Extract Why (optional)
+                        const whyMatch = cleanBlock.match(/\(Why\)\s*([^\n]+)/i);
+                        const whyText = whyMatch ? whyMatch[1].trim() : '';
+
+                        // 3. Extract How (optional)
+                        const howMatch = cleanBlock.match(/\(How\)\s*([^\n]+)/i);
+                        const howText = howMatch ? howMatch[1].trim() : '';
+
+                        if (signalText && signalText !== 'Watchlist') {
+                            data.watchlist.push({
+                                signal: signalText,
+                                why: whyText,
+                                how_to_monitor: howText
+                            });
+                        }
+                    });
+                }
+
+                // Sources (🔧 FIX #1: 접근 불가 출처 자동 필터링)
+                if (cleanSection.startsWith('Sources')) {
+                    const BLOCKED_DOMAINS = [
+                        'vertexaisearch.cloud.google.com',
+                        'google.com/search',
+                        'bing.com/search',
+                        'search.yahoo.com'
+                    ];
+
+                    const lines = cleanSection.split('\n');
+                    lines.forEach((line, idx) => {
+                        // Format: - [1] Title | Date | [Label] URL   OR   - [1] Title | Date | URL
+                        // Flexible Regex to capture 4 parts: ID, Title, Date, and the rest (URL + Label)
+                        const match = line.match(/^\-\s*\[(\d+)\]\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*)/);
+
+                        if (match) {
+                            let urlPart = match[4].trim();
+
+                            // Remove label if present (e.g. [Brief Origin]) to extract pure URL
+                            let url = urlPart.replace(/^\[.*?\]\s*/, '').trim();
+
+                            // Check if URL is from a blocked domain
+                            const isBlocked = BLOCKED_DOMAINS.some(domain => url.includes(domain));
+                            if (!isBlocked) {
+                                let title = match[2].trim();
+                                let publisher = 'Source';
+
+                                // Extract publisher from "Title (Media)" format
+                                const mediaMatch = title.match(/(.+)\s*\((.+)\)$/);
+                                if (mediaMatch) {
+                                    title = mediaMatch[1].trim();
+                                    publisher = mediaMatch[2].trim();
+                                }
+
+                                data.sources.push({
+                                    sid: match[1],
+                                    title: title,
+                                    date: match[3].trim(),
+                                    url: url,
+                                    publisher: publisher
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+
+            return data;
+        } catch (e) {
+            console.error('Markdown structure parsing failed', e);
+            return null;
         }
     };
 
@@ -394,47 +633,55 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 </div>
                             </section>
 
-                            <section className="report-section">
-                                <h2 className="section-title">■ Sources</h2>
-                                <div className="source-chips">
-                                    {parsedReport.sources?.map((src, i) => {
-                                        const { url, title } = getSourceInfo(src);
-                                        return (
-                                            <a
-                                                key={i}
-                                                href={url}
-                                                className="source-chip"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                title={`[${src.sid}] ${title} (${src.publisher})\n${url}`}
-                                            >
-                                                <span className="source-sid">{src.sid}</span>
-                                                <span className="source-host">{formatUrl(url)}</span>
-                                            </a>
-                                        );
-                                    })}
-                                </div>
-                            </section>
+                            {/* 🔧 FIX #4: 빈 Sources 섹션 숨김 */}
+                            {(parsedReport.sources?.length ?? 0) > 0 && (
+                                <section className="report-section">
+                                    <h2 className="section-title">■ Sources</h2>
+                                    <div className="source-chips">
+                                        {parsedReport.sources?.map((src, i) => {
+                                            const { url, title } = getSourceInfo(src);
+                                            return (
+                                                <a
+                                                    key={i}
+                                                    href={url}
+                                                    className="source-chip"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title={`[${src.sid}] ${title} (${src.publisher})\n${url}`}
+                                                >
+                                                    <span className="source-sid">{src.sid}</span>
+                                                    <span className="source-host">{formatUrl(url)}</span>
+                                                </a>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
 
-                            <section className="report-section quality-section">
-                                <h2 className="section-title">■ Analysis Quality</h2>
-                                {parsedReport.quality?.coverage_gaps?.length && parsedReport.quality.coverage_gaps.length > 0 ? (
-                                    <div className="quality-item">
-                                        <strong>Coverage Gaps:</strong>
-                                        <ul>{parsedReport.quality.coverage_gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
-                                    </div>
-                                ) : null}
-                                {parsedReport.quality?.conflicts?.length && parsedReport.quality.conflicts.length > 0 ? (
-                                    <div className="quality-item">
-                                        <strong>Conflicts:</strong>
-                                        <ul>{parsedReport.quality.conflicts.map((c, i) => <li key={i}>{c}</li>)}</ul>
-                                    </div>
-                                ) : null}
-                            </section>
+                            {/* 🔧 FIX #4: 빈 Analysis Quality 섹션 완전 숨김 */}
+                            {((parsedReport.quality?.coverage_gaps?.length ?? 0) > 0 ||
+                                (parsedReport.quality?.conflicts?.length ?? 0) > 0 ||
+                                (parsedReport.quality?.low_evidence_points?.length ?? 0) > 0) && (
+                                    <section className="report-section quality-section">
+                                        <h2 className="section-title">■ Analysis Quality</h2>
+                                        {parsedReport.quality?.coverage_gaps?.length && parsedReport.quality.coverage_gaps.length > 0 ? (
+                                            <div className="quality-item">
+                                                <strong>Coverage Gaps:</strong>
+                                                <ul>{parsedReport.quality.coverage_gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
+                                            </div>
+                                        ) : null}
+                                        {parsedReport.quality?.conflicts?.length && parsedReport.quality.conflicts.length > 0 ? (
+                                            <div className="quality-item">
+                                                <strong>Conflicts:</strong>
+                                                <ul>{parsedReport.quality.conflicts.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                                            </div>
+                                        ) : null}
+                                    </section>
+                                )}
                         </div>
                     ) : (
                         <div className="markdown-content">
-                            <ReactMarkdown>{report}</ReactMarkdown>
+                            <ReactMarkdown>{localReport || report}</ReactMarkdown>
                         </div>
                     )}
                 </div>
@@ -583,10 +830,105 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     100% { opacity: 0; transform: translate(-50%, -60%); }
                 }
 
+                /* Markdown Content Styling (Premium Look) */
+                .markdown-content {
+                    color: var(--text-primary);
+                    line-height: 1.7;
+                    font-size: 1rem;
+                }
+
+                .markdown-content h1 {
+                    font-size: 1.8rem;
+                    font-weight: 800;
+                    margin-bottom: 1.5rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 2px solid var(--border-color);
+                    color: var(--text-primary);
+                }
+
+                .markdown-content h2 {
+                    font-size: 1.2rem;
+                    font-weight: 800;
+                    margin-top: 2.5rem;
+                    margin-bottom: 1.25rem;
+                    color: var(--accent-color);
+                    border-left: 5px solid var(--accent-color);
+                    padding-left: 0.75rem;
+                    background: linear-gradient(90deg, var(--bg-body) 0%, transparent 100%);
+                    padding-top: 0.5rem;
+                    padding-bottom: 0.5rem;
+                    border-radius: 0 4px 4px 0;
+                }
+
+                .markdown-content h3 {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    margin-top: 1.5rem;
+                    margin-bottom: 0.75rem;
+                    color: var(--text-primary);
+                    background-color: var(--bg-body);
+                    padding: 0.5rem 1rem;
+                    border-radius: 6px;
+                    border: 1px solid var(--border-color);
+                    display: inline-block;
+                }
+
+                .markdown-content h4 {
+                    font-size: 1rem;
+                    font-weight: 700;
+                    margin-top: 1rem;
+                    color: var(--text-secondary);
+                }
+
+                .markdown-content p {
+                    margin-bottom: 1rem;
+                    color: var(--text-secondary);
+                }
+
+                .markdown-content ul, .markdown-content ol {
+                    padding-left: 1.2rem;
+                    margin-bottom: 1.25rem;
+                }
+
+                .markdown-content li {
+                    margin-bottom: 0.5rem;
+                    position: relative;
+                    color: var(--text-secondary);
+                }
+
+                .markdown-content blockquote {
+                    border-left: 4px solid var(--accent-color);
+                    margin: 1.5rem 0;
+                    padding: 1rem 1.5rem;
+                    background: var(--bg-body);
+                    color: var(--text-secondary);
+                    font-style: italic;
+                    border-radius: 0 8px 8px 0;
+                }
+
+                .markdown-content strong {
+                    font-weight: 700;
+                    color: var(--text-primary);
+                }
+
+                .markdown-content a {
+                    color: var(--accent-color);
+                    text-decoration: underline;
+                    text-underline-offset: 2px;
+                }
+
+                .markdown-content hr {
+                    margin: 3rem 0;
+                    border: 0;
+                    border-top: 1px solid var(--border-color);
+                }
+
                 @media (max-width: 640px) {
                     .implications-grid, .watchlist-grid { grid-template-columns: 1fr; }
                     .report-title { font-size: 1.4rem; }
                     .modal-body { padding: 1.25rem; }
+                    .markdown-content h1 { font-size: 1.5rem; }
+                    .markdown-content h2 { font-size: 1.1rem; }
                 }
             `}</style>
         </div>

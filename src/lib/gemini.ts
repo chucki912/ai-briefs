@@ -78,13 +78,13 @@ async function generateIssueFromCluster(
     const primaryNews = cluster[0];
     const frameworks = matchFrameworks(primaryNews.title, primaryNews.description);
 
-    const prompt = `당신은 AI 산업 전문 분석가입니다. 아래 뉴스를 분석하여 한국어 브리핑을 작성해주세요.
+    // 뉴스 리스트에 인덱스 부여
+    const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n출처: ${n.url}`).join('\n\n');
 
-## 뉴스 정보
-제목: ${primaryNews.title}
-내용: ${primaryNews.description}
-출처: ${primaryNews.source}
-${cluster.length > 1 ? `\n관련 기사 ${cluster.length - 1}개 추가` : ''}
+    const prompt = `당신은 AI 산업 전문 분석가입니다. 아래 제공된 뉴스 클러스터를 분석하여 한국어 브리핑을 작성해주세요.
+
+## 뉴스 클러스터 정보 (인덱스 부여됨)
+${indexedNews}
 
 ## 분석 프레임워크
 ${getFrameworkNames(frameworks)}
@@ -94,13 +94,14 @@ ${getFrameworkNames(frameworks)}
 {
   "headline": "한국어 헤드라인 (25자 이내, 핵심 사실 중심)",
   "keyFacts": ["핵심 사실 1", "핵심 사실 2", "핵심 사실 3"],
-  "insight": "프레임워크 기반 1-3줄 분석 인사이트"
+  "insight": "프레임워크 기반 1-3줄 분석 인사이트",
+  "relevantSourceIndices": [1, 3] 
 }
 
 ## 작성 규칙
 - 100% 한국어 (전문용어/기업명은 원어 병기)
+- **중요**: \`relevantSourceIndices\` 필드에는 제공된 뉴스 리스트 번호 중, 이 브리핑의 요약 내용과 직접적으로 연관된 핵심 기사의 번호만 정수 배열로 넣으세요. 관련 없는 노이즈 기사는 반드시 제외하십시오.
 - 객관적 수치, 공식 발언, 데이터 기반 서술
-- 미확인 사실은 '추정됨', '가능성 있음'으로 표기
 - 감정적 표현 배제, 건조하고 전문적인 분석 톤
 
 JSON만 출력하세요.`;
@@ -118,12 +119,40 @@ JSON만 출력하세요.`;
 
         const parsed = JSON.parse(jsonMatch[0]);
 
+        // 🔧 1차 필터링: Gemini가 선택한 인덱스 사용
+        let selectedSources: string[] = [];
+        if (parsed.relevantSourceIndices && Array.isArray(parsed.relevantSourceIndices)) {
+            selectedSources = parsed.relevantSourceIndices
+                .map((idx: number) => cluster[idx - 1]?.url)
+                .filter(url => url !== undefined);
+        }
+
+        // 🔧 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
+        // LLM이 실수를 하더라도 코드에서 한번 더 걸러줌
+        const headline = parsed.headline;
+        const headlineKeywords = headline.split(' ').filter((w: string) => w.length > 1);
+
+        const finalSources = (selectedSources.length > 0 ? selectedSources : cluster.map(c => c.url))
+            .filter((url, index) => {
+                const newsItem = cluster.find(c => c.url === url);
+                if (!newsItem) return false;
+
+                // 제목이나 설명에 헤드라인 키워드가 하나라도 포함되어 있는지 확인
+                const content = (newsItem.title + ' ' + (newsItem.description || '')).toLowerCase();
+                const score = headlineKeywords.reduce((acc: number, kw: string) => {
+                    return acc + (content.includes(kw.toLowerCase()) ? 1 : 0);
+                }, 0);
+
+                // 첫 번째 기사(Cluster Lead)는 무조건 포함, 나머지는 키워드 매칭 점수가 있어야 함
+                return index === 0 || score > 0;
+            });
+
         return {
             headline: parsed.headline,
             keyFacts: parsed.keyFacts,
             insight: parsed.insight,
             framework: getFrameworkNames(frameworks),
-            sources: cluster.map(n => n.url),
+            sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
         };
     } catch (error) {
         console.error('[Issue Generation Error]', error);
@@ -144,88 +173,149 @@ export async function testGeminiConnection(): Promise<boolean> {
     }
 }
 
-
-// 트렌드 센싱 리포트 (Deep Dive) 생성 - Vercel Pro (300s) Optimized
-// Vercel Pro 업그레이드로 인해 Job Splitting이 불필요해져 Monolithic으로 원복.
-// 단, 400 Bad Request (Search + Schema) 해결을 위해 "Search Enable, Schema Disable" & Manual Parsing 적용.
+// 트렌드 센싱 리포트 (Deep Dive) 생성
 export async function generateTrendReport(
     issue: IssueItem,
-    context: string // Not strictly used if Search is active
+    context: string // Kept for compatibility
 ): Promise<string | null> {
-    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 전문 트렌드센싱 리서치 전문가다. 
-모든 리포트는 **반드시 한국어**로 작성해야 하며, 정보 밀도가 매우 높고 전략적인 관점이 담긴 "인텔리전스 리포트" 스타일을 유지한다.
 
-[핵심 문체 지침]
-- **한국어 작성 필수**: 모든 필드의 내용은 한국어로 작성한다. (기술 용어나 기업명은 원어 병기 가능)
-- **고밀도 압축(High Density)**: 단순 요약이 아닌, 시장의 구조적 변화와 기술적 함의를 한 문장에 압축하여 전달한다.
-- **전략적 통찰(Strategic Insight)**: 사실 전달을 넘어, 그것이 산업 생태계(ecosystem)나 경쟁 구도에 미치는 영향을 포함한다.
-- **건조하고 객관적인 보고서 톤**: 수식어를 배제하고 담백하면서도 권위 있는 어조를 유지한다. (예: "진입함", "측면이 강함", "전략을 취함" 등)
+    // Updated System Prompt for Source Consistency & Expansion
+    const systemPrompt = `# Antigravity Prompt — 상세 리포트 생성기 (Source Expansion Edition)
 
-[Deep Research 지침]
-- **Google Search 활용**: 제공된 정보를 넘어, **Google Search 도구**를 적극적으로 사용하여 해당 이슈와 관련된 최신 뉴스, 기술 문서, 전문가 분석을 실시간으로 조사한다.
-- **다각적 검증**: 5개 이상의 신뢰할 수 있는 출처를 검색하여 교차 검증한다.
-- **최신성 확보**: 리포트 생성 시점(Generated At) 기준 가장 최신의 업데이트 내용을 반영한다.
+## Role
+당신은 ‘글로벌 AI 산업 트렌드센싱 리포트 작성자’이자 ‘전략 컨설턴트’입니다.
+브리프(단신)의 정보를 기반으로 더 깊이 있는 "심층 분석"을 수행합니다.
 
-[출력 규칙]
-- **순수 JSON 데이터만 반환**: Markdown 포맷(\`\`\`json)을 포함하여 출력하되, 내용은 정의된 JSON Schema를 따라야 한다.
-- **참고**: Google API 제한으로 인해 JSON 강제 모드(Schema)를 껐으므로, 반드시 형식을 지켜야 한다.`;
+## 핵심 목표: 소스 일관성 및 확장 (Critical)
+1) **소스 상속**: 입력된 'ISSUE_URLS'는 이미 검증된 브리프의 원본 소스들입니다. 이들은 리포트의 기반이며, 모든 분석의 출발점이 되어야 합니다.
+2) **소스 확장**: 당신은 상세 리포트 작성자로서 전문가적인 깊이를 더하기 위해, 제공된 소스 외에 **최소 1~2개 이상의 새로운 고품질 소스**를 스스로 검색하여 추가해야 합니다.
+3) **검색 활용**: 'googleSearch' 도구를 적극적으로 사용하여 기술적 상세 내용, 시장 데이터, 또는 경쟁사의 반응 등을 찾아 리포트를 보완하십시오.
+
+## Critical Rules
+1) 출력 포맷: 반드시 아래 “OUTPUT TEMPLATE” 그대로 작성.
+2) Action Item 금지: 행동 지시 문구 작성 금지.
+3) 사실 검증: 존재하지 않는 사실 창작 금지.
+4) 소스 섹션 작성 방식:
+   - **Sources 섹션 작성 금지**: 최종 소스 리스트는 시스템이 원본과 검색 결과를 합쳐서 자동으로 생성합니다. 리포트 끝에 절대로 URL을 직접 적지 마십시오.
+
+========================================================
+## OUTPUT TEMPLATE (이 형식 그대로 출력)
+
+# [트렌드 리포트] {이슈를 한 문장으로 요약한 제목}
+
+분석대상: {산업 세그먼트}
+타겟: {이해관계자 3종}
+기간: {날짜 범위}
+관점: {분석 프레임워크 기반 관점}
+
+## ■ Executive Summary
+- **[Signal]** {핵심 신호}
+- **[Change]** {산업 구조 변화}
+- **[So What]** {전략적 함의}
+
+## ■ Key Developments
+### [{핵심 전개 1}]
+- (Fact) {확정 사실 1}
+- (Analysis) {분석} (Basis: {이론} - {설명})
+
+## ■ Core Themes
+### [{테마 1}]
+- (Driver) {메커니즘}
+
+## ■ Implications
+- **[Market]** {시장 관점}
+- **[Tech]** {기술 관점}
+- **[Comp]** {경쟁 관점}
+- **[Policy]** {규제 관점}
+
+## ■ Risks & Uncertainties
+- **[tech]** {기술 리스크}
+- **[market]** {시장 리스크}
+- **[reg]** {규제 리스크}
+
+## ■ Watchlist
+- **{관측 지표 1}**
+(Why) {중요성}
+(How) {모니터링 방법}
+
+## ■ Sources
+(시스템이 브리프 소스 ${issue.sources ? issue.sources.length : 0}개에 당신이 추가한 신규 소스를 더하여 주입합니다.)
+
+## START
+즉시 리포트를 작성하라.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3-pro-preview', // Pro Model (High Reasoning)
+        model: 'gemini-3-pro-preview',
         systemInstruction: systemPrompt,
-        tools: [{ googleSearch: {} } as any], // Search ENABLED
-        // responseSchema: DISABLED to avoid 400 error with Search
+        tools: [{ googleSearch: {} } as any],
     });
 
     const nowDate = new Date();
     const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-    const kstIsoStr = nowDate.toISOString();
 
-    const userPrompt = `## 현재 날짜 및 시간 (KST)
-- **일시**: ${kstDateStr}
-- **ISO**: ${kstIsoStr}
-
-## 분석 필요 이슈 (Deep Dive Request)
-- **헤드라인**: ${issue.headline}
-- **핵심 사실**: ${issue.keyFacts.join(', ')}
-- **초기 인사이트**: ${issue.insight}
-- **참고 키워드**: ${issue.framework}
-
-## 사용자 요청
-위 이슈에 대해 **Google Search를 사용하여 심층 조사(Deep Research)**를 수행하고, 확보된 최신 정보를 바탕으로 포괄적인 인텔리전스 리포트를 작성해줘.
-기존에 알고 있는 지식뿐만 아니라, **반드시 검색 결과**를 근거로 사용하여 분석의 깊이와 신뢰도를 확보해야 한다.
-
-## JSON Schema (이 형식을 준수할 것)
-{
-  "report_meta": { "title": "string", "time_window": "string", "coverage": "string", "audience": "string", "lens": "string", "generated_at": "string" },
-  "executive_summary": { "signal_summary": [{"text": "string", "citations": []}], "what_changed": [{"text": "string", "citations": []}], "so_what": [{"text": "string", "citations": []}] },
-  "key_developments": [{"headline": "string", "facts": [{"text": "string", "citations": []}], "analysis": [{"text": "string", "basis": "string", "citations": []}], "why_it_matters": [{"text": "string", "citations": []}], "evidence_level": "high/medium/low", "citations": []}],
-  "themes": [{"theme": "string", "drivers": [{"text": "string", "citations": []}], "supporting_developments": [], "citations": []}],
-  "implications": { "market_business": [{"text": "string", "citations": []}], "tech_product": [{"text": "string", "citations": []}], "policy_regulation": [{"text": "string", "citations": []}], "competitive_landscape": [{"text": "string", "citations": []}] },
-  "risks_and_uncertainties": [{"risk": "string", "type": "market/tech/etc", "impact_paths": [{"text": "string", "citations": []}], "evidence_level": "high/medium/low", "citations": []}],
-  "watchlist": [{"signal": "string", "why": "string", "how_to_monitor": "string"}],
-  "sources": [{"sid": "string", "publisher": "string", "date": "string", "title": "string", "url": "string"}],
-  "quality": { "coverage_gaps": [], "conflicts": [], "low_evidence_points": [] }
-}`;
+    const userPrompt = `
+# INPUTS
+- ISSUE_TITLE: ${issue.headline}
+- ISSUE_BULLETS: ${issue.keyFacts.join(', ')}
+- ISSUE_URLS:
+${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
+- TODAY_KST: ${kstDateStr}`;
 
     try {
-        console.log('[Trend API] Gemini Deep Research 분석 시작 (Pro/Monolithic)...');
+        console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');
         const result = await model.generateContent(userPrompt);
         const response = await result.response;
-        const text = response.text();
+        let text = response.text();
 
-        console.log(`[Trend API] Gemini 분석 완료 (길이: ${text.length}자)`);
+        // 🔧 소스 일관성 및 강화 로직
+        const briefingSources = issue.sources || [];
+        const additionalSources: string[] = [];
 
-        // Grounding Metadata 로깅
+        // Grounding Metadata에서 신규 소스 추출
         const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        if (groundingMetadata) {
-            console.log('[Trend API] Grounding Metadata found:', JSON.stringify(groundingMetadata, null, 2));
+        if (groundingMetadata?.groundingChunks) {
+            groundingMetadata.groundingChunks.forEach((chunk: any) => {
+                if (chunk.web?.url) {
+                    const url = chunk.web.url;
+                    if (!briefingSources.includes(url)) {
+                        additionalSources.push(url);
+                    }
+                }
+            });
         }
 
-        // Manual validation/extraction since schema is off
-        const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        return jsonMatch ? jsonMatch[0] : text;
+        // 최종 소스 결합 (브리프 소스 전원 필수 포함 + 검색 소스)
+        const combinedSourcesSet = new Set([...briefingSources, ...additionalSources]);
+        const finalUniqueSources = Array.from(combinedSourcesSet);
 
+        // 소스 섹션 렌더링
+        let newSourcesSection = '\n## ■ Sources\n';
+        finalUniqueSources.forEach((url, idx) => {
+            try {
+                const urlObj = new URL(url);
+                const hostname = urlObj.hostname.replace('www.', '');
+                const label = briefingSources.includes(url) ? 'Brief Origin' : 'Deep Research';
+                newSourcesSection += `- [${idx + 1}] ${hostname} | ${kstDateStr.split(' ')[0]} | [${label}] ${url}\n`;
+            } catch (e) {
+                newSourcesSection += `- [${idx + 1}] Source | ${kstDateStr.split(' ')[0]} | ${url}\n`;
+            }
+        });
+
+        const expansionCount = finalUniqueSources.length - briefingSources.length;
+        newSourcesSection += expansionCount > 0
+            ? `\n(브리프 소스 ${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 ${expansionCount}개의 신규 출처를 확보했습니다.)\n`
+            : `\n(브리프 작성에 사용된 모든 원본 소스 ${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
+
+        // 리포트 본문에서 기존 Sources 섹션(있다면) 제거 후 강제 결합
+        const sourcesPattern = /## ■ Sources[\s\S]*$/i;
+        const bodyContent = text.replace(sourcesPattern, '').trim();
+
+        // 최종 리포트 합체 (본문 + 강제 주입된 소스 섹션)
+        const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
+
+        console.log(`[Trend API] 소스 검증 완료: 브리프(${briefingSources.length}) -> 리포트(${finalUniqueSources.length})`);
+
+        return finalReport;
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;

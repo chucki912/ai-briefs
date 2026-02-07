@@ -38,7 +38,7 @@ export const RSS_FEEDS = {
         { name: "MIT Tech Review", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed" },
     ],
     TIER_3: [
-        { name: "Reuters Tech", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" },
+        // { name: "Reuters Tech", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" }, // 404 Error (2026-02-07)
     ]
 };
 

@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
 import { BriefReport, IssueItem } from '@/types';
+import { logger } from '@/lib/logger';
 
 export default function HomePage() {
   const [brief, setBrief] = useState<BriefReport | null>(null);
@@ -83,6 +84,12 @@ export default function HomePage() {
   useEffect(() => {
     loadBrief();
   }, []);
+
+  useEffect(() => {
+    if (brief) {
+      logger.viewBrief(brief.date);
+    }
+  }, [brief]);
 
   return (
     <div className="container">

@@ -14,21 +14,37 @@ export interface StorageAdapter {
     // Generic KV Operations for temporary jobs
     kvSet(key: string, value: any, ttlSeconds?: number): Promise<void>;
     kvGet<T>(key: string): Promise<T | null>;
+    // Activity Logging
+    saveLog(log: ActivityLog): Promise<void>;
+    getLogs(limit?: number): Promise<ActivityLog[]>;
+}
+
+export interface ActivityLog {
+    id: string; // UUID
+    timestamp: number;
+    action: 'VIEW_BRIEF' | 'CLICK_ISSUE' | 'SHARE_ISSUE' | 'GENERATE_TREND_REPORT' | 'CLICK_SOURCE' | 'VIEW_TREND_REPORT';
+    targetId: string; // e.g., "2024-02-07" or "issue_hash"
+    metadata?: Record<string, any>;
+    userAgent?: string;
+    ip?: string;
 }
 
 // 1. 파일 시스템 스토리지 (로컬 개발용)
 class FileSystemStorage implements StorageAdapter {
     private dataDir: string;
     private kvDir: string;
+    private logDir: string;
 
     constructor() {
         this.dataDir = path.join(process.cwd(), 'data', 'briefs');
         this.kvDir = path.join(process.cwd(), 'data', 'kv');
+        this.logDir = path.join(process.cwd(), 'data', 'logs');
     }
 
     private async ensureDir() {
         try { await fs.access(this.dataDir); } catch { await fs.mkdir(this.dataDir, { recursive: true }); }
         try { await fs.access(this.kvDir); } catch { await fs.mkdir(this.kvDir, { recursive: true }); }
+        try { await fs.access(this.logDir); } catch { await fs.mkdir(this.logDir, { recursive: true }); }
     }
 
     async saveBrief(report: BriefReport): Promise<void> {
@@ -124,6 +140,41 @@ class FileSystemStorage implements StorageAdapter {
             return null;
         }
     }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        await this.ensureDir();
+        // 일별 로그 파일: logs/2024-02-07.jsonl (line-delimited JSON)
+        const dateStr = new Date(log.timestamp).toISOString().split('T')[0];
+        const filePath = path.join(this.logDir, `${dateStr}.jsonl`);
+        // Append log line
+        await fs.appendFile(filePath, JSON.stringify(log) + '\n', 'utf-8');
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        // 최근 로그 파일부터 읽어서 limit만큼 반환하는 로직 (간소화)
+        // 실제로는 최근 파일들을 역순으로 읽어야 함
+        await this.ensureDir();
+        try {
+            const files = await fs.readdir(this.logDir);
+            const logFiles = files.filter(f => f.endsWith('.jsonl')).sort().reverse();
+
+            const logs: ActivityLog[] = [];
+            for (const file of logFiles) {
+                if (logs.length >= limit) break;
+                const content = await fs.readFile(path.join(this.logDir, file), 'utf-8');
+                const lines = content.split('\n').filter(Boolean).reverse(); // 최신순
+                for (const line of lines) {
+                    if (logs.length >= limit) break;
+                    try {
+                        logs.push(JSON.parse(line));
+                    } catch { }
+                }
+            }
+            return logs;
+        } catch {
+            return [];
+        }
+    }
 }
 
 // 2. Vercel KV 스토리지 (프로덕션 배포용)
@@ -181,6 +232,25 @@ class VercelKvStorage implements StorageAdapter {
     async kvGet<T>(key: string): Promise<T | null> {
         return await kv.get<T>(key);
     }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        // 1. 로그 상세 저장 (30일 보관)
+        const key = `log:${log.timestamp}:${log.id}`;
+        await kv.set(key, log, { ex: 2592000 }); // 30 days
+
+        // 2. 인덱싱 (Timestamp Score)
+        await kv.zadd('logs_index', { score: log.timestamp, member: key });
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        // 최신순 조회
+        const keys = await kv.zrange('logs_index', 0, limit - 1, { rev: true });
+        if (keys.length === 0) return [];
+
+        // MGET으로 로그 상세 조회 (string[]으로 반환됨을 고려)
+        const logs = await kv.mget<(ActivityLog | null)[]>(...keys as string[]);
+        return logs.filter((log): log is ActivityLog => log !== null);
+    }
 }
 
 // 3. 인메모리 스토리지 (Vercel 배포 시 KV 미설정 상황 대비 Fallback)
@@ -224,6 +294,18 @@ class InMemoryStorage implements StorageAdapter {
             return null;
         }
         return item.value as T;
+    }
+
+    private logs: ActivityLog[] = [];
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        this.logs.unshift(log); // 최신순
+        // 메모리 관리: 1000개까지만 유지
+        if (this.logs.length > 1000) this.logs.pop();
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        return this.logs.slice(0, limit);
     }
 }
 
@@ -330,6 +412,28 @@ class RedisStorage implements StorageAdapter {
         const data = await client.get(key);
         return data ? JSON.parse(data) as T : null;
     }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        const client = await this.clientPromise;
+        const key = `log:${log.timestamp}:${log.id}`;
+
+        // Transaction to ensure atomicity
+        await client.multi()
+            .set(key, JSON.stringify(log), { EX: 2592000 }) // 30 days
+            .zAdd('logs_index', { score: log.timestamp, value: key })
+            .exec();
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        const client = await this.clientPromise;
+        const keys = await client.zRange('logs_index', 0, limit - 1, { REV: true });
+        if (keys.length === 0) return [];
+
+        const logs = await client.mGet(keys);
+        return logs
+            .filter((log): log is string => log !== null)
+            .map(log => JSON.parse(log) as ActivityLog);
+    }
 }
 
 // 환경에 따른 스토리지 선택 factory
@@ -365,6 +469,10 @@ export const deleteBrief = (date: string) => storage.deleteBrief(date);
 // KV Helper Exports
 export const kvSet = (key: string, value: any, ttl?: number) => storage.kvSet(key, value, ttl);
 export const kvGet = <T>(key: string) => storage.kvGet<T>(key);
+
+// Logging Exports
+export const saveLog = (log: ActivityLog) => storage.saveLog(log);
+export const getLogs = (limit?: number) => storage.getLogs(limit);
 
 export function closeDb(): void {
     // 필요 시 연결 종료 로직 추가 가능

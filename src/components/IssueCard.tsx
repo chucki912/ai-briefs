@@ -1,5 +1,6 @@
 'use client';
 
+import { logger } from '@/lib/logger';
 import { IssueItem } from '@/types';
 
 interface IssueCardProps {
@@ -20,6 +21,13 @@ const formatUrl = (url: string) => {
 };
 
 export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) {
+    const handleDeepDiveClick = () => {
+        if (onDeepDive) {
+            onDeepDive(issue);
+            logger.generateReport(issue.headline, issue.headline); // Temporary use headline as ID? No, we don't have ID. Use headline as ID for now.
+        }
+    };
+
     return (
         <article className="issue-card animate-in">
             <div className="issue-header-row">
@@ -30,7 +38,7 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
                 {onDeepDive && (
                     <button
                         className="btn-text-icon"
-                        onClick={() => onDeepDive(issue)}
+                        onClick={handleDeepDiveClick}
                         title="이 뉴스를 심층 분석하여 트렌드 리포트를 생성합니다"
                     >
                         <span className="icon">📊</span>
@@ -69,6 +77,7 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={source}
+                                onClick={() => logger.clickSource(source, issue.headline)}
                             >
                                 <span className="source-dot"></span>
                                 {formatUrl(source)}

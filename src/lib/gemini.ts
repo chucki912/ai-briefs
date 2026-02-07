@@ -107,7 +107,7 @@ ${getFrameworkNames(frameworks)}
 JSON만 출력하세요.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await generateWithRetry(model, prompt);
         const response = await result.response;
         const text = response.text();
 
@@ -263,7 +263,7 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
 
     try {
         console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');
-        const result = await model.generateContent(userPrompt);
+        const result = await generateWithRetry(model, userPrompt);
         const response = await result.response;
         let text = response.text();
 
@@ -319,5 +319,25 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;
+    }
+}
+
+// Helper: Retry logic for API calls
+async function generateWithRetry(model: any, prompt: string | any, retries = 3, delay = 2000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await model.generateContent(prompt);
+        } catch (error: any) {
+            const isOverloaded = error.status === 503 || error.message?.includes('overloaded');
+            const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
+
+            if ((isOverloaded || isRateLimit) && i < retries - 1) {
+                console.warn(`[Gemini Retry] Attempt ${i + 1} failed (${error.status || error.message}). Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+                continue;
+            }
+            throw error;
+        }
     }
 }

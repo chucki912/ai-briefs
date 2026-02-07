@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { IssueItem } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface TrendReportModalProps {
     isOpen: boolean;
@@ -177,6 +178,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             fetchTrendReport();
         }
     }, [isOpen, loading, issue, report]);
+
+    useEffect(() => {
+        if (isOpen && parsedReport && issue) {
+            logger.viewReport(issue.headline);
+        }
+    }, [isOpen, parsedReport, issue]);
 
     // 레거시 JSON 파싱 시도 + 실패 시 Markdown 구조 파싱 (Hybrid Helper)
     const processReport = (inputStr: string) => {

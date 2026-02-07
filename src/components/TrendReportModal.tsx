@@ -924,11 +924,46 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 }
 
                 @media (max-width: 640px) {
-                    .implications-grid, .watchlist-grid { grid-template-columns: 1fr; }
-                    .report-title { font-size: 1.4rem; }
-                    .modal-body { padding: 1.25rem; }
-                    .markdown-content h1 { font-size: 1.5rem; }
-                    .markdown-content h2 { font-size: 1.1rem; }
+                    .modal-content.report-modal {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: 0;
+                        max-width: none;
+                    }
+                    
+                    .modal-body { 
+                        padding: 1.25rem; 
+                    }
+
+                    .implications-grid, .watchlist-grid { 
+                        grid-template-columns: 1fr; 
+                    }
+
+                    .report-title { 
+                        font-size: 1.4rem; 
+                    }
+
+                    .markdown-content h1 { 
+                        font-size: 1.5rem; 
+                    }
+
+                    .markdown-content h2 { 
+                        font-size: 1.1rem; 
+                    }
+                    
+                    .modal-footer {
+                        flex-direction: column-reverse;
+                        padding: 1rem;
+                    }
+
+                    .modal-footer .btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+
+                    .close-btn {
+                        padding: 8px;
+                    }
                 }
             `}</style>
         </div>

@@ -282,6 +282,59 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
                     border-radius: 50%;
                     opacity: 0.5;
                 }
+
+                @media (max-width: 480px) {
+                    .issue-card {
+                        padding: 1.25rem;
+                        border-radius: 20px;
+                    }
+
+                    .issue-header-row {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 12px;
+                        margin-bottom: 1rem;
+                    }
+
+                    .issue-tag-group {
+                        width: 100%;
+                        justify-content: space-between;
+                    }
+
+                    .btn-text-icon {
+                        width: 100%;
+                        justify-content: center;
+                        padding: 10px;
+                    }
+
+                    .issue-headline {
+                        font-size: 1.25rem;
+                        margin-bottom: 1rem;
+                    }
+
+                    .issue-facts li {
+                        font-size: 0.95rem;
+                        padding-left: 1.25rem;
+                    }
+
+                    .issue-insight-container {
+                        padding: 1.25rem;
+                        margin-bottom: 1.5rem;
+                    }
+
+                    .issue-insight-content {
+                        font-size: 0.95rem;
+                    }
+
+                    .sources-list {
+                        gap: 8px;
+                    }
+
+                    .source-link-chip {
+                        width: 100%;
+                        justify-content: flex-start;
+                    }
+                }
             `}</style>
         </article>
     );

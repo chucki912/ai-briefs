@@ -386,6 +386,49 @@ export default function ArchivePage() {
                     from { opacity: 0; transform: translateY(20px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+
+                @media (max-width: 480px) {
+                    .archive-header {
+                        margin-bottom: 2rem;
+                    }
+
+                    .archive-title {
+                        font-size: 2rem;
+                    }
+
+                    .archive-subtitle {
+                        font-size: 0.95rem;
+                    }
+
+                    .action-row {
+                        flex-direction: column;
+                        gap: 1rem;
+                    }
+
+                    .back-button, .delete-button {
+                        width: 100%;
+                        justify-content: center;
+                        padding: 12px;
+                    }
+
+                    .archive-grid {
+                        grid-template-columns: 1fr;
+                        gap: 1rem;
+                    }
+
+                    .premium-archive-card {
+                        padding: 1.25rem;
+                    }
+
+                    .detail-hero {
+                        padding: 2rem 1.5rem;
+                        border-radius: 20px;
+                    }
+
+                    .detail-title {
+                        font-size: 1.5rem;
+                    }
+                }
             `}</style>
         </div>
     );

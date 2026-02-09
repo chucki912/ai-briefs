@@ -89,7 +89,7 @@ export default function BatteryArchivePage() {
                 </Link>
                 <nav className="nav">
                     <Link href="/battery" className="nav-link">
-                        Briefing
+                        브리핑
                     </Link>
                     <ThemeToggle />
                 </nav>

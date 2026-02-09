@@ -101,11 +101,8 @@ export default function BatteryBriefPage() {
                 </div>
                 <nav className="nav">
                     <Link href="/battery/archive" className="nav-link">
-                        Archive
+                        아카이브
                     </Link>
-                    <span className="nav-link" style={{ opacity: 0.6, cursor: 'default' }}>
-                        K-Battery Intelligence
-                    </span>
                     <ThemeToggle />
                 </nav>
             </header>

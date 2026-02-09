@@ -1,0 +1,256 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
+import IssueCard from '@/components/IssueCard';
+import TrendReportModal from '@/components/TrendReportModal';
+import { BriefReport, IssueItem } from '@/types';
+
+interface BriefSummary {
+    id: string;
+    date: string;
+    dayOfWeek: string;
+    totalIssues: number;
+    generatedAt: string;
+}
+
+export default function BatteryArchivePage() {
+    const [briefs, setBriefs] = useState<BriefSummary[]>([]);
+    const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+
+    // Trend Report State
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportContent, setReportContent] = useState('');
+    const [reportLoading, setReportLoading] = useState(false);
+    const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
+
+    // 배터리 브리핑 목록 로드
+    useEffect(() => {
+        async function loadBriefs() {
+            try {
+                const res = await fetch('/api/battery/brief?list=true');
+                const data = await res.json();
+
+                if (data.success) {
+                    setBriefs(data.data);
+                }
+            } catch (err) {
+                console.error('Failed to load battery briefs:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadBriefs();
+    }, []);
+
+    // 특정 날짜 배터리 브리핑 로드
+    const loadBriefDetail = async (date: string) => {
+        try {
+            setLoadingDetail(true);
+            const res = await fetch(`/api/battery/brief?date=${date}`);
+            const data = await res.json();
+
+            if (data.success) {
+                setSelectedBrief(data.data);
+            }
+        } catch (err) {
+            console.error('Failed to load battery brief detail:', err);
+        } finally {
+            setLoadingDetail(false);
+        }
+    };
+
+    const formatDate = (dateStr: string) => {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[0]}년 ${parseInt(parts[1])}월 ${parseInt(parts[2])}일`;
+        }
+        return dateStr;
+    };
+
+    // 트렌드 리포트 생성 (Deep Dive) - 배터리 전용 API 사용
+    const handleDeepDive = async (issue: IssueItem) => {
+        setIsReportModalOpen(true);
+        setSelectedReportIssue(issue);
+        setReportContent('');
+        setReportLoading(true);
+    };
+
+    return (
+        <div className="container">
+            {/* Header - Battery Theme */}
+            <header className="header">
+                <Link href="/battery" className="logo" style={{ color: '#22c55e' }}>
+                    🔋 Battery Intelligence
+                </Link>
+                <nav className="nav">
+                    <Link href="/battery" className="nav-link">
+                        Briefing
+                    </Link>
+                    <ThemeToggle />
+                </nav>
+            </header>
+
+            {/* Main Content */}
+            <main>
+                <div className="archive-header animate-in">
+                    <h1 className="archive-title">
+                        Battery <span className="highlight" style={{ color: '#22c55e' }}>Archive</span>
+                    </h1>
+                    <p className="archive-subtitle">
+                        글로벌 배터리 산업의 과거 리포트를 확인하고 K-Battery의 흐름을 추적하세요.
+                    </p>
+                </div>
+
+                {loading ? (
+                    <div className="loading-container">
+                        <div className="premium-spinner" style={{ borderTopColor: '#22c55e' }} />
+                        <span className="loading-text">배터리 아카이브를 불러오는 중...</span>
+                    </div>
+                ) : selectedBrief ? (
+                    <>
+                        {/* Action Buttons */}
+                        <div className="action-row animate-in">
+                            <button
+                                className="back-button"
+                                onClick={() => setSelectedBrief(null)}
+                            >
+                                <span className="icon">←</span> 전체 목록
+                            </button>
+                        </div>
+
+                        {/* Brief Detail - Battery Styled */}
+                        <div className="hero-section animate-in" style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.05))' }}>
+                            <div className="hero-content">
+                                <div className="date-badge">
+                                    <span className="calendar-icon">🔋</span>
+                                    {selectedBrief.date.replace('battery-', '').split('-')[0]}년 {selectedBrief.date.replace('battery-', '').split('-')[1]}월 {selectedBrief.date.replace('battery-', '').split('-')[2]}일
+                                </div>
+                                <h1 className="hero-title">
+                                    Battery Daily <span className="highlight" style={{ color: '#22c55e' }}>Intelligence</span>
+                                </h1>
+                                <p className="hero-subtitle">
+                                    K-Battery 관점의 글로벌 배터리 산업 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
+                                </p>
+                                <div className="hero-meta">
+                                    <div className="meta-item">
+                                        <span className="meta-label">Total Signals</span>
+                                        <span className="meta-value">{selectedBrief.totalIssues} Issues</span>
+                                    </div>
+                                    <div className="meta-divider" />
+                                    <div className="meta-item">
+                                        <span className="meta-label">Generated At</span>
+                                        <span className="meta-value">
+                                            {new Date(selectedBrief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' KST'}
+                                        </span>
+                                    </div>
+                                    <div className="meta-filler" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="issues-container">
+                            {selectedBrief.issues.map((issue, index) => (
+                                <IssueCard
+                                    key={index}
+                                    issue={issue}
+                                    index={index}
+                                    onDeepDive={handleDeepDive}
+                                />
+                            ))}
+                        </div>
+                    </>
+                ) : briefs.length > 0 ? (
+                    <div className="archive-grid animate-in">
+                        {briefs.map((brief) => (
+                            <a
+                                key={brief.id}
+                                href="#"
+                                className="premium-archive-card"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    loadBriefDetail(brief.date);
+                                }}
+                            >
+                                <div className="archive-card-date">{formatDate(brief.date)}</div>
+                                <div className="archive-card-day">{brief.dayOfWeek}</div>
+                                <div className="archive-card-footer">
+                                    <span className="count" style={{ color: '#22c55e' }}>{brief.totalIssues} Signals</span>
+                                    <span className="arrow">→</span>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="empty-state">
+                        <div className="empty-icon">🔋</div>
+                        <h2 className="empty-title">아직 저장된 배터리 브리핑이 없습니다</h2>
+                        <p className="empty-description">
+                            브리핑이 생성되면 여기에 자동으로 보관됩니다.
+                        </p>
+                        <Link href="/battery" className="btn" style={{ background: '#22c55e' }}>
+                            오늘의 배터리 브리핑 보기
+                        </Link>
+                    </div>
+                )}
+
+                {loadingDetail && (
+                    <div className="modal-overlay">
+                        <div className="loading-container">
+                            <div className="premium-spinner" style={{ borderTopColor: '#22c55e' }} />
+                            <span className="loading-text">리포트를 구성 중입니다...</span>
+                        </div>
+                    </div>
+                )}
+            </main>
+
+            <footer className="footer">
+                <p>© 2026 Battery Daily Brief. K-Battery Intelligence Archive</p>
+            </footer>
+
+            <TrendReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                report={reportContent}
+                loading={reportLoading}
+                issue={selectedReportIssue}
+                onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
+                onGenerationComplete={() => setReportLoading(false)}
+                trendReportApiUrl="/api/battery/trend-report"
+            />
+
+            <style jsx>{`
+                .archive-header { margin-bottom: 4rem; text-align: center; }
+                .archive-title { font-size: 3rem; font-weight: 900; margin-bottom: 1rem; letter-spacing: -0.04em; }
+                .archive-subtitle { color: var(--text-secondary); font-size: 1.1rem; }
+                .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+                .premium-archive-card {
+                    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px;
+                    padding: 1.5rem; text-decoration: none; transition: all 0.3s ease;
+                    display: flex; flex-direction: column; gap: 4px;
+                }
+                .premium-archive-card:hover { transform: translateY(-5px); border-color: #22c55e; box-shadow: var(--shadow-md); }
+                .archive-card-date { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
+                .archive-card-day { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; margin-bottom: 1rem; }
+                .archive-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border-color); }
+                .archive-card-footer .count { font-size: 0.8rem; font-weight: 700; }
+                .archive-card-footer .arrow { transition: transform 0.2s; }
+                .premium-archive-card:hover .arrow { transform: translateX(4px); }
+                .action-row { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+                .back-button { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 8px 16px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+                .back-button:hover { background: var(--bg-card); border-color: #22c55e; }
+                .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+                .animate-in { animation: fadeInUp 0.6s ease-out forwards; }
+                @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                @media (max-width: 480px) {
+                    .archive-grid { grid-template-columns: 1fr; }
+                    .back-button { width: 100%; justify-content: center; }
+                }
+            `}</style>
+        </div>
+    );
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
@@ -99,6 +100,9 @@ export default function BatteryBriefPage() {
                     🔋 Battery Daily Brief
                 </div>
                 <nav className="nav">
+                    <Link href="/battery/archive" className="nav-link">
+                        Archive
+                    </Link>
                     <span className="nav-link" style={{ opacity: 0.6, cursor: 'default' }}>
                         K-Battery Intelligence
                     </span>

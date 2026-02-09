@@ -10,10 +10,13 @@ export async function GET(request: NextRequest) {
 
         // 목록 조회
         if (list === 'true') {
-            const briefs = await getAllBriefs(30);
+            const allBriefs = await getAllBriefs(50);
+            // AI 브리프만 필터링 (battery- 접두사가 없는 것)
+            const aiBriefs = allBriefs.filter(b => !b.id.startsWith('battery-'));
+
             return NextResponse.json({
                 success: true,
-                data: briefs.map(b => ({
+                data: aiBriefs.map(b => ({
                     id: b.id,
                     date: b.date,
                     dayOfWeek: b.dayOfWeek,

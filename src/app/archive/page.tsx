@@ -108,11 +108,11 @@ export default function ArchivePage() {
             {/* Header */}
             <header className="header">
                 <Link href="/" className="logo">
-                    🤖 AI Intelligence
+                    🤖 AI Daily Brief
                 </Link>
                 <nav className="nav">
                     <Link href="/" className="nav-link">
-                        Intelligence
+                        오늘의 브리핑
                     </Link>
                     <ThemeToggle />
                 </nav>

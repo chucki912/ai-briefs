@@ -13,6 +13,7 @@ interface TrendReportModalProps {
     issue?: IssueItem;
     onRetry?: () => void;
     onGenerationComplete?: () => void;
+    trendReportApiUrl?: string; // 배터리 등 다른 산업용 API URL 지원
 }
 
 // URL을 축약된 형태로 변환하는 헬퍼 함수
@@ -102,7 +103,7 @@ interface Inference {
     citations: string[];
 }
 
-export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry, onGenerationComplete }: TrendReportModalProps) {
+export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry, onGenerationComplete, trendReportApiUrl = '/api/trend-report' }: TrendReportModalProps) {
     const [parsedReport, setParsedReport] = useState<TrendReportData | null>(null);
     const [localReport, setLocalReport] = useState<string>('');
     const [parseError, setParseError] = useState(false);
@@ -131,7 +132,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 setStatusMessage('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
                 try {
                     // 1. 작업 시작 요청
-                    const startRes = await fetch('/api/trend-report', {
+                    const startRes = await fetch(trendReportApiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ issue })
@@ -143,7 +144,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     // 2. 작업 상태 폴링 (Polling)
                     pollIntervalRef.current = setInterval(async () => {
                         try {
-                            const statusRes = await fetch(`/api/trend-report/status?jobId=${jobId}`);
+                            const statusRes = await fetch(`${trendReportApiUrl}/status?jobId=${jobId}`);
                             if (!statusRes.ok) return;
 
                             const { data: statusData } = await statusRes.json();

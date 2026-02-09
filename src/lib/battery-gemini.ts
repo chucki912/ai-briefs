@@ -11,7 +11,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 export async function analyzeBatteryNewsAndGenerateInsights(
     newsItems: NewsItem[]
 ): Promise<IssueItem[]> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
     // 뉴스를 관련 주제별로 클러스터링
     const clusters = clusterBatteryNewsByTopic(newsItems);
@@ -225,7 +225,7 @@ export async function generateBatteryTrendReport(
 즉시 리포트를 작성하라.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-pro-preview',
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });

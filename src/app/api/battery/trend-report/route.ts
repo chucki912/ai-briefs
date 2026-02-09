@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { generateBatteryTrendReport } from '@/lib/battery-gemini';
+import { kvSet } from '@/lib/store';
 import { IssueItem } from '@/types';
+import { waitUntil } from '@vercel/functions';
 
-// 배터리 트렌드 리포트 생성 API
+export const maxDuration = 300; // Vercel timeout up to 5 min
+
+// 배터리 트렌드 리포트 생성 API (비동기 처리)
 export async function POST(request: Request) {
     try {
         const body = await request.json();
@@ -15,21 +19,40 @@ export async function POST(request: Request) {
             );
         }
 
-        console.log('[Battery Trend API] 심층 리포트 생성 시작:', issue.headline);
+        const jobId = `battery_job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log('[Battery Trend API] 작업 시작:', jobId, issue.headline);
 
-        const report = await generateBatteryTrendReport(issue, '');
+        // 초기 상태 설정
+        await kvSet(`battery_trend_job:${jobId}`, { status: 'generating', progress: 10 }, 3600);
 
-        if (report) {
-            return NextResponse.json({
-                success: true,
-                data: report
-            });
-        } else {
-            return NextResponse.json({
-                success: false,
-                error: '배터리 트렌드 리포트 생성에 실패했습니다.'
-            });
-        }
+        // 백그라운드 작업 실행 (Vercel waitUntil 사용)
+        waitUntil((async () => {
+            try {
+                const report = await generateBatteryTrendReport(issue, '');
+
+                if (report) {
+                    await kvSet(`battery_trend_job:${jobId}`, {
+                        status: 'completed',
+                        progress: 100,
+                        report
+                    }, 3600);
+                } else {
+                    throw new Error('리포트 생성 결과가 비어있습니다.');
+                }
+            } catch (error: any) {
+                console.error(`[Battery Job ${jobId}] 실패:`, error);
+                await kvSet(`battery_trend_job:${jobId}`, {
+                    status: 'failed',
+                    error: error.message || '리포트 생성 중 오류가 발생했습니다.'
+                }, 3600);
+            }
+        })());
+
+        // 즉시 작업 ID 반환
+        return NextResponse.json({
+            success: true,
+            data: { jobId, message: '배터리 리포트 분석을 시작했습니다.' }
+        });
 
     } catch (error) {
         console.error('[Battery Trend API Error]', error);

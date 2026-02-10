@@ -7,6 +7,8 @@ import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
 import { BriefReport, IssueItem } from '@/types';
 
+import { useAuth } from '@/contexts/AuthContext';
+
 interface BriefSummary {
     id: string;
     date: string;
@@ -16,6 +18,7 @@ interface BriefSummary {
 }
 
 export default function BatteryArchivePage() {
+    const { isAdmin } = useAuth();
     const [briefs, setBriefs] = useState<BriefSummary[]>([]);
     const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -28,22 +31,23 @@ export default function BatteryArchivePage() {
     const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
 
     // 배터리 브리핑 목록 로드
-    useEffect(() => {
-        async function loadBriefs() {
-            try {
-                const res = await fetch('/api/battery/brief?list=true');
-                const data = await res.json();
+    const loadBriefs = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/battery/brief?list=true');
+            const data = await res.json();
 
-                if (data.success) {
-                    setBriefs(data.data);
-                }
-            } catch (err) {
-                console.error('Failed to load battery briefs:', err);
-            } finally {
-                setLoading(false);
+            if (data.success) {
+                setBriefs(data.data);
             }
+        } catch (err) {
+            console.error('Failed to load battery briefs:', err);
+        } finally {
+            setLoading(false);
         }
+    };
 
+    useEffect(() => {
         loadBriefs();
     }, []);
 
@@ -61,6 +65,31 @@ export default function BatteryArchivePage() {
             console.error('Failed to load battery brief detail:', err);
         } finally {
             setLoadingDetail(false);
+        }
+    };
+
+    // 브리핑 삭제 (관리자 전용)
+    const handleDeleteBrief = async (e: React.MouseEvent, date: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!confirm('정말로 이 브리핑을 삭제하시겠습니까?')) return;
+
+        try {
+            const res = await fetch(`/api/battery/brief?date=${date}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert('브리핑이 삭제되었습니다.');
+                loadBriefs(); // 목록 갱신
+            } else {
+                alert(data.error || '삭제 실패');
+            }
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('삭제 중 오류가 발생했습니다.');
         }
     };
 
@@ -159,7 +188,7 @@ export default function BatteryArchivePage() {
                                     key={index}
                                     issue={issue}
                                     index={index}
-                                    onDeepDive={handleDeepDive}
+                                    onDeepDive={isAdmin ? handleDeepDive : undefined}
                                 />
                             ))}
                         </div>
@@ -167,22 +196,32 @@ export default function BatteryArchivePage() {
                 ) : briefs.length > 0 ? (
                     <div className="archive-grid animate-in">
                         {briefs.map((brief) => (
-                            <a
-                                key={brief.id}
-                                href="#"
-                                className="premium-archive-card"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    loadBriefDetail(brief.date);
-                                }}
-                            >
-                                <div className="archive-card-date">{formatDate(brief.date)}</div>
-                                <div className="archive-card-day">{brief.dayOfWeek}</div>
-                                <div className="archive-card-footer">
-                                    <span className="count" style={{ color: '#22c55e' }}>{brief.totalIssues} Signals</span>
-                                    <span className="arrow">→</span>
-                                </div>
-                            </a>
+                            <div key={brief.id} style={{ position: 'relative' }}>
+                                <a
+                                    href="#"
+                                    className="premium-archive-card"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        loadBriefDetail(brief.date);
+                                    }}
+                                >
+                                    <div className="archive-card-date">{formatDate(brief.date)}</div>
+                                    <div className="archive-card-day">{brief.dayOfWeek}</div>
+                                    <div className="archive-card-footer">
+                                        <span className="count" style={{ color: '#22c55e' }}>{brief.totalIssues} Signals</span>
+                                        <span className="arrow">→</span>
+                                    </div>
+                                </a>
+                                {isAdmin && (
+                                    <button
+                                        className="delete-button"
+                                        onClick={(e) => handleDeleteBrief(e, brief.date)}
+                                        title="삭제"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
                         ))}
                     </div>
                 ) : (
@@ -228,10 +267,12 @@ export default function BatteryArchivePage() {
                 .archive-title { font-size: 3rem; font-weight: 900; margin-bottom: 1rem; letter-spacing: -0.04em; }
                 .archive-subtitle { color: var(--text-secondary); font-size: 1.1rem; }
                 .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+                
                 .premium-archive-card {
                     background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px;
                     padding: 1.5rem; text-decoration: none; transition: all 0.3s ease;
                     display: flex; flex-direction: column; gap: 4px;
+                    height: 100%;
                 }
                 .premium-archive-card:hover { transform: translateY(-5px); border-color: #22c55e; box-shadow: var(--shadow-md); }
                 .archive-card-date { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
@@ -240,15 +281,68 @@ export default function BatteryArchivePage() {
                 .archive-card-footer .count { font-size: 0.8rem; font-weight: 700; }
                 .archive-card-footer .arrow { transition: transform 0.2s; }
                 .premium-archive-card:hover .arrow { transform: translateX(4px); }
-                .action-row { display: flex; justify-content: space-between; margin-bottom: 2rem; }
-                .back-button { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 8px 16px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
-                .back-button:hover { background: var(--bg-card); border-color: #22c55e; }
+                
+                .delete-button {
+                    position: absolute;
+                    top: -10px;
+                    right: -10px;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: #ef4444;
+                    color: white;
+                    border: none;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                }
+                
+                div[style*="position: relative"]:hover .delete-button {
+                    opacity: 1;
+                }
+                
+                .delete-button:hover {
+                    background: #dc2626;
+                    transform: scale(1.1);
+                }
+
+                .action-row { display: flex; justify-content: flex-start; margin-bottom: 2rem; }
+                
+                .back-button { 
+                    background: rgba(34, 197, 94, 0.1);
+                    color: #22c55e;
+                    border: 1px solid rgba(34, 197, 94, 0.2);
+                    border-radius: 99px;
+                    padding: 10px 24px;
+                    font-size: 0.95rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s ease;
+                }
+                
+                .back-button:hover { 
+                    background: #22c55e;
+                    color: #fff;
+                    border-color: #22c55e;
+                    transform: translateX(-4px);
+                    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+                }
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
                 .animate-in { animation: fadeInUp 0.6s ease-out forwards; }
                 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
                 @media (max-width: 480px) {
                     .archive-grid { grid-template-columns: 1fr; }
                     .back-button { width: 100%; justify-content: center; }
+                    .delete-button { opacity: 1; } /* 모바일에서는 항상 보임 */
                 }
             `}</style>
         </div>

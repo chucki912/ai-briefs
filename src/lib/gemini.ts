@@ -170,7 +170,7 @@ JSON만 출력하세요.`;
         return {
             headline: parsed.title,
             keyFacts: parsed.keyFacts,
-            insight: parsed.insight,
+            insight: parsed.strategicInsight, // 스키마 불일치 수정 (insight -> strategicInsight)
             framework: getFrameworkNames(frameworks),
             sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
         };

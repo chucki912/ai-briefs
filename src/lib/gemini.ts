@@ -149,7 +149,7 @@ JSON만 출력하세요.`;
 
         // 🔧 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
         // LLM이 실수를 하더라도 코드에서 한번 더 걸러줌
-        const headline = parsed.headline;
+        const headline = parsed.title; // JSON 스키마에는 title로 정의되어 있음
         const headlineKeywords = headline.split(' ').filter((w: string) => w.length > 1);
 
         const finalSources = (selectedSources.length > 0 ? selectedSources : cluster.map(c => c.url))
@@ -168,7 +168,7 @@ JSON만 출력하세요.`;
             });
 
         return {
-            headline: parsed.headline,
+            headline: parsed.title,
             keyFacts: parsed.keyFacts,
             insight: parsed.insight,
             framework: getFrameworkNames(frameworks),

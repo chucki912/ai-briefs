@@ -44,7 +44,8 @@ export const RSS_FEEDS = {
 
 // Google News RSS 검색 URL 생성
 export function getGoogleNewsRssUrl(query: string): string {
-    const encodedQuery = encodeURIComponent(query);
+    // when:1d 파라미터를 추가하여 24시간 이내 뉴스만 검색
+    const encodedQuery = encodeURIComponent(query + ' when:1d');
     return `https://news.google.com/rss/search?q=${encodedQuery}&hl=en-US&gl=US&ceid=US:en`;
 }
 

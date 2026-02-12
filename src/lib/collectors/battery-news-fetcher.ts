@@ -93,7 +93,8 @@ async function fetchFromBatteryGoogleNews(): Promise<NewsItem[]> {
 
     for (const keyword of searchKeywords) {
         try {
-            const encodedQuery = encodeURIComponent(keyword);
+            // when:1d 파라미터를 추가하여 24시간 이내 뉴스만 검색
+            const encodedQuery = encodeURIComponent(keyword + ' when:1d');
             const url = `https://news.google.com/rss/search?q=${encodedQuery}&hl=en-US&gl=US&ceid=US:en`;
             const feedData = await parser.parseURL(url);
 

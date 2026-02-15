@@ -119,7 +119,8 @@ ${getFrameworkNames(frameworks)}
   "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
   "relatedStocks": [
     {"name": "연관 종목명", "reason": "연관 이유 (간략히)"}
-  ]
+  ],
+  "relevantSourceIndices": [1, 2]
 }
 \`\`\`
 - 감정적 표현 배제, 건조하고 전문적인 분석 톤
@@ -139,7 +140,7 @@ JSON만 출력하세요.`;
 
         const parsed = JSON.parse(jsonMatch[0]);
 
-        // 🔧 1차 필터링: Gemini가 선택한 인덱스 사용
+        // 1차 필터링: Gemini가 선택한 인덱스 사용
         let selectedSources: string[] = [];
         if (parsed.relevantSourceIndices && Array.isArray(parsed.relevantSourceIndices)) {
             selectedSources = parsed.relevantSourceIndices
@@ -147,9 +148,8 @@ JSON만 출력하세요.`;
                 .filter((url: string) => url !== undefined);
         }
 
-        // 🔧 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
-        // LLM이 실수를 하더라도 코드에서 한번 더 걸러줌
-        const headline = parsed.title; // JSON 스키마에는 title로 정의되어 있음
+        // 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
+        const headline = parsed.title;
         const headlineKeywords = headline.split(' ').filter((w: string) => w.length > 1);
 
         const finalSources = (selectedSources.length > 0 ? selectedSources : cluster.map(c => c.url))
@@ -157,20 +157,18 @@ JSON만 출력하세요.`;
                 const newsItem = cluster.find(c => c.url === url);
                 if (!newsItem) return false;
 
-                // 제목이나 설명에 헤드라인 키워드가 하나라도 포함되어 있는지 확인
                 const content = (newsItem.title + ' ' + (newsItem.description || '')).toLowerCase();
                 const score = headlineKeywords.reduce((acc: number, kw: string) => {
                     return acc + (content.includes(kw.toLowerCase()) ? 1 : 0);
                 }, 0);
 
-                // 첫 번째 기사(Cluster Lead)는 무조건 포함, 나머지는 키워드 매칭 점수가 있어야 함
                 return index === 0 || score > 0;
             });
 
         return {
             headline: parsed.title,
             keyFacts: parsed.keyFacts,
-            insight: parsed.strategicInsight, // 스키마 불일치 수정 (insight -> strategicInsight)
+            insight: parsed.strategicInsight,
             framework: getFrameworkNames(frameworks),
             sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
         };
@@ -198,337 +196,6 @@ export async function generateTrendReport(
     issue: IssueItem,
     context: string // Kept for compatibility
 ): Promise<string | null> {
-<<<<<<< HEAD
-    // 2.0 Flash 사용 권장 (JSON 모드 지원 우수)
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-3-flash-preview',
-        generationConfig: { responseMimeType: 'application/json' }
-    });
-
-    const systemPrompt = `너는 산업 동향(Industry Trend Brief) 리포트를 작성하는 트렌드센싱 리서처다.
-사용자가 제공한 기사/자료 묶음([S1], [S2] …)을 바탕으로 심층적이고 풍부한 "상세 리포트"를 생성한다.
-
-[핵심 목표]
-1. **Multi-Source Synthesis (복합 인용)**: 단일 기사([S1])만 요약하지 말고, 제공된 모든 관련 기사([S1], [S2], [S3]...)의 내용을 종합하여 연결한다. 
-   - 하나의 주장에 대해 여러 출처가 있다면 citations: ["S1", "S3"]와 같이 교차 검증하라.
-   - 메인 기사 외의 서브 기사들에 있는 세부 사실(통계, 코멘트, 배경)을 적극적으로 발굴하여 내용을 보강(Elaborate)하라.
-2. **Title Refinement (출처 제목 정제)**: 소스 목록 작성 시, "Google News RSS" 같은 무의미한 제목 대신, 해당 링크 기사의 **실제 헤드라인**이나 주제를 추론하여 [S#]의 title 필드에 기입하라.
-
-[CRITICAL - Source ID Integrity]
-- 입력된 소스 목록의 순서와 ID([S1], [S2]...)를 절대 변경하지 말라.
-- [S1]의 URL이 "A.com"이면, 결과 JSON의 sources 배열에서도 [S1]은 반드시 "A.com"이어야 한다.
-- 만약 특정 소스([S#])의 본문이 'Context'에 없다면, 해당 URL만으로 내용을 추론하거나 일반적인 사실로 처리하되, 엉뚱한 기사 내용을 매핑하지 말라.
-
-[작성 원칙]
-- Fact(사실)과 Inference(해석/추론)를 명확히 분리한다.
-- 제공 자료에 없는 내용은 단정하지 않는다.
-- 문체는 건조한 보고서 톤(Dry & Professional). 과장/마케팅 문구 금지.
-- "Action/실행과제/To-do" 섹션은 작성하지 않는다.
-- **모든 내용은 반드시 100% 한국어로 작성하라.**
-- 전문 용어나 고유 명사(기업명, 모델명 등)는 원어를 병기하거나 원어 그대로 사용할 수 있으나, 그 외의 모든 설명과 분석은 한국어여야 한다.
-
-[출력 규칙]
-- 최종 출력은 오직 JSON 1개 객체만 반환한다.
-- 반드시 아래 JSON Schema의 요구사항(필드/타입/필수값/금지된 추가필드)을 만족해야 한다.
-- 인용은 본문에 [S#] 텍스트를 쓰지 말고, 각 항목의 citations 배열로만 표기한다.
-- **Source Section**: 각 소스의 제목(title)은 독자가 식별 가능한 구체적인 기사 제목이어야 한다.
-
-[JSON Syntax Warning]
-- 절대 trailing comma(마지막 항목 뒤 콤마)를 쓰지 말라.
-- 주석(//)이나 마크다운 코드 블록(\`\`\`json) 외의 사족을 절대 달지 말라.
-- 문자열 내에 double quote(")가 들어갈 경우 반드시 escape 처리(\\")하라.`;
-
-    const jsonSchema = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/industry-trend-brief.schema.json",
-  "title": "Industry Trend Brief (Trend Sensing) - Deep Dive",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "report_meta",
-    "executive_summary",
-    "key_developments",
-    "themes",
-    "implications",
-    "risks_and_uncertainties",
-    "watchlist",
-    "sources",
-    "quality"
-  ],
-  "properties": {
-    "report_meta": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["title", "time_window", "coverage", "audience", "lens", "generated_at"],
-      "properties": {
-        "title": { "type": "string", "minLength": 3 },
-        "time_window": { "type": "string", "minLength": 3 },
-        "coverage": { "type": "string", "minLength": 2 },
-        "audience": { "type": "string", "minLength": 2 },
-        "lens": { "type": "string", "minLength": 1 },
-        "generated_at": {
-          "type": "string",
-          "description": "ISO 8601 datetime",
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
-        }
-      }
-    },
-
-    "executive_summary": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["signal_summary", "what_changed", "so_what"],
-      "properties": {
-        "signal_summary": {
-          "type": "array",
-          "minItems": 3,
-          "maxItems": 5,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        },
-        "what_changed": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 5,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        },
-        "so_what": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 5,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        }
-      }
-    },
-
-    "key_developments": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 8,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["headline", "facts", "analysis", "why_it_matters", "evidence_level", "citations"],
-        "properties": {
-          "headline": { "type": "string", "minLength": 5 },
-          "facts": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 8,
-            "items": { "$ref": "#/$defs/fact" }
-          },
-          "analysis": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 6,
-            "items": { "$ref": "#/$defs/inference" }
-          },
-          "why_it_matters": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 5,
-            "items": { "$ref": "#/$defs/statement_with_citations" }
-          },
-          "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
-          "citations": { "$ref": "#/$defs/citations" },
-          "notes": { "type": "string" }
-        }
-      }
-    },
-
-    "themes": {
-      "type": "array",
-      "minItems": 2,
-      "maxItems": 6,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["theme", "drivers", "supporting_developments", "citations"],
-        "properties": {
-          "theme": { "type": "string", "minLength": 4 },
-          "drivers": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 5,
-            "items": { "$ref": "#/$defs/statement_with_citations" }
-          },
-          "supporting_developments": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 5,
-            "items": { "type": "string" }
-          },
-          "citations": { "$ref": "#/$defs/citations" }
-        }
-      }
-    },
-
-    "implications": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["market_business", "tech_product", "policy_regulation", "competitive_landscape"],
-      "properties": {
-        "market_business": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 8,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        },
-        "tech_product": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 8,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        },
-        "policy_regulation": {
-          "type": "array",
-          "minItems": 0,
-          "maxItems": 6,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        },
-        "competitive_landscape": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 8,
-          "items": { "$ref": "#/$defs/statement_with_citations" }
-        }
-      }
-    },
-
-    "risks_and_uncertainties": {
-      "type": "array",
-      "minItems": 2,
-      "maxItems": 8,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["risk", "type", "impact_paths", "evidence_level", "citations"],
-        "properties": {
-          "risk": { "type": "string", "minLength": 6 },
-          "type": { "type": "string", "enum": ["market", "tech", "regulatory", "supply_chain", "geopolitics", "execution", "other"] },
-          "impact_paths": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 4,
-            "items": { "$ref": "#/$defs/statement_with_citations" }
-          },
-          "evidence_level": { "type": "string", "enum": ["high", "medium", "low"] },
-          "citations": { "$ref": "#/$defs/citations" },
-          "notes": { "type": "string" }
-        }
-      }
-    },
-
-    "watchlist": {
-      "type": "array",
-      "minItems": 6,
-      "maxItems": 12,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["signal", "why", "how_to_monitor"],
-        "properties": {
-          "signal": { "type": "string", "minLength": 4 },
-          "why": { "type": "string", "minLength": 4 },
-          "how_to_monitor": { "type": "string", "minLength": 4 }
-        }
-      }
-    },
-
-    "sources": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["sid", "publisher", "date", "title", "url"],
-        "properties": {
-          "sid": { "type": "string", "pattern": "^S[0-9]+$" },
-          "publisher": { "type": "string" },
-          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
-          "title": { "type": "string" },
-          "url": { "type": "string" },
-          "note": { "type": "string" }
-        }
-      }
-    },
-
-    "quality": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["coverage_gaps", "conflicts", "low_evidence_points"],
-      "properties": {
-        "coverage_gaps": { "type": "array", "items": { "type": "string" } },
-        "conflicts": { "type": "array", "items": { "type": "string" } },
-        "low_evidence_points": { "type": "array", "items": { "type": "string" } }
-      }
-    }
-  },
-
-  "$defs": {
-    "citations": {
-      "type": "array",
-      "items": { "type": "string", "pattern": "^S[0-9]+$" },
-      "minItems": 0,
-      "maxItems": 8,
-      "uniqueItems": true
-    },
-    "statement_with_citations": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["text", "citations"],
-      "properties": {
-        "text": { "type": "string", "minLength": 6 },
-        "citations": { "$ref": "#/$defs/citations" }
-      }
-    },
-    "fact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["text", "citations"],
-      "properties": {
-        "text": {
-          "type": "string",
-          "minLength": 6,
-          "description": "기사에서 직접 확인 가능한 사실만"
-        },
-        "citations": { "$ref": "#/$defs/citations" }
-      }
-    },
-    "inference": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["text", "basis", "citations"],
-      "properties": {
-        "text": { "type": "string", "minLength": 6, "description": "사실 기반의 해석/추론" },
-        "basis": {
-          "type": "string",
-          "minLength": 6,
-          "description": "추론 근거(어떤 사실로부터 왜 이런 해석이 가능한지)"
-        },
-        "citations": { "$ref": "#/$defs/citations" }
-      }
-    }
-  }
-}
-`;
-
-    const prompt = `${systemPrompt}
-
-# JSON Schema
-\`\`\`json
-${jsonSchema}
-\`\`\`
-
-# 분석 대상 이슈 및 소스 매핑
-- 헤드라인: ${issue.headline}
-- 핵심 사실: ${issue.keyFacts.join(', ')}
-${issue.sources.map((url, i) => `- [S${i + 1}] ${url}`).join('\n')}
-
-[분석 대상 데이터 상세 (Context)]
-${context || '(수집된 본문 없음. 위 핵심 사실과 외부 지식을 활용하여 작성하되 근거 부족 시 명시 바람)'}`;
-=======
-
     // Updated System Prompt for Source Consistency & Expansion
     const systemPrompt = `# Antigravity Prompt — 상세 리포트 생성기 (Source Expansion Edition)
 
@@ -610,19 +277,14 @@ ${context || '(수집된 본문 없음. 위 핵심 사실과 외부 지식을 �
 - ISSUE_URLS:
 ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
 - TODAY_KST: ${kstDateStr}`;
->>>>>>> feature/battery-brief
 
     try {
         console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');
         const result = await generateWithRetry(model, userPrompt);
         const response = await result.response;
-<<<<<<< HEAD
-        // JSON 문자열 반환
-        return response.text();
-=======
         let text = response.text();
 
-        // 🔧 소스 일관성 및 강화 로직
+        // 소스 일관성 및 강화 로직
         const briefingSources = issue.sources || [];
         const additionalSources: string[] = [];
 
@@ -639,7 +301,7 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
             });
         }
 
-        // 최종 소스 결합 (브리프 소스 전원 필수 포함 + 검색 소스)
+        // 최종 소스 결합
         const combinedSourcesSet = new Set([...briefingSources, ...additionalSources]);
         const finalUniqueSources = Array.from(combinedSourcesSet);
 
@@ -661,26 +323,20 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
             ? `\n(브리프 소스 ${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 ${expansionCount}개의 신규 출처를 확보했습니다.)\n`
             : `\n(브리프 작성에 사용된 모든 원본 소스 ${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
 
-        // 리포트 본문에서 기존 Sources 섹션(있다면) 제거 후 강제 결합
         const sourcesPattern = /## ■ Sources[\s\S]*$/i;
         const bodyContent = text.replace(sourcesPattern, '').trim();
 
-        // 최종 리포트 합체 (본문 + 강제 주입된 소스 섹션)
         const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
 
         console.log(`[Trend API] 소스 검증 완료: 브리프(${briefingSources.length}) -> 리포트(${finalUniqueSources.length})`);
 
         return finalReport;
->>>>>>> feature/battery-brief
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;
     }
 }
 
-<<<<<<< HEAD
-
-=======
 // Helper: Retry logic for API calls
 async function generateWithRetry(model: any, prompt: string | any, retries = 3, delay = 2000) {
     for (let i = 0; i < retries; i++) {
@@ -691,13 +347,12 @@ async function generateWithRetry(model: any, prompt: string | any, retries = 3, 
             const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
 
             if ((isOverloaded || isRateLimit) && i < retries - 1) {
-                console.warn(`[Gemini Retry] Attempt ${i + 1} failed (${error.status || error.message}). Retrying in ${delay}ms...`);
+                console.warn(`[Gemini Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
-                delay *= 2; // Exponential backoff
+                delay *= 2;
                 continue;
             }
             throw error;
         }
     }
 }
->>>>>>> feature/battery-brief

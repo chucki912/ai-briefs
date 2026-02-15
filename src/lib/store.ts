@@ -4,28 +4,47 @@ import path from 'path';
 import { kv } from '@vercel/kv';
 
 // 스토리지 인터페이스 정의
-interface StorageAdapter {
+// 스토리지 인터페이스 정의
+export interface StorageAdapter {
     saveBrief(report: BriefReport): Promise<void>;
     getBriefByDate(date: string): Promise<BriefReport | null>;
     getLatestBrief(): Promise<BriefReport | null>;
     getAllBriefs(limit?: number): Promise<BriefReport[]>;
     deleteBrief(date: string): Promise<boolean>;
+    // Generic KV Operations for temporary jobs
+    kvSet(key: string, value: any, ttlSeconds?: number): Promise<void>;
+    kvGet<T>(key: string): Promise<T | null>;
+    // Activity Logging
+    saveLog(log: ActivityLog): Promise<void>;
+    getLogs(limit?: number): Promise<ActivityLog[]>;
+}
+
+export interface ActivityLog {
+    id: string; // UUID
+    timestamp: number;
+    action: 'VIEW_BRIEF' | 'CLICK_ISSUE' | 'SHARE_ISSUE' | 'GENERATE_TREND_REPORT' | 'CLICK_SOURCE' | 'VIEW_TREND_REPORT';
+    targetId: string; // e.g., "2024-02-07" or "issue_hash"
+    metadata?: Record<string, any>;
+    userAgent?: string;
+    ip?: string;
 }
 
 // 1. 파일 시스템 스토리지 (로컬 개발용)
 class FileSystemStorage implements StorageAdapter {
     private dataDir: string;
+    private kvDir: string;
+    private logDir: string;
 
     constructor() {
         this.dataDir = path.join(process.cwd(), 'data', 'briefs');
+        this.kvDir = path.join(process.cwd(), 'data', 'kv');
+        this.logDir = path.join(process.cwd(), 'data', 'logs');
     }
 
     private async ensureDir() {
-        try {
-            await fs.access(this.dataDir);
-        } catch {
-            await fs.mkdir(this.dataDir, { recursive: true });
-        }
+        try { await fs.access(this.dataDir); } catch { await fs.mkdir(this.dataDir, { recursive: true }); }
+        try { await fs.access(this.kvDir); } catch { await fs.mkdir(this.kvDir, { recursive: true }); }
+        try { await fs.access(this.logDir); } catch { await fs.mkdir(this.logDir, { recursive: true }); }
     }
 
     async saveBrief(report: BriefReport): Promise<void> {
@@ -90,6 +109,72 @@ class FileSystemStorage implements StorageAdapter {
             return false;
         }
     }
+
+    async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
+        await this.ensureDir();
+        const safeKey = key.replace(/:/g, '_');
+        const filePath = path.join(this.kvDir, `${safeKey}.json`);
+
+        const data = {
+            value,
+            expiry: ttlSeconds ? Date.now() + (ttlSeconds * 1000) : Infinity
+        };
+
+        await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    }
+
+    async kvGet<T>(key: string): Promise<T | null> {
+        const safeKey = key.replace(/:/g, '_');
+        const filePath = path.join(this.kvDir, `${safeKey}.json`);
+
+        try {
+            const fileContent = await fs.readFile(filePath, 'utf-8');
+            const data = JSON.parse(fileContent);
+
+            if (Date.now() > data.expiry) {
+                await fs.unlink(filePath).catch(() => { });
+                return null;
+            }
+            return data.value as T;
+        } catch {
+            return null;
+        }
+    }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        await this.ensureDir();
+        // 일별 로그 파일: logs/2024-02-07.jsonl (line-delimited JSON)
+        const dateStr = new Date(log.timestamp).toISOString().split('T')[0];
+        const filePath = path.join(this.logDir, `${dateStr}.jsonl`);
+        // Append log line
+        await fs.appendFile(filePath, JSON.stringify(log) + '\n', 'utf-8');
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        // 최근 로그 파일부터 읽어서 limit만큼 반환하는 로직 (간소화)
+        // 실제로는 최근 파일들을 역순으로 읽어야 함
+        await this.ensureDir();
+        try {
+            const files = await fs.readdir(this.logDir);
+            const logFiles = files.filter(f => f.endsWith('.jsonl')).sort().reverse();
+
+            const logs: ActivityLog[] = [];
+            for (const file of logFiles) {
+                if (logs.length >= limit) break;
+                const content = await fs.readFile(path.join(this.logDir, file), 'utf-8');
+                const lines = content.split('\n').filter(Boolean).reverse(); // 최신순
+                for (const line of lines) {
+                    if (logs.length >= limit) break;
+                    try {
+                        logs.push(JSON.parse(line));
+                    } catch { }
+                }
+            }
+            return logs;
+        } catch {
+            return [];
+        }
+    }
 }
 
 // 2. Vercel KV 스토리지 (프로덕션 배포용)
@@ -99,7 +184,6 @@ class VercelKvStorage implements StorageAdapter {
         await kv.set(`brief:${report.date}`, report, { ex: 7776000 });
 
         // 날짜 인덱싱을 위한 Sorted Set 업데이트 (정렬 및 목록 조회용)
-        // Score: 타임스탬프 (최신순 정렬을 위해), Member: 날짜 문자열
         const timestamp = new Date(report.date).getTime();
         await kv.zadd('briefs_index', { score: timestamp, member: report.date });
         console.log(`[KV Store] 브리핑 저장 완료 (90일 보관): ${report.date}`);
@@ -110,7 +194,6 @@ class VercelKvStorage implements StorageAdapter {
     }
 
     async getLatestBrief(): Promise<BriefReport | null> {
-        // 가장 최근 날짜 1개 가져오기
         const dates = await kv.zrange('briefs_index', 0, 0, { rev: true });
         if (dates.length === 0) return null;
 
@@ -119,12 +202,9 @@ class VercelKvStorage implements StorageAdapter {
     }
 
     async getAllBriefs(limit = 30): Promise<BriefReport[]> {
-        // 최신 날짜 목록 조회
         const dates = await kv.zrange('briefs_index', 0, limit - 1, { rev: true });
         if (dates.length === 0) return [];
 
-        // 병렬로 데이터 가져오기 (mget 사용 가능하지만 키가 다르므로 Promise.all)
-        // mget은 `brief:date1`, `brief:date2`... 키를 한번에 가져올 수 있음.
         const keys = dates.map(date => `brief:${date}`);
         if (keys.length === 0) return [];
 
@@ -143,11 +223,40 @@ class VercelKvStorage implements StorageAdapter {
             return false;
         }
     }
+
+    async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
+        const opts = ttlSeconds ? { ex: ttlSeconds } : {};
+        await kv.set(key, value, opts);
+    }
+
+    async kvGet<T>(key: string): Promise<T | null> {
+        return await kv.get<T>(key);
+    }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        // 1. 로그 상세 저장 (30일 보관)
+        const key = `log:${log.timestamp}:${log.id}`;
+        await kv.set(key, log, { ex: 2592000 }); // 30 days
+
+        // 2. 인덱싱 (Timestamp Score)
+        await kv.zadd('logs_index', { score: log.timestamp, member: key });
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        // 최신순 조회
+        const keys = await kv.zrange('logs_index', 0, limit - 1, { rev: true });
+        if (keys.length === 0) return [];
+
+        // MGET으로 로그 상세 조회 (string[]으로 반환됨을 고려)
+        const logs = await kv.mget<(ActivityLog | null)[]>(...keys as string[]);
+        return logs.filter((log): log is ActivityLog => log !== null);
+    }
 }
 
 // 3. 인메모리 스토리지 (Vercel 배포 시 KV 미설정 상황 대비 Fallback)
 class InMemoryStorage implements StorageAdapter {
     private store = new Map<string, BriefReport>();
+    private kvStore = new Map<string, { value: any, expiry: number }>();
 
     async saveBrief(report: BriefReport): Promise<void> {
         this.store.set(report.date, report);
@@ -171,11 +280,38 @@ class InMemoryStorage implements StorageAdapter {
     async deleteBrief(date: string): Promise<boolean> {
         return this.store.delete(date);
     }
+
+    async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
+        const expiry = ttlSeconds ? Date.now() + (ttlSeconds * 1000) : Infinity;
+        this.kvStore.set(key, { value, expiry });
+    }
+
+    async kvGet<T>(key: string): Promise<T | null> {
+        const item = this.kvStore.get(key);
+        if (!item) return null;
+        if (Date.now() > item.expiry) {
+            this.kvStore.delete(key);
+            return null;
+        }
+        return item.value as T;
+    }
+
+    private logs: ActivityLog[] = [];
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        this.logs.unshift(log); // 최신순
+        // 메모리 관리: 1000개까지만 유지
+        if (this.logs.length > 1000) this.logs.pop();
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        return this.logs.slice(0, limit);
+    }
 }
 
 import { createClient, RedisClientType } from 'redis';
 
-// Redis Client Singleton (for Next.js Hot Reload)
+// Redis Client Singleton
 let redisClientInstance: RedisClientType | undefined;
 
 async function getRedisClient(url: string) {
@@ -184,16 +320,11 @@ async function getRedisClient(url: string) {
     const isTls = url.startsWith('rediss://');
     const client = createClient({
         url: url,
-        socket: isTls ? {
-            tls: true,
-            rejectUnauthorized: false
-        } : undefined
+        socket: isTls ? { tls: true, rejectUnauthorized: false } : undefined
     });
 
     client.on('error', (err) => console.error('[Redis Client Error]', err));
 
-    // User's preferred pattern: await connect()
-    // We attach it to the global scope in dev to prevent multiple instances
     if (process.env.NODE_ENV !== 'production') {
         if (!global.redisGlobal) {
             await client.connect();
@@ -208,7 +339,6 @@ async function getRedisClient(url: string) {
     return redisClientInstance;
 }
 
-// Global declaration for TypeScript
 declare global {
     var redisGlobal: unknown;
 }
@@ -223,10 +353,7 @@ class RedisStorage implements StorageAdapter {
 
     async saveBrief(report: BriefReport): Promise<void> {
         const client = await this.clientPromise;
-        // 개별 브리핑 저장 (90일 유지)
         await client.set(`brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
-
-        // 정렬용 인덱스
         const timestamp = new Date(report.date).getTime();
         await client.zAdd('briefs_index', { score: timestamp, value: report.date });
         console.log(`[Redis] 브리핑 저장 완료: ${report.date}`);
@@ -247,17 +374,13 @@ class RedisStorage implements StorageAdapter {
 
     async getAllBriefs(limit = 30): Promise<BriefReport[]> {
         const client = await this.clientPromise;
-        // 인덱스 조회
         const dates = await client.zRange('briefs_index', 0, limit - 1, { REV: true });
         if (dates.length === 0) return [];
 
-        // MGET을 위한 키 생성
         const keys = dates.map(date => `brief:${date}`);
         if (keys.length === 0) return [];
 
         const results = await client.mGet(keys);
-
-        // null 제외하고 파싱
         return results
             .filter((item): item is string => item !== null)
             .map(item => JSON.parse(item) as BriefReport);
@@ -275,32 +398,63 @@ class RedisStorage implements StorageAdapter {
             return false;
         }
     }
+
+    async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
+        const client = await this.clientPromise;
+        const opts = ttlSeconds ? { EX: ttlSeconds } : {};
+        // Redis는 객체를 문자열로 직렬화해야 함
+        const stringVal = JSON.stringify(value);
+        await client.set(key, stringVal, opts);
+    }
+
+    async kvGet<T>(key: string): Promise<T | null> {
+        const client = await this.clientPromise;
+        const data = await client.get(key);
+        return data ? JSON.parse(data) as T : null;
+    }
+
+    async saveLog(log: ActivityLog): Promise<void> {
+        const client = await this.clientPromise;
+        const key = `log:${log.timestamp}:${log.id}`;
+
+        // Transaction to ensure atomicity
+        await client.multi()
+            .set(key, JSON.stringify(log), { EX: 2592000 }) // 30 days
+            .zAdd('logs_index', { score: log.timestamp, value: key })
+            .exec();
+    }
+
+    async getLogs(limit = 100): Promise<ActivityLog[]> {
+        const client = await this.clientPromise;
+        const keys = await client.zRange('logs_index', 0, limit - 1, { REV: true });
+        if (keys.length === 0) return [];
+
+        const logs = await client.mGet(keys);
+        return logs
+            .filter((log): log is string => log !== null)
+            .map(log => JSON.parse(log) as ActivityLog);
+    }
 }
 
 // 환경에 따른 스토리지 선택 factory
-function getStorage(): StorageAdapter {
+export function getStorage(): StorageAdapter {
     // 1. Vercel KV (전용 SDK 사용)
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        console.log('[Store] Vercel KV Storage 모드로 동작합니다.');
         return new VercelKvStorage();
     }
 
     // 2. 표준 Redis (KV_URL 또는 REDIS_URL)
     const redisUrl = process.env.KV_URL || process.env.REDIS_URL;
     if (redisUrl) {
-        console.log('[Store] Standard Redis Storage 모드로 동작합니다.');
         return new RedisStorage(redisUrl);
     }
 
-    // 3. Fallback: Vercel 환경이지만 설정 없는 경우
+    // 3. Fallback: 배포 환경이지만 설정 없음
     if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-        console.warn('⚠️ [Store] Vercel 환경이 감지되었으나 KV 설정이 없습니다.');
-        console.warn('⚠️ [Store] InMemoryStorage로 전환합니다. (서버 재시작 시 데이터가 초기화됩니다)');
         return new InMemoryStorage();
     }
 
     // 4. 로컬 개발 환경
-    console.log('[Store] Local File Storage 모드로 동작합니다.');
     return new FileSystemStorage();
 }
 
@@ -311,6 +465,14 @@ export const getBriefByDate = (date: string) => storage.getBriefByDate(date);
 export const getLatestBrief = () => storage.getLatestBrief();
 export const getAllBriefs = (limit?: number) => storage.getAllBriefs(limit);
 export const deleteBrief = (date: string) => storage.deleteBrief(date);
+
+// KV Helper Exports
+export const kvSet = (key: string, value: any, ttl?: number) => storage.kvSet(key, value, ttl);
+export const kvGet = <T>(key: string) => storage.kvGet<T>(key);
+
+// Logging Exports
+export const saveLog = (log: ActivityLog) => storage.saveLog(log);
+export const getLogs = (limit?: number) => storage.getLogs(limit);
 
 export function closeDb(): void {
     // 필요 시 연결 종료 로직 추가 가능

@@ -38,13 +38,14 @@ export const RSS_FEEDS = {
         { name: "MIT Tech Review", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed" },
     ],
     TIER_3: [
-        { name: "Reuters Tech", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" },
+        // { name: "Reuters Tech", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" }, // 404 Error (2026-02-07)
     ]
 };
 
 // Google News RSS 검색 URL 생성
 export function getGoogleNewsRssUrl(query: string): string {
-    const encodedQuery = encodeURIComponent(query);
+    // when:1d 파라미터를 추가하여 24시간 이내 뉴스만 검색
+    const encodedQuery = encodeURIComponent(query + ' when:1d');
     return `https://news.google.com/rss/search?q=${encodedQuery}&hl=en-US&gl=US&ceid=US:en`;
 }
 

@@ -26,18 +26,27 @@ async function handleGenerate(request: Request) {
 
         console.log('[Generate] 브리핑 생성 시작...');
 
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0];
+        const body = await request.json().catch(() => ({}));
+        const force = body.force === true;
 
-        // 이미 오늘 브리핑이 있는지 확인
-        const existingBrief = await getBriefByDate(dateStr);
-        if (existingBrief) {
-            console.log('[Generate] 오늘 브리핑이 이미 존재합니다.');
-            return NextResponse.json({
-                success: true,
-                data: existingBrief,
-                message: '이미 생성된 브리핑이 있습니다.'
-            });
+        const nowDate = new Date();
+        // Asia/Seoul 시간대로 YYYY-MM-DD 형식 추출
+        const dateStr = nowDate.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+        const kstDate = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+
+        // 이미 오늘 브리핑이 있는지 확인 (force가 아닐 때만)
+        if (!force) {
+            const existingBrief = await getBriefByDate(dateStr);
+            if (existingBrief) {
+                console.log('[Generate] 오늘 브리핑이 이미 존재합니다.');
+                return NextResponse.json({
+                    success: true,
+                    data: existingBrief,
+                    message: '이미 생성된 브리핑이 있습니다.'
+                });
+            }
+        } else {
+            console.log('[Generate] 강제 재생성 모드 활성화');
         }
 
         // 1. 뉴스 수집
@@ -46,7 +55,7 @@ async function handleGenerate(request: Request) {
 
         if (newsItems.length === 0) {
             console.log('[Generate] 수집된 뉴스가 없습니다.');
-            const emptyReport = buildEmptyReport(today);
+            const emptyReport = buildEmptyReport(kstDate);
             await saveBrief(emptyReport);
             return NextResponse.json({
                 success: true,
@@ -63,7 +72,7 @@ async function handleGenerate(request: Request) {
 
         // 3. 리포트 생성
         console.log('[Generate] Step 3: 리포트 생성 중...');
-        const report = buildReport(issues, today);
+        const report = buildReport(issues, kstDate);
 
         // 4. 데이터베이스 저장
         console.log('[Generate] Step 4: 저장 중...');

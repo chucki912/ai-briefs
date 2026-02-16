@@ -13,6 +13,7 @@ const parser = new Parser({
 });
 
 const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY || '';
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '';
 
 // 배터리 뉴스 수집 메인 함수
 export async function fetchBatteryNews(): Promise<NewsItem[]> {
@@ -28,11 +29,17 @@ export async function fetchBatteryNews(): Promise<NewsItem[]> {
     const googleNews = await fetchFromBatteryGoogleNews();
     allNews.push(...googleNews);
 
-    // 3. Brave Search에서 배터리 키워드 검색
     if (BRAVE_API_KEY) {
         console.log('[Battery] Step 3: Brave Search 검색 중...');
         const braveNews = await fetchFromBatteryBraveSearch();
         allNews.push(...braveNews);
+    }
+
+    // 3.5. Tavily Search에서 배터리 키워드 검색 (추가)
+    if (TAVILY_API_KEY) {
+        console.log('[Battery] Step 3.5: Tavily Search 검색 중...');
+        const tavilyNews = await fetchFromBatteryTavilySearch();
+        allNews.push(...tavilyNews);
     }
 
     // 4. 중복 제거 및 필터링 (LG 제외 포함)
@@ -168,6 +175,58 @@ async function fetchFromBatteryBraveSearch(): Promise<NewsItem[]> {
             console.log(`[Battery Brave] "${keyword}": ${items.length}개 항목`);
         } catch (error) {
             console.error(`[Battery Brave Error] ${keyword}:`, error);
+        }
+    }
+
+    return news;
+}
+
+// Tavily Search에서 배터리 키워드 검색
+async function fetchFromBatteryTavilySearch(): Promise<NewsItem[]> {
+    const news: NewsItem[] = [];
+    const searchKeywords = BATTERY_CONFIG.keywords.slice(0, 5);
+
+    for (const keyword of searchKeywords) {
+        try {
+            const response = await fetch('https://api.tavily.com/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: TAVILY_API_KEY,
+                    query: keyword,
+                    search_depth: 'basic',
+                    include_answer: false,
+                    include_images: false,
+                    include_raw_content: false,
+                    max_results: 5,
+                    days: 1
+                }),
+            });
+
+            if (!response.ok) {
+                console.error(`[Battery Tavily Error] ${response.status}`);
+                continue;
+            }
+
+            const data = await response.json();
+            const results = data.results || [];
+
+            for (const result of results) {
+                news.push({
+                    id: generateId(result.url),
+                    title: result.title,
+                    description: result.content || '',
+                    url: result.url,
+                    source: 'Tavily Search',
+                    publishedAt: new Date(),
+                });
+            }
+
+            console.log(`[Battery Tavily] "${keyword}": ${results.length}개 항목`);
+        } catch (error) {
+            console.error(`[Battery Tavily Error] ${keyword}:`, error);
         }
     }
 

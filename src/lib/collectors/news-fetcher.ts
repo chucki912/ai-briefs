@@ -16,6 +16,7 @@ const parser = new Parser({
 });
 
 const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY || '';
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '';
 
 // 뉴스 수집 메인 함수
 export async function fetchAllNews(): Promise<NewsItem[]> {
@@ -37,10 +38,18 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
         console.warn('[NewsCollector] Brave API Key가 설정되지 않아 건너뜁니다.');
     }
 
-    // 4. 중복 제거 및 필터링
+    // 4. Tavily Search에서 주요 키워드 검색 (추가)
+    if (TAVILY_API_KEY) {
+        const tavilyNews = await fetchFromTavilySearch();
+        allNews.push(...tavilyNews);
+    } else {
+        console.warn('[NewsCollector] Tavily API Key가 설정되지 않아 건너뜁니다.');
+    }
+
+    // 5. 중복 제거 및 필터링
     const filteredNews = filterAndDeduplicate(allNews);
 
-    // 5. 점수 기반 정렬
+    // 6. 점수 기반 정렬
     const sortedNews = sortByRelevance(filteredNews);
 
     console.log(`[NewsCollector] 총 ${sortedNews.length}개 뉴스 수집 완료`);
@@ -178,6 +187,57 @@ async function fetchFromBraveSearch(): Promise<NewsItem[]> {
     return news;
 }
 
+// Tavily Search에서 키워드 검색
+async function fetchFromTavilySearch(): Promise<NewsItem[]> {
+    const news: NewsItem[] = [];
+    const searchKeywords = PRIMARY_KEYWORDS.slice(0, 5);
+
+    for (const keyword of searchKeywords) {
+        try {
+            const response = await fetch('https://api.tavily.com/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: TAVILY_API_KEY,
+                    query: keyword,
+                    search_depth: 'basic',
+                    include_answer: false,
+                    include_images: false,
+                    include_raw_content: false,
+                    max_results: 5,
+                    days: 1 // 최신 뉴스 위주
+                }),
+            });
+
+            if (!response.ok) {
+                console.error(`[Tavily API Error] ${response.status} ${response.statusText}`);
+                continue;
+            }
+
+            const data = await response.json();
+            const results = data.results || [];
+
+            for (const result of results) {
+                news.push({
+                    id: generateId(result.url),
+                    title: result.title,
+                    description: result.content || '',
+                    url: result.url,
+                    source: 'Tavily Search',
+                    publishedAt: new Date(), // Tavily results are fresh
+                });
+            }
+
+            console.log(`[Tavily Search] "${keyword}": ${results.length}개 항목`);
+        } catch (error) {
+            console.error(`[Tavily Search Error] ${keyword}:`, error);
+        }
+    }
+
+    return news;
+}
 
 // 필터링 및 중복 제거
 function filterAndDeduplicate(news: NewsItem[]): NewsItem[] {

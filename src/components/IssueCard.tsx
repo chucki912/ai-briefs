@@ -359,6 +359,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     .issue-card {
                         padding: 1.25rem;
                         border-radius: 20px;
+                        margin-bottom: 1.5rem;
                     }
 
                     .issue-header-row {
@@ -370,23 +371,40 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
 
                     .issue-tag-group {
                         width: 100%;
-                        justify-content: space-between;
+                        justify-content: flex-start; /* Changed from space-between to keep tags together */
+                        gap: 8px;
+                        flex-wrap: wrap;
+                    }
+
+                    .actions-group {
+                        width: 100%;
+                        justify-content: flex-start;
+                        margin-top: 0.5rem;
                     }
 
                     .btn-text-icon {
-                        width: 100%;
+                        flex: 1; /* Make deep dive button take available space */
                         justify-content: center;
                         padding: 10px;
+                        height: 42px; /* Ensure 44px touch target height */
+                    }
+
+                    .btn-icon-only {
+                        width: 42px;
+                        height: 42px;
                     }
 
                     .issue-headline {
-                        font-size: 1.25rem;
+                        font-size: 1.35rem; /* Slightly larger for readability */
                         margin-bottom: 1rem;
+                        line-height: 1.3;
+                        word-break: keep-all; 
                     }
 
                     .issue-facts li {
                         font-size: 0.95rem;
                         padding-left: 1.25rem;
+                        margin-bottom: 0.5rem;
                     }
 
                     .issue-insight-container {
@@ -396,6 +414,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
 
                     .issue-insight-content {
                         font-size: 0.95rem;
+                        line-height: 1.6;
                     }
 
                     .sources-list {
@@ -403,11 +422,10 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     }
 
                     .source-link-chip {
-                        width: 100%;
-                        justify-content: flex-start;
-                    }
-                }
-                        justify-content: flex-start;
+                        max-width: 100%;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
                     }
                 }
 

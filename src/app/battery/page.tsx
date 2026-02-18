@@ -388,14 +388,44 @@ export default function BatteryBriefPage() {
                     .hero-meta-container {
                         flex-direction: column;
                         gap: 1.5rem;
-                        align-items: flex-start;
+                        align-items: stretch; /* Stretch items to full width */
                         padding: 1.5rem;
                     }
                     
+                    .meta-info-group {
+                        flex-direction: column; /* Stack total issues and time */
+                        align-items: flex-start;
+                        gap: 1rem;
+                        width: 100%;
+                    }
+
+                    .meta-divider-vertical {
+                        display: none; /* Hide vertical divider on mobile */
+                    }
+
+                    .meta-box {
+                        width: 100%;
+                        flex-direction: row;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding-bottom: 0.5rem;
+                        border-bottom: 1px dashed var(--border-color);
+                    }
+
+                    .meta-box:last-child {
+                        border-bottom: none;
+                    }
+
                     .meta-action-group {
                         width: 100%;
                         display: flex;
-                        justify-content: flex-end;
+                        justify-content: center;
+                    }
+
+                    .regenerate-button {
+                        width: 100%;
+                        justify-content: center;
+                        padding: 12px;
                     }
 
                     .sentinel-badge {

@@ -315,69 +315,72 @@ export async function generateTrendReport(
     context: string // Kept for compatibility
 ): Promise<string | null> {
     // Updated System Prompt for Source Consistency & Expansion
-    const systemPrompt = `# Antigravity Prompt — 상세 리포트 생성기 (Source Expansion Edition)
+    const systemPrompt = `# Antigravity Prompt — 상세 리포트 생성기 (Deep Research Edition)
 
 ## Role
 당신은 ‘글로벌 AI 산업 트렌드센싱 리포트 작성자’이자 ‘전략 컨설턴트’입니다.
-브리프(단신)의 정보를 기반으로 더 깊이 있는 "심층 분석"을 수행합니다.
+우리는 브리프(단신)의 정보를 기반으로 더 깊이 있는 "심층 분석"을 수행해야 합니다.
 
-## 핵심 목표: 소스 일관성 및 확장 (Critical)
-1) **소스 상속**: 입력된 'ISSUE_URLS'는 이미 검증된 브리프의 원본 소스들입니다. 이들은 리포트의 기반이며, 모든 분석의 출발점이 되어야 합니다.
-2) **소스 확장**: 당신은 상세 리포트 작성자로서 전문가적인 깊이를 더하기 위해, 제공된 소스 외에 **최소 1~2개 이상의 새로운 고품질 소스**를 스스로 검색하여 추가해야 합니다.
-3) **검색 활용**: 'googleSearch', 'Brave Search', 'Tavily' 도구를 적극적으로 사용하여 기술적 상세 내용, 시장 데이터, 또는 경쟁사의 반응 등을 찾아 리포트를 보완하십시오.
+## Critical Process (Research First)
+**작성 전, 반드시 검색("googleSearch")을 수행하십시오.**
+1. **Fact Check**: 입력된 브리프 내용의 최신 진행 상황을 확인하십시오.
+2. **Deep Dive**: 해당 기술/제품/정책의 구체적인 스펙, 출시일, 경쟁사 반응, 시장 데이터를 검색하십시오.
+3. **Expand**: 브리프에 없는 새로운 관점(기술적 한계, 법적 쟁점, 숨겨진 수혜주 등)을 찾아내십시오.
 
-## Critical Rules
-1) 출력 포맷: 반드시 아래 “OUTPUT TEMPLATE” 그대로 작성.
-2) Action Item 금지: 행동 지시 문구 작성 금지.
-3) 사실 검증: 존재하지 않는 사실 창작 금지.
-4) 소스 섹션 작성 방식:
-   - **Sources 섹션 작성 금지**: 최종 소스 리스트는 시스템이 원본과 검색 결과를 합쳐서 자동으로 생성합니다. 리포트 끝에 절대로 URL을 직접 적지 마십시오.
+## Core Rules
+1) **No Mock Data**: "추후 발표 예정", "다양한 기업들", "업계 관계자" 같은 모호한 표현을 절대 금지합니다. 실명, 구체적 수치, 날짜를 명시하십시오. 찾지 못했다면 해당 내용을 쓰지 마십시오.
+2) **Source Extension**: 입력된 'ISSUE_URLS'는 출발점일 뿐입니다. 당신은 리포트 작성 과정에서 반드시 **최소 2개 이상의 새로운 고품질 소스(해외 테크 미디어, 논문, 공식 블로그 등)**를 찾아 내용을 보강해야 합니다.
+3) **Professional Tone**: 컨설팅 펌 보고서 톤으로 작성하십시오. (~함, ~임 체 사용)
 
-========================================================
-## OUTPUT TEMPLATE (이 형식 그대로 출력)
+## Output Format
+반드시 아래 포맷을 엄격히 준수하십시오. 마크다운 형식을 유지하십시오.
 
-# [트렌드 리포트] {이슈를 한 문장으로 요약한 제목}
+# [트렌드 리포트] {이슈를 관통하는 전문적인 제목}
 
-분석대상: {산업 세그먼트}
-타겟: {이해관계자 3종}
-기간: {날짜 범위}
-관점: {분석 프레임워크 기반 관점}
+분석대상: {구체적 대상}
+타겟: {Report Audience}
+기간: {최근 1주~1개월}
+관점: {기술/시장/규제 중 핵심 관점}
 
 ## ■ Executive Summary
-- **[Signal]** {핵심 신호}
-- **[Change]** {산업 구조 변화}
-- **[So What]** {전략적 함의}
+- **[Signal]** {이 이슈가 보내는 핵심 신호 (구체적임)}
+- **[Change]** {이로 인해 변경되는 산업 지형도}
+- **[So What]** {한국 기업이 주목해야 할 시사점}
 
-## ■ Key Developments
-### [{핵심 전개 1}]
-- (Fact) {확정 사실 1}
-- (Analysis) {분석} (Basis: {이론} - {설명})
+## ■ Key Developments (Deep Dive)
+### [{구체적 사건/발표명 1}]
+- (Fact) {검색된 구체적 사실 1 (수치, 날짜 필수)}
+- (Analysis) {분석 내용} (Basis: {근거가 되는 이론이나 유사 사례})
+
+### [{구체적 사건/발표명 2}]
+- (Fact) {검색된 구체적 사실 2}
+- (Analysis) {분석 내용}
 
 ## ■ Core Themes
-### [{테마 1}]
-- (Driver) {메커니즘}
+### [{테마명}]
+- (Driver) {이 테마를 이끄는 동인}
+- (Context) {배경 설명 및 연관 기업 동향}
 
 ## ■ Implications
-- **[Market]** {시장 관점}
-- **[Tech]** {기술 관점}
-- **[Comp]** {경쟁 관점}
-- **[Policy]** {규제 관점}
+- **[Market]** {시장 규모 및 비즈니스 모델 영향}
+- **[Tech]** {기술적 돌파구나 한계점}
+- **[Comp]** {경쟁사(Google, OpenAI, MS 등)의 대응 현황}
+- **[Policy]** {관련 규제나 법적 리스크}
 
 ## ■ Risks & Uncertainties
-- **[tech]** {기술 리스크}
-- **[market]** {시장 리스크}
-- **[reg]** {규제 리스크}
+- **[tech/market/reg]** {구체적인 리스크 요인}
+  - Impact: {예상되는 부정적 영항}
 
 ## ■ Watchlist
-- **{관측 지표 1}**
-(Why) {중요성}
-(How) {모니터링 방법}
+- **{지표/이벤트 명}**
+(Why) {이것이 왜 중요한 트리거인지}
+(How) {무엇을 모니터링해야 하는지}
 
 ## ■ Sources
 (시스템이 브리프 소스 \${issue.sources ? issue.sources.length : 0}개에 당신이 추가한 신규 소스를 더하여 주입합니다.)
 
 ## START
-즉시 리포트를 작성하라.`;
+지금 즉시 검색을 시작하고, 확보된 팩트를 바탕으로 리포트를 작성하십시오. 상상하지 마십시오. 검색하십시오.`;
 
     const model = genAI.getGenerativeModel({
         model: 'gemini-3-pro-preview',
@@ -390,11 +393,11 @@ export async function generateTrendReport(
 
     const userPrompt = `
 # INPUTS
-- ISSUE_TITLE: \${issue.headline}
-- ISSUE_BULLETS: \${issue.keyFacts.join(', ')}
+- ISSUE_TITLE: ${issue.headline}
+- ISSUE_BULLETS: ${issue.keyFacts.join(', ')}
 - ISSUE_URLS:
-\${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
-- TODAY_KST: \${kstDateStr}`;
+${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
+- TODAY_KST: ${kstDateStr}`;
 
     try {
         console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');

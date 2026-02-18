@@ -224,6 +224,109 @@ export default function HomePage() {
         onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
         onGenerationComplete={() => setReportLoading(false)}
       />
-    </div>
+      <style jsx>{`
+        .hero-meta {
+
+          display: flex;
+          align-items: center;
+          gap: 2rem;
+          background: var(--bg-card);
+          backdrop-filter: blur(8px);
+          border: 1px solid var(--border-color);
+          padding: 1.5rem 2rem;
+          border-radius: 20px;
+          box-shadow: var(--shadow-md);
+        }
+
+        .meta-item {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .meta-label {
+          font-size: 0.75rem;
+          font-weight: 800;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          margin-bottom: 4px;
+        }
+
+        .meta-value {
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .meta-divider {
+          width: 1px;
+          height: 40px;
+          background: var(--border-color);
+        }
+
+        .meta-filler {
+          flex: 1;
+        }
+
+        .regenerate-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: var(--text-primary);
+          color: var(--bg-primary);
+          border: none;
+          padding: 10px 20px;
+          border-radius: 14px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .regenerate-button:hover:not(:disabled) {
+          transform: translateY(-2px) scale(1.02);
+          background: black;
+          box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .regenerate-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 640px) {
+          .hero-meta {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1.5rem;
+            padding: 1.5rem;
+          }
+
+          .meta-item {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dashed var(--border-color);
+          }
+
+          .meta-divider {
+            display: none;
+          }
+          
+          .meta-filler {
+            display: none;
+          }
+
+          .regenerate-button {
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+            margin-top: 0.5rem;
+          }
+        }
+      `}</style>
+    </div >
   );
 }

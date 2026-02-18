@@ -794,10 +794,47 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     display: flex;
                     align-items: center;
                     gap: 6px;
-                    background: var(--bg-body);
-                    border: 1px solid var(--border-color);
-                    padding: 4px 10px;
-                    border-radius: 6px;
+                @media (max-width: 480px) {
+                    .modal-overlay {
+                        padding: 0; /* Full screen on mobile */
+                        align-items: flex-end; /* Bottom sheet style or just full screen */
+                    }
+                    .modal-content.report-modal {
+                        width: 100%;
+                        height: 100%; /* Full screen height */
+                        border-radius: 0;
+                        max-width: none;
+                    }
+                    .modal-header {
+                        padding: 1rem;
+                    }
+                    .modal-header h2 {
+                        font-size: 1.1rem;
+                    }
+                    .modal-body {
+                        padding: 1.25rem;
+                    }
+                    .report-title {
+                        font-size: 1.4rem;
+                    }
+                    .report-badge-row {
+                        gap: 0.4rem;
+                    }
+                    .implications-grid {
+                        grid-template-columns: 1fr; /* Stack implications */
+                    }
+                    .watchlist-grid {
+                        grid-template-columns: 1fr; /* Stack watchlist */
+                    }
+                    .source-chip {
+                        max-width: 100%;
+                    }
+                    .source-host {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                }
                     text-decoration: none;
                     font-size: 0.8rem;
                     color: var(--text-primary);

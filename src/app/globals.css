@@ -475,13 +475,29 @@ body {
     margin-bottom: 2rem;
   }
 
+  .logo {
+    font-size: 1.8rem;
+    /* Make logo slightly smaller but still prominent */
+  }
+
+  .nav {
+    width: 100%;
+    justify-content: center;
+    /* Center nav items */
+    gap: 1.5rem;
+  }
+
   .hero-section {
     padding: 2rem 0 3rem 0;
     margin-bottom: 2rem;
   }
 
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
+    /* reduced from 2.5rem */
+    word-break: keep-all;
+    /* Prevent awkward word breaks for Korean */
+    line-height: 1.2;
   }
 
   .hero-subtitle {

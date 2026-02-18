@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NewsItem, IssueItem } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
+import { getRecentIssues } from './store';
 
 // Gemini API 클라이언트 초기화
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -14,6 +15,10 @@ export async function analyzeNewsAndGenerateInsights(
     // 뉴스를 관련 주제별로 클러스터링
     const clusters = clusterNewsByTopic(newsItems);
 
+    // 중복 방지를 위한 최근 이슈 조회 (지난 3일치)
+    const recentIssues = await getRecentIssues(3);
+    console.log(`[Deduplication] Loaded ${recentIssues.length} recent issues for comparison.`);
+
     const issues: IssueItem[] = [];
 
     // 최대 5개 이슈만 생성
@@ -21,8 +26,25 @@ export async function analyzeNewsAndGenerateInsights(
 
     for (const cluster of topClusters) {
         try {
+            // 중복 체크 1단계: 헤드라인 유사도 (빠른 필터링)
+            const clusterHeadline = cluster[0].title;
+            const isPotentialDupe = recentIssues.some(issue =>
+                calculateSimilarity(issue.headline, clusterHeadline) > 0.6
+            );
+
+            if (isPotentialDupe) {
+                console.log(`[Deduplication] Skipping likely duplicate cluster: ${clusterHeadline}`);
+                continue;
+            }
+
             const issue = await generateIssueFromCluster(model, cluster);
             if (issue) {
+                // 중복 체크 2단계: 생성된 이슈 내용 기반 정밀 체크 (AI 활용 가능하나 비용 절감 위해 키워드/소스 매칭 사용)
+                const isDuplicate = await checkDuplicateIssues(issue, recentIssues);
+                if (isDuplicate) {
+                    console.log(`[Deduplication] Discarded duplicate issue: ${issue.headline}`);
+                    continue;
+                }
                 issues.push(issue);
             }
         } catch (error) {
@@ -122,7 +144,9 @@ ${getFrameworkNames(frameworks)}
   "relevantSourceIndices": [1, 2]
 }
 \`\`\`
+
 - 감정적 표현 배제, 건조하고 전문적인 분석 톤
+- **단일 사건 집중 원칙**: 제공된 뉴스 클러스터 안에서 **가장 중요하고 시급한 단 하나의 사건(Single Event)**을 선정하세요. 나머지 관련성이 낮은 기사는 과감히 무시하십시오. Key Facts 3가지는 모두 **동일한 하나의 사건**에 대한 세부 내용이어야 합니다.
 
 JSON만 출력하세요.`;
 
@@ -174,6 +198,101 @@ JSON만 출력하세요.`;
     } catch (error) {
         console.error('[Issue Generation Error]', error);
         return null;
+    }
+}
+
+// 중복 이슈 체크 로직
+export async function checkDuplicateIssues(newIssue: IssueItem, history: IssueItem[]): Promise<boolean> {
+    if (history.length === 0) return false;
+
+    // 1. 소스 URL 중복 체크 (가장 확실함)
+    // 새로운 이슈의 소스가 기존 이슈의 소스와 50% 이상 겹치면 중복
+    const newSources = new Set(newIssue.sources || []);
+
+    for (const oldIssue of history) {
+        const oldSources = new Set(oldIssue.sources || []);
+        if (newSources.size === 0 || oldSources.size === 0) continue;
+
+        const intersection = [...newSources].filter(x => oldSources.has(x));
+        const overlapRatio = intersection.length / Math.min(newSources.size, oldSources.size);
+
+        if (overlapRatio >= 0.5) {
+            console.log(`[Deduplication] Source overlap ${Math.round(overlapRatio * 100)}% with "${oldIssue.headline}"`);
+            return true;
+        }
+
+        // 2. 헤드라인 유사도 체크 (Jaccard Similarity of keywords)
+        const sim = calculateSimilarity(newIssue.headline, oldIssue.headline);
+        if (sim > 0.7) {
+            console.log(`[Deduplication] Headline similarity ${sim.toFixed(2)} with "${oldIssue.headline}"`);
+            return true;
+        }
+
+        // 3. AI Semantic Check (Fallback for semantic duplicates)
+        // 키워드 유사도가 낮아도(0.2~0.7) 의미적으로 동일할 수 있음 (예: "Stock Hits High" vs "Shares Record")
+        if (sim > 0.2) {
+            const isSemanticDupe = await checkSemanticDuplicate(newIssue, oldIssue);
+            if (isSemanticDupe) return true;
+        }
+    }
+    return false;
+}
+
+// 3. AI 기반 의미론적 유사도 체크 (키워드 매칭이 애매한 경우)
+async function checkSemanticDuplicate(newIssue: IssueItem, oldIssue: IssueItem): Promise<boolean> {
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const prompt = `
+        Compare these two news issues and determine if they describe the exact same core event or announcement. 
+        Ignore minor differences in details or perspective.
+
+        Issue A: "${newIssue.headline}"
+        Key Facts A: ${newIssue.keyFacts.join(', ')}
+        
+        Issue B: "${oldIssue.headline}"
+        Key Facts B: ${oldIssue.keyFacts.join(', ')}
+        
+        Are they referring to the same event? Answer strictly with "YES" or "NO".
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().trim().toUpperCase();
+
+        if (text.includes("YES")) {
+            console.log(`[Deduplication] AI Semantic Match: "${newIssue.headline}" == "${oldIssue.headline}"`);
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error("Semantic check failed", e);
+        return false;
+    }
+}
+
+// 간단한 키워드 기반 유사도 (Jaccard Similarity)
+export function calculateSimilarity(str1: string, str2: string): number {
+    const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s가-힣]/g, '').split(/\s+/).filter(w => w.length > 1);
+    const set1 = new Set(normalize(str1));
+    const set2 = new Set(normalize(str2));
+
+    if (set1.size === 0 || set2.size === 0) return 0;
+
+    const intersection = [...set1].filter(x => set2.has(x));
+    return intersection.length / (set1.size + set2.size - intersection.length); // Jaccard Index
+}
+
+// API 연결 테스트 function
+export async function checkGeminiConnection(): Promise<boolean> {
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const result = await model.generateContent('Hello');
+        const response = await result.response;
+        console.log('[Gemini Connection Test Success]:', response.text().slice(0, 20) + '...');
+        return true;
+    } catch (error) {
+        console.error('[Gemini Connection Test Failed]', error);
+        return false;
     }
 }
 
@@ -255,7 +374,7 @@ export async function generateTrendReport(
 (How) {모니터링 방법}
 
 ## ■ Sources
-(시스템이 브리프 소스 ${issue.sources ? issue.sources.length : 0}개에 당신이 추가한 신규 소스를 더하여 주입합니다.)
+(시스템이 브리프 소스 \${issue.sources ? issue.sources.length : 0}개에 당신이 추가한 신규 소스를 더하여 주입합니다.)
 
 ## START
 즉시 리포트를 작성하라.`;
@@ -271,11 +390,11 @@ export async function generateTrendReport(
 
     const userPrompt = `
 # INPUTS
-- ISSUE_TITLE: ${issue.headline}
-- ISSUE_BULLETS: ${issue.keyFacts.join(', ')}
+- ISSUE_TITLE: \${issue.headline}
+- ISSUE_BULLETS: \${issue.keyFacts.join(', ')}
 - ISSUE_URLS:
-${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
-- TODAY_KST: ${kstDateStr}`;
+\${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
+- TODAY_KST: \${kstDateStr}`;
 
     try {
         console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');
@@ -311,23 +430,23 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
                 const urlObj = new URL(url);
                 const hostname = urlObj.hostname.replace('www.', '');
                 const label = briefingSources.includes(url) ? 'Brief Origin' : 'Deep Research';
-                newSourcesSection += `- [${idx + 1}] ${hostname} | ${kstDateStr.split(' ')[0]} | [${label}] ${url}\n`;
+                newSourcesSection += `- [\${idx + 1}] \${hostname} | \${kstDateStr.split(' ')[0]} | [\${label}] \${url}\n`;
             } catch (e) {
-                newSourcesSection += `- [${idx + 1}] Source | ${kstDateStr.split(' ')[0]} | ${url}\n`;
+                newSourcesSection += `- [\${idx + 1}] Source | \${kstDateStr.split(' ')[0]} | \${url}\n`;
             }
         });
 
         const expansionCount = finalUniqueSources.length - briefingSources.length;
         newSourcesSection += expansionCount > 0
-            ? `\n(브리프 소스 ${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 ${expansionCount}개의 신규 출처를 확보했습니다.)\n`
-            : `\n(브리프 작성에 사용된 모든 원본 소스 ${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
+            ? `\n(브리프 소스 \${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 \${expansionCount}개의 신규 출처를 확보했습니다.)\n`
+            : `\n(브리프 작성에 사용된 모든 원본 소스 \${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
 
         const sourcesPattern = /## ■ Sources[\s\S]*$/i;
         const bodyContent = text.replace(sourcesPattern, '').trim();
 
         const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
 
-        console.log(`[Trend API] 소스 검증 완료: 브리프(${briefingSources.length}) -> 리포트(${finalUniqueSources.length})`);
+        console.log(`[Trend API] 소스 검증 완료: 브리프(\${briefingSources.length}) -> 리포트(\${finalUniqueSources.length})`);
 
         return finalReport;
     } catch (error) {
@@ -346,7 +465,7 @@ async function generateWithRetry(model: any, prompt: string | any, retries = 3, 
             const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
 
             if ((isOverloaded || isRateLimit) && i < retries - 1) {
-                console.warn(`[Gemini Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+                console.warn(`[Gemini Retry] Attempt \${i + 1} failed. Retrying in \${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 delay *= 2;
                 continue;

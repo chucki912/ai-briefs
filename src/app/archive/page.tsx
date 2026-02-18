@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
+import ManualSourceInput from '@/components/ManualSourceInput';
 import { BriefReport, IssueItem } from '@/types';
 
 interface BriefSummary {
@@ -20,6 +21,12 @@ export default function ArchivePage() {
     const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingDetail, setLoadingDetail] = useState(false);
+
+    // Selection Mode State
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIssues, setSelectedIssues] = useState<IssueItem[]>([]);
+    const [manualUrls, setManualUrls] = useState<string[]>(['']);
+    const [manualTexts, setManualTexts] = useState<string[]>([]);
 
     // Trend Report State
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -103,6 +110,68 @@ export default function ArchivePage() {
         setReportLoading(true); // Signal to Modal to start generation
     };
 
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIssues([]);
+        setManualUrls(['']);
+        setManualTexts([]);
+    };
+
+    const toggleIssueSelection = (issue: IssueItem) => {
+        if (selectedIssues.some(i => i.headline === issue.headline)) {
+            setSelectedIssues(selectedIssues.filter(i => i.headline !== issue.headline));
+        } else {
+            setSelectedIssues([...selectedIssues, issue]);
+        }
+    };
+
+    const handleGenerateAggregatedReport = async () => {
+        const validUrls = manualUrls.filter(url => url.trim() !== '');
+        const validTexts = manualTexts.filter(t => t.trim() !== '');
+
+        if (selectedIssues.length === 0 && validUrls.length === 0 && validTexts.length === 0) {
+            alert('이슈를 선택하거나 수동 소스를 추가해주세요.');
+            return;
+        }
+
+        setIsReportModalOpen(true);
+        setReportLoading(true);
+        setReportContent('');
+        setSelectedReportIssue(undefined);
+
+        try {
+            const res = await fetch('/api/reports/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'CUSTOM',
+                    selectionMethod: selectedIssues.length > 0 ? 'MANUAL_SELECTION' : 'MANUAL_ONLY',
+                    selectedIssues: selectedIssues,
+                    manualUrls: validUrls,
+                    manualTexts: validTexts,
+                })
+            });
+
+            if (!res.ok) throw new Error('Report generation failed');
+
+            const data = await res.json();
+            setReportContent(data.report);
+        } catch (e) {
+            console.error(e);
+            alert('리포트 생성 실패');
+            setIsReportModalOpen(false);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    const addManualUrlField = () => setManualUrls([...manualUrls, '']);
+    const updateManualUrl = (index: number, value: string) => {
+        const newUrls = [...manualUrls];
+        newUrls[index] = value;
+        setManualUrls(newUrls);
+    };
+
     return (
         <div className="container">
             {/* Header */}
@@ -159,6 +228,35 @@ export default function ArchivePage() {
                             )}
                         </div>
 
+                        {/* Selection Mode Toolbar - Only visible in Detail View */}
+                        <div className="selection-toolbar animate-in">
+                            <button
+                                className={`selection-toggle-btn ${isSelectionMode ? 'active' : ''}`}
+                                onClick={toggleSelectionMode}
+                            >
+                                {isSelectionMode ? '✅ 선택 모드 종료' : '☑️ 다중 선택 모드'}
+                            </button>
+
+                            {isSelectionMode && selectedIssues.length > 0 && (
+                                <button
+                                    className="generate-report-btn"
+                                    onClick={handleGenerateAggregatedReport}
+                                >
+                                    ✨ 소집({selectedIssues.length}) 통합 분석 리포트 생성
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Manual Source Input Section */}
+                        {isSelectionMode && (
+                            <ManualSourceInput
+                                manualUrls={manualUrls}
+                                setManualUrls={setManualUrls}
+                                manualTexts={manualTexts}
+                                setManualTexts={setManualTexts}
+                            />
+                        )}
+
                         {/* Brief Detail - Styled to match Home Page */}
                         <div className="hero-section animate-in">
                             <div className="hero-content">
@@ -198,6 +296,10 @@ export default function ArchivePage() {
                                     issue={issue}
                                     index={index}
                                     onDeepDive={handleDeepDive}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedIssues.some(i => i.headline === issue.headline)}
+                                    onSelect={() => toggleIssueSelection(issue)}
+                                    briefDate={selectedBrief.date}
                                 />
                             ))}
                         </div>
@@ -387,6 +489,67 @@ export default function ArchivePage() {
                     to { opacity: 1; transform: translateY(0); }
                 }
 
+                .selection-toolbar {
+                    display: flex;
+                    gap: 0.75rem;
+                    margin-bottom: 1.5rem;
+                    flex-wrap: wrap;
+                    align-items: center;
+                }
+
+                .selection-toggle-btn {
+                    background: var(--bg-card);
+                    border: 1.5px solid var(--border-color);
+                    padding: 10px 20px;
+                    border-radius: 14px;
+                    cursor: pointer;
+                    font-size: 0.88rem;
+                    font-weight: 700;
+                    color: var(--text-secondary);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    letter-spacing: -0.01em;
+                }
+                .selection-toggle-btn:hover {
+                    border-color: var(--accent-color);
+                    color: var(--accent-color);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
+                }
+                .selection-toggle-btn.active {
+                    background: linear-gradient(135deg, #6366f1, #818cf8);
+                    color: white;
+                    border-color: transparent;
+                    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+                }
+                .selection-toggle-btn.active:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+                }
+
+                .generate-report-btn {
+                    background: linear-gradient(135deg, #6366f1, #a855f7);
+                    color: white;
+                    border: none;
+                    padding: 10px 22px;
+                    border-radius: 14px;
+                    font-size: 0.88rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+                    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    letter-spacing: -0.01em;
+                }
+                .generate-report-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+                }
+
                 @media (max-width: 480px) {
                     .archive-header {
                         margin-bottom: 2rem;
@@ -404,6 +567,18 @@ export default function ArchivePage() {
                         flex-direction: column;
                         gap: 1rem;
                     }
+
+                    .selection-toolbar {
+                        flex-direction: column;
+                        gap: 0.75rem;
+                    }
+
+                    .selection-toggle-btn,
+                    .generate-report-btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+
 
                     .back-button, .delete-button {
                         width: 100%;

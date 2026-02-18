@@ -4,6 +4,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NewsItem, IssueItem } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
+import { getRecentIssues } from './store';
+import { checkDuplicateIssues, calculateSimilarity } from './gemini';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -16,6 +18,10 @@ export async function analyzeBatteryNewsAndGenerateInsights(
     // 뉴스를 관련 주제별로 클러스터링
     const clusters = clusterBatteryNewsByTopic(newsItems);
 
+    // 중복 방지를 위한 최근 이슈 조회 (지난 3일치)
+    const recentIssues = await getRecentIssues(3);
+    console.log(`[Battery Deduplication] Loaded ${recentIssues.length} recent issues for comparison.`);
+
     const issues: IssueItem[] = [];
 
     // 최대 5개 이슈만 생성
@@ -23,8 +29,24 @@ export async function analyzeBatteryNewsAndGenerateInsights(
 
     for (const cluster of topClusters) {
         try {
+            // 중복 체크 1단계: 헤드라인 유사도 (빠른 필터링)
+            const isPotentialDupe = recentIssues.some(issue =>
+                calculateSimilarity(issue.headline, cluster[0].title) > 0.6
+            );
+
+            if (isPotentialDupe) {
+                console.log(`[Battery Dupe] Skipping likely duplicate cluster: ${cluster[0].title}`);
+                continue;
+            }
+
             const issue = await generateBatteryIssueFromCluster(model, cluster);
             if (issue) {
+                // 중복 체크 2단계: 정밀 체크
+                const isDuplicate = await checkDuplicateIssues(issue, recentIssues);
+                if (isDuplicate) {
+                    console.log(`[Battery Dupe] Discarded duplicate issue: ${issue.headline}`);
+                    continue;
+                }
                 issues.push(issue);
             }
         } catch (error) {

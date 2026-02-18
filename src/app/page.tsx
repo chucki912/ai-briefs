@@ -169,6 +169,7 @@ export default function HomePage() {
                     issue={issue}
                     index={index}
                     onDeepDive={handleDeepDive}
+                    briefDate={brief.date}
                   />
                 ))
               ) : (

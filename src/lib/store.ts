@@ -1,9 +1,8 @@
-import { BriefReport } from '@/types';
+import { BriefReport, IssueItem } from '@/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { kv } from '@vercel/kv';
 
-// 스토리지 인터페이스 정의
 // 스토리지 인터페이스 정의
 export interface StorageAdapter {
     saveBrief(report: BriefReport): Promise<void>;
@@ -12,6 +11,8 @@ export interface StorageAdapter {
     getAllBriefs(limit?: number): Promise<BriefReport[]>;
     deleteBrief(date: string): Promise<boolean>;
     // Generic KV Operations for temporary jobs
+    getRecentIssues(days?: number): Promise<IssueItem[]>;
+    getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]>;
     kvSet(key: string, value: any, ttlSeconds?: number): Promise<void>;
     kvGet<T>(key: string): Promise<T | null>;
     // Activity Logging
@@ -110,6 +111,66 @@ class FileSystemStorage implements StorageAdapter {
         }
     }
 
+    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+        await this.ensureDir();
+        try {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+            const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            const files = await fs.readdir(this.dataDir);
+            const recentBriefFiles = files
+                .filter(f => f.endsWith('.json'))
+                .filter(f => {
+                    const fileDate = f.replace('.json', '');
+                    return fileDate >= cutoffDateStr;
+                })
+                .sort()
+                .reverse();
+
+            const briefs = await Promise.all(
+                recentBriefFiles.map(async (file) => {
+                    const data = await fs.readFile(path.join(this.dataDir, file), 'utf-8');
+                    return JSON.parse(data) as BriefReport;
+                })
+            );
+
+            return briefs.flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get recent issues from FileSystem:', error);
+            return [];
+        }
+    }
+
+    async getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]> {
+        await this.ensureDir();
+        try {
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
+
+            const files = await fs.readdir(this.dataDir);
+            const targetFiles = files
+                .filter(f => f.endsWith('.json'))
+                .filter(f => {
+                    const fileDate = f.replace('.json', '');
+                    return fileDate >= startStr && fileDate <= endStr;
+                })
+                .sort();
+
+            const briefs = await Promise.all(
+                targetFiles.map(async (file) => {
+                    const data = await fs.readFile(path.join(this.dataDir, file), 'utf-8');
+                    return JSON.parse(data) as BriefReport;
+                })
+            );
+
+            return briefs.flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get issues by date range from FileSystem:', error);
+            return [];
+        }
+    }
+
     async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
         await this.ensureDir();
         const safeKey = key.replace(/:/g, '_');
@@ -179,6 +240,53 @@ class FileSystemStorage implements StorageAdapter {
 
 // 2. Vercel KV 스토리지 (프로덕션 배포용)
 class VercelKvStorage implements StorageAdapter {
+    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+        // Calculate date range
+        const dates: string[] = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            dates.push(d.toISOString().split('T')[0]);
+        }
+
+        try {
+            // Fetch all briefs in parallel
+            const keys = dates.map(date => `brief:${date}`);
+            const briefs = await kv.mget<BriefReport[]>(...keys);
+
+            return briefs
+                .filter((b): b is BriefReport => b !== null)
+                .flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get recent issues from KV:', error);
+            return [];
+        }
+    }
+
+    async getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]> {
+        const dates: string[] = [];
+        let current = new Date(startDate);
+        const end = new Date(endDate);
+
+        while (current <= end) {
+            dates.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 1);
+        }
+
+        try {
+            const keys = dates.map(date => `brief:${date}`);
+            // Vercel KV mget limits might apply, but for typical ranges (30 days) it should be fine.
+            const briefs = await kv.mget<BriefReport[]>(...keys);
+
+            return briefs
+                .filter((b): b is BriefReport => b !== null)
+                .flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get issues by date range from KV:', error);
+            return [];
+        }
+    }
+
     async saveBrief(report: BriefReport): Promise<void> {
         // 개별 브리핑 저장 (90일 유지: 60s * 60m * 24h * 90d = 7776000)
         await kv.set(`brief:${report.date}`, report, { ex: 7776000 });
@@ -186,7 +294,7 @@ class VercelKvStorage implements StorageAdapter {
         // 날짜 인덱싱을 위한 Sorted Set 업데이트 (정렬 및 목록 조회용)
         const timestamp = new Date(report.date).getTime();
         await kv.zadd('briefs_index', { score: timestamp, member: report.date });
-        console.log(`[KV Store] 브리핑 저장 완료 (90일 보관): ${report.date}`);
+        console.log(`[KV Store] 브리핑 저장 완료(90일 보관): ${report.date}`);
     }
 
     async getBriefByDate(date: string): Promise<BriefReport | null> {
@@ -257,6 +365,27 @@ class VercelKvStorage implements StorageAdapter {
 class InMemoryStorage implements StorageAdapter {
     private store = new Map<string, BriefReport>();
     private kvStore = new Map<string, { value: any, expiry: number }>();
+
+    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+
+        const recentBriefs = Array.from(this.store.values())
+            .filter(b => b.date >= cutoffDateStr);
+
+        return recentBriefs.flatMap(b => b.issues);
+    }
+
+    async getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]> {
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+
+        const rangeBriefs = Array.from(this.store.values())
+            .filter(b => b.date >= startStr && b.date <= endStr);
+
+        return rangeBriefs.flatMap(b => b.issues);
+    }
 
     async saveBrief(report: BriefReport): Promise<void> {
         this.store.set(report.date, report);
@@ -349,6 +478,57 @@ class RedisStorage implements StorageAdapter {
 
     constructor(url: string) {
         this.clientPromise = getRedisClient(url);
+    }
+
+    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+        const client = await this.clientPromise;
+
+        // Calculate date range
+        const dates: string[] = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            dates.push(d.toISOString().split('T')[0]);
+        }
+
+        try {
+            const keys = dates.map(date => `brief:${date}`);
+            const results = await client.mGet(keys);
+
+            return results
+                .filter((item): item is string => item !== null)
+                .map(item => JSON.parse(item) as BriefReport)
+                .flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get recent issues from Redis:', error);
+            return [];
+        }
+    }
+
+    async getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]> {
+        const client = await this.clientPromise;
+
+        const dates: string[] = [];
+        let current = new Date(startDate);
+        const end = new Date(endDate);
+
+        while (current <= end) {
+            dates.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 1);
+        }
+
+        try {
+            const keys = dates.map(date => `brief:${date}`);
+            const results = await client.mGet(keys);
+
+            return results
+                .filter((item): item is string => item !== null)
+                .map(item => JSON.parse(item) as BriefReport)
+                .flatMap(b => b.issues);
+        } catch (error) {
+            console.error('Failed to get issues by date range from Redis:', error);
+            return [];
+        }
     }
 
     async saveBrief(report: BriefReport): Promise<void> {
@@ -465,6 +645,8 @@ export const getBriefByDate = (date: string) => storage.getBriefByDate(date);
 export const getLatestBrief = () => storage.getLatestBrief();
 export const getAllBriefs = (limit?: number) => storage.getAllBriefs(limit);
 export const deleteBrief = (date: string) => storage.deleteBrief(date);
+export const getRecentIssues = (days?: number) => storage.getRecentIssues(days);
+export const getIssuesByDateRange = (startDate: Date, endDate: Date) => storage.getIssuesByDateRange(startDate, endDate);
 
 // KV Helper Exports
 export const kvSet = (key: string, value: any, ttl?: number) => storage.kvSet(key, value, ttl);

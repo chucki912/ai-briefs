@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
+import ManualSourceInput from '@/components/ManualSourceInput';
 import { BriefReport, IssueItem } from '@/types';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +30,12 @@ export default function BatteryArchivePage() {
     const [reportContent, setReportContent] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
     const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
+
+    // Admin-only: Selection Mode State
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIssues, setSelectedIssues] = useState<IssueItem[]>([]);
+    const [manualUrls, setManualUrls] = useState<string[]>(['']);
+    const [manualTexts, setManualTexts] = useState<string[]>([]);
 
     // 배터리 브리핑 목록 로드
     const loadBriefs = async () => {
@@ -109,6 +116,64 @@ export default function BatteryArchivePage() {
         setReportLoading(true);
     };
 
+    // Admin-only: 선택 모드 토글
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIssues([]);
+        setManualUrls(['']);
+        setManualTexts([]);
+    };
+
+    // Admin-only: 이슈 선택 토글
+    const toggleIssueSelection = (issue: IssueItem) => {
+        if (selectedIssues.some(i => i.headline === issue.headline)) {
+            setSelectedIssues(selectedIssues.filter(i => i.headline !== issue.headline));
+        } else {
+            setSelectedIssues([...selectedIssues, issue]);
+        }
+    };
+
+    // Admin-only: 통합 분석 리포트 생성
+    const handleGenerateAggregatedReport = async () => {
+        const validUrls = manualUrls.filter(url => url.trim() !== '');
+        const validTexts = manualTexts.filter(t => t.trim() !== '');
+
+        if (selectedIssues.length === 0 && validUrls.length === 0 && validTexts.length === 0) {
+            alert('이슈를 선택하거나 수동 소스를 추가해주세요.');
+            return;
+        }
+
+        setIsReportModalOpen(true);
+        setReportLoading(true);
+        setReportContent('');
+        setSelectedReportIssue(undefined);
+
+        try {
+            const res = await fetch('/api/reports/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'CUSTOM',
+                    selectionMethod: selectedIssues.length > 0 ? 'MANUAL_SELECTION' : 'MANUAL_ONLY',
+                    selectedIssues: selectedIssues,
+                    manualUrls: validUrls,
+                    manualTexts: validTexts,
+                })
+            });
+
+            if (!res.ok) throw new Error('Report generation failed');
+
+            const data = await res.json();
+            setReportContent(data.report);
+        } catch (e) {
+            console.error(e);
+            alert('리포트 생성 실패');
+            setIsReportModalOpen(false);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
     return (
         <div className="container">
             {/* Header - Battery Theme */}
@@ -146,11 +211,50 @@ export default function BatteryArchivePage() {
                         <div className="action-row animate-in">
                             <button
                                 className="back-button"
-                                onClick={() => setSelectedBrief(null)}
+                                onClick={() => { setSelectedBrief(null); setIsSelectionMode(false); }}
                             >
                                 <span className="icon">←</span> 전체 목록
                             </button>
+                            {isAdmin && (
+                                <button
+                                    className="delete-brief-btn"
+                                    onClick={(e) => handleDeleteBrief(e, selectedBrief.date)}
+                                >
+                                    🗑️ 삭제
+                                </button>
+                            )}
                         </div>
+
+                        {/* Admin-only: Selection Mode Toolbar */}
+                        {isAdmin && (
+                            <div className="selection-toolbar animate-in">
+                                <button
+                                    className={`selection-toggle-btn ${isSelectionMode ? 'active' : ''}`}
+                                    onClick={toggleSelectionMode}
+                                >
+                                    {isSelectionMode ? '✅ 선택 모드 종료' : '☑️ 다중 선택 모드'}
+                                </button>
+
+                                {isSelectionMode && selectedIssues.length > 0 && (
+                                    <button
+                                        className="generate-report-btn"
+                                        onClick={handleGenerateAggregatedReport}
+                                    >
+                                        ✨ 소집({selectedIssues.length}) 통합 분석 리포트 생성
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Admin-only: Manual Source Input */}
+                        {isAdmin && isSelectionMode && (
+                            <ManualSourceInput
+                                manualUrls={manualUrls}
+                                setManualUrls={setManualUrls}
+                                manualTexts={manualTexts}
+                                setManualTexts={setManualTexts}
+                            />
+                        )}
 
                         {/* Brief Detail - Battery Styled */}
                         <div className="hero-section animate-in" style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.05))' }}>
@@ -189,6 +293,10 @@ export default function BatteryArchivePage() {
                                     issue={issue}
                                     index={index}
                                     onDeepDive={isAdmin ? handleDeepDive : undefined}
+                                    isSelectionMode={isAdmin && isSelectionMode}
+                                    isSelected={selectedIssues.some(i => i.headline === issue.headline)}
+                                    onSelect={() => toggleIssueSelection(issue)}
+                                    briefDate={selectedBrief.date}
                                 />
                             ))}
                         </div>
@@ -283,66 +391,94 @@ export default function BatteryArchivePage() {
                 .premium-archive-card:hover .arrow { transform: translateX(4px); }
                 
                 .delete-button {
-                    position: absolute;
-                    top: -10px;
-                    right: -10px;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    background: #ef4444;
-                    color: white;
-                    border: none;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    transition: all 0.2s;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                    position: absolute; top: -10px; right: -10px; width: 24px; height: 24px;
+                    border-radius: 50%; background: #ef4444; color: white; border: none;
+                    font-size: 16px; font-weight: bold; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center;
+                    opacity: 0; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
                 }
-                
-                div[style*="position: relative"]:hover .delete-button {
-                    opacity: 1;
-                }
-                
-                .delete-button:hover {
-                    background: #dc2626;
-                    transform: scale(1.1);
+                div[style*="position: relative"]:hover .delete-button { opacity: 1; }
+                .delete-button:hover { background: #dc2626; transform: scale(1.1); }
+
+                .action-row {
+                    display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;
                 }
 
-                .action-row { display: flex; justify-content: flex-start; margin-bottom: 2rem; }
-                
                 .back-button { 
-                    background: rgba(34, 197, 94, 0.1);
-                    color: #22c55e;
-                    border: 1px solid rgba(34, 197, 94, 0.2);
-                    border-radius: 99px;
-                    padding: 10px 24px;
-                    font-size: 0.95rem;
-                    font-weight: 700;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: all 0.2s ease;
+                    background: rgba(34, 197, 94, 0.1); color: #22c55e;
+                    border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 99px;
+                    padding: 10px 24px; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+                    display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease;
                 }
-                
                 .back-button:hover { 
-                    background: #22c55e;
-                    color: #fff;
-                    border-color: #22c55e;
-                    transform: translateX(-4px);
-                    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+                    background: #22c55e; color: #fff; border-color: #22c55e;
+                    transform: translateX(-4px); box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
                 }
+
+                .delete-brief-btn {
+                    background: rgba(239, 68, 68, 0.08); color: var(--error-color, #ef4444);
+                    border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 99px;
+                    padding: 10px 24px; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+                    display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;
+                }
+                .delete-brief-btn:hover {
+                    background: var(--error-color, #ef4444); color: white;
+                    border-color: var(--error-color, #ef4444);
+                }
+
+                /* Admin: Selection Toolbar */
+                .selection-toolbar {
+                    display: flex; gap: 0.75rem; margin-bottom: 1.5rem;
+                    flex-wrap: wrap; align-items: center;
+                }
+                .selection-toggle-btn {
+                    background: var(--bg-card); border: 1.5px solid var(--border-color);
+                    padding: 10px 20px; border-radius: 14px; cursor: pointer;
+                    font-size: 0.88rem; font-weight: 700; color: var(--text-secondary);
+                    display: inline-flex; align-items: center; gap: 6px;
+                    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    letter-spacing: -0.01em;
+                }
+                .selection-toggle-btn:hover {
+                    border-color: #22c55e; color: #22c55e;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.12);
+                }
+                .selection-toggle-btn.active {
+                    background: linear-gradient(135deg, #22c55e, #16a34a);
+                    color: white; border-color: transparent;
+                    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
+                }
+                .selection-toggle-btn.active:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45);
+                }
+
+                .generate-report-btn {
+                    background: linear-gradient(135deg, #22c55e, #059669);
+                    color: white; border: none; padding: 10px 22px; border-radius: 14px;
+                    font-size: 0.88rem; font-weight: 700; cursor: pointer;
+                    display: inline-flex; align-items: center; gap: 6px;
+                    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+                    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    letter-spacing: -0.01em;
+                }
+                .generate-report-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45);
+                }
+
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
                 .animate-in { animation: fadeInUp 0.6s ease-out forwards; }
                 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
                 @media (max-width: 480px) {
                     .archive-grid { grid-template-columns: 1fr; }
                     .back-button { width: 100%; justify-content: center; }
-                    .delete-button { opacity: 1; } /* 모바일에서는 항상 보임 */
+                    .delete-button { opacity: 1; }
+                    .action-row { flex-direction: column; gap: 1rem; }
+                    .selection-toolbar { flex-direction: column; gap: 0.75rem; }
+                    .selection-toggle-btn, .generate-report-btn { width: 100%; justify-content: center; }
                 }
             `}</style>
         </div>

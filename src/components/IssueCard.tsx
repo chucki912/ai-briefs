@@ -2,11 +2,16 @@
 
 import { logger } from '@/lib/logger';
 import { IssueItem } from '@/types';
+import { useBriefCart } from '@/contexts/BriefCartContext';
 
 interface IssueCardProps {
     issue: IssueItem;
     index: number;
     onDeepDive?: (issue: IssueItem) => void;
+    isSelectionMode?: boolean;
+    isSelected?: boolean;
+    onSelect?: () => void;
+    briefDate?: string;
 }
 
 // URL을 축약된 형태로 변환하는 헬퍼 함수
@@ -20,8 +25,21 @@ const formatUrl = (url: string) => {
     }
 };
 
-export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) {
-    const handleDeepDiveClick = () => {
+export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, isSelected, onSelect, briefDate }: IssueCardProps) {
+    const { addToCart, removeFromCart, isInCart } = useBriefCart();
+    const inCart = isInCart(issue.headline);
+
+    const handleCartToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (inCart) {
+            removeFromCart(issue.headline);
+        } else {
+            addToCart(issue, briefDate || 'Unknown Date');
+        }
+    };
+
+    const handleDeepDiveClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
         if (onDeepDive) {
             onDeepDive(issue);
             logger.generateReport(issue.headline, issue.headline); // Temporary use headline as ID? No, we don't have ID. Use headline as ID for now.
@@ -29,22 +47,39 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
     };
 
     return (
-        <article className="issue-card animate-in">
+        <article
+            className={`issue-card animate-in ${isSelectionMode ? 'selection-mode' : ''} ${isSelected ? 'selected' : ''}`}
+            onClick={isSelectionMode ? onSelect : undefined}
+        >
+            {isSelectionMode && (
+                <div className="selection-checkbox">
+                    {isSelected && <span className="check-mark">✓</span>}
+                </div>
+            )}
             <div className="issue-header-row">
                 <div className="issue-tag-group">
                     <span className="issue-number">ISSUE {index + 1}</span>
                     <span className="issue-category-tag">{issue.framework.split(',')[0]}</span>
                 </div>
-                {onDeepDive && (
+                <div className="actions-group" style={{ display: 'flex', gap: '8px' }}>
                     <button
-                        className="btn-text-icon"
-                        onClick={handleDeepDiveClick}
-                        title="이 뉴스를 심층 분석하여 트렌드 리포트를 생성합니다"
+                        className={`btn-icon-only ${inCart ? 'active' : ''}`}
+                        onClick={handleCartToggle}
+                        title={inCart ? "리포트 카트에서 제거" : "리포트 카트에 담기"}
                     >
-                        <span className="icon">📊</span>
-                        <span className="text">심층 리포트</span>
+                        {inCart ? "🛒✓" : "🛒+"}
                     </button>
-                )}
+                    {onDeepDive && (
+                        <button
+                            className="btn-text-icon"
+                            onClick={handleDeepDiveClick}
+                            title="이 뉴스를 심층 분석하여 트렌드 리포트를 생성합니다"
+                        >
+                            <span className="icon">📊</span>
+                            <span className="text">심층 리포트</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             <h2 className="issue-headline">{issue.headline}</h2>
@@ -185,6 +220,34 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
                     margin-bottom: 1.5rem;
                     line-height: 1.35;
                     letter-spacing: -0.02em;
+                }
+
+                .btn-icon-only {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-color);
+                    border-radius: 12px;
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    color: var(--text-secondary);
+                }
+
+                .btn-icon-only:hover {
+                    background: var(--accent-light);
+                    color: var(--accent-color);
+                    border-color: var(--accent-color);
+                    transform: scale(1.1);
+                }
+
+                .btn-icon-only.active {
+                    background: var(--accent-color);
+                    color: white;
+                    border-color: var(--accent-color);
                 }
 
                 .issue-facts {
@@ -343,6 +406,50 @@ export default function IssueCard({ issue, index, onDeepDive }: IssueCardProps) 
                         width: 100%;
                         justify-content: flex-start;
                     }
+                }
+                        justify-content: flex-start;
+                    }
+                }
+
+                .selection-mode {
+                    cursor: pointer;
+                    border: 2px solid transparent;
+                }
+
+                .selection-mode:hover {
+                    border-color: var(--accent-light);
+                }
+
+                .selected {
+                    border-color: var(--accent-color) !important;
+                    background: rgba(79, 70, 229, 0.05);
+                }
+
+                .selection-checkbox {
+                    position: absolute;
+                    top: 1.5rem;
+                    right: 1.5rem;
+                    width: 24px;
+                    height: 24px;
+                    border: 2px solid var(--border-color);
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                    background: var(--bg-card);
+                    z-index: 10;
+                }
+
+                .selected .selection-checkbox {
+                    background: var(--accent-color);
+                    border-color: var(--accent-color);
+                    color: white;
+                }
+
+                .check-mark {
+                    font-size: 14px;
+                    font-weight: bold;
                 }
             `}</style>
         </article>

@@ -198,7 +198,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
             if (jsonMatch) {
                 let finalJson = jsonMatch[0].replace(/,\s*([\}\]])/g, '$1');
-                setParsedReport(JSON.parse(finalJson));
+                const parsed = JSON.parse(finalJson);
+                setParsedReport(parsed);
                 setParseError(false);
                 return;
             }
@@ -221,6 +222,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             setParseError(true);
         }
     };
+
+
 
     // Markdown 텍스트를 구조화된 데이터로 변환하는 파서
     const parseMarkdownToStructure = (md: string): TrendReportData | null => {
@@ -263,9 +266,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 if (cleanSection.startsWith('Executive Summary')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
-                        if (line.includes('[Signal]')) data.executive_summary.signal_summary.push({ text: line.replace(/.*\[Signal\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
-                        if (line.includes('[Change]')) data.executive_summary.what_changed.push({ text: line.replace(/.*\[Change\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
-                        if (line.includes('[So What]')) data.executive_summary.so_what.push({ text: line.replace(/.*\[So What\]\*/, '').replace(/\*\*/g, '').replace(/^-/, '').trim() });
+                        const cleanLine = line.replace(/\*\*/g, '').trim(); // strip all ** first
+                        if (cleanLine.includes('[Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*\[Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('[Change]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*\[Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('[So What]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*\[So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                     });
                 }
 

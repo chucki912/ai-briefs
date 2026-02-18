@@ -129,9 +129,19 @@ export default function HomePage() {
             {/* Brief Header - Hero Section */}
             <div className="hero-section">
               <div className="hero-content">
-                <div className="date-badge">
-                  <span className="calendar-icon">📅</span>
-                  {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
+                <div className="hero-header-row">
+                  <div className="date-badge">
+                    <span className="calendar-icon">📅</span>
+                    {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
+                  </div>
+                  <button
+                    className="weekly-report-btn-top"
+                    onClick={handleWeeklyReport}
+                    disabled={reportLoading}
+                  >
+                    <span>📊</span>
+                    주간 트렌드 리포트
+                  </button>
                 </div>
                 <h1 className="hero-title">
                   AI Daily <span className="highlight">Intelligence</span>
@@ -167,14 +177,7 @@ export default function HomePage() {
                       </>
                     )}
                   </button>
-                  <button
-                    className="weekly-report-button"
-                    onClick={handleWeeklyReport}
-                    disabled={reportLoading}
-                  >
-                    <span>📈</span>
-                    주간 리포트
-                  </button>
+
                 </div>
               </div>
             </div>
@@ -336,6 +339,42 @@ export default function HomePage() {
         }
 
         .weekly-report-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .hero-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+
+        .weekly-report-btn-top {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(99, 102, 241, 0.1);
+          color: #6366f1;
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          backdrop-filter: blur(4px);
+        }
+        
+        .weekly-report-btn-top:hover:not(:disabled) {
+          background: #6366f1;
+          color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .weekly-report-btn-top:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }

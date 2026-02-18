@@ -113,6 +113,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [isPolling, setIsPolling] = useState(false);
+    const [loadingStep, setLoadingStep] = useState(0); // 0: Start, 1: Collecting, 2: Clustering, 3: Generating
 
     useEffect(() => {
         // 클린업 함수 정의
@@ -181,6 +182,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         } else if (isOpen && loading && weeklyMode) {
             // Weekly Report mode
             const fetchWeeklyReport = async () => {
+                setLoadingStep(0);
                 setIsPolling(true);
                 setStatusMessage('최근 7일 이슈를 수집 중...');
                 try {
@@ -202,14 +204,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                             // Update status message based on progress
                             if (statusData.status === 'collecting') {
+                                setLoadingStep(1);
                                 setStatusMessage('최근 7일 이슈를 수집 중...');
                             } else if (statusData.status === 'clustering') {
+                                setLoadingStep(2);
                                 setStatusMessage(statusData.message || '이슈를 주제별로 분류 중...');
                             } else if (statusData.status === 'generating') {
+                                setLoadingStep(3);
                                 setStatusMessage(statusData.message || '종합 심층 리포트 작성 중... (최대 3분 소요)');
                             } else if (statusData.status === 'completed') {
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 processReport(statusData.report);
+                                setLoadingStep(4);
                                 setIsPolling(false);
                                 onGenerationComplete?.();
                             } else if (statusData.status === 'failed') {
@@ -596,9 +602,27 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 <div className="modal-body">
                     {loading || isPolling ? (
                         <div className="loading-state">
-                            <div className="spinner"></div>
-                            <p>{statusMessage}</p>
-                            <span className="loading-tip">💡 다수의 관련 기사를 실시간으로 수집 및 분석하고 있습니다.</span>
+                            <div className="loading-visual">
+                                <div className="spinner"></div>
+                            </div>
+                            <div className="progress-stepper">
+                                <div className={`step-item ${loadingStep >= 1 ? 'active' : ''} ${loadingStep > 1 ? 'completed' : ''}`}>
+                                    <span className="step-icon">{loadingStep > 1 ? '✓' : '1'}</span>
+                                    <span className="step-label">뉴스 수집</span>
+                                </div>
+                                <div className={`step-line ${loadingStep > 1 ? 'filled' : ''}`}></div>
+                                <div className={`step-item ${loadingStep >= 2 ? 'active' : ''} ${loadingStep > 2 ? 'completed' : ''}`}>
+                                    <span className="step-icon">{loadingStep > 2 ? '✓' : '2'}</span>
+                                    <span className="step-label">클러스터링</span>
+                                </div>
+                                <div className={`step-line ${loadingStep > 2 ? 'filled' : ''}`}></div>
+                                <div className={`step-item ${loadingStep >= 3 ? 'active' : ''}`}>
+                                    <span className="step-icon">3</span>
+                                    <span className="step-label">리포트 작성</span>
+                                </div>
+                            </div>
+                            <p className="status-message-large">{statusMessage}</p>
+                            <span className="loading-tip">💡 AI가 수백 건의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
                         </div>
                     ) : (
                         <div className="report-content">
@@ -823,9 +847,22 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     height: 100%; gap: 1rem; color: var(--text-secondary);
                 }
+                .loading-visual { margin-bottom: 2rem; }
+                .progress-stepper { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+                .step-item { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; position: relative; opacity: 0.4; transition: all 0.3s; }
+                .step-item.active { opacity: 1; transform: scale(1.05); }
+                .step-item.completed { opacity: 1; color: var(--accent-color); }
+                .step-icon { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--text-secondary); display: flex; justify-content: center; align-items: center; font-weight: 700; z-index: 1; }
+                .step-item.active .step-icon { border-color: var(--accent-color); background: var(--bg-body); color: var(--accent-color); box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+                .step-item.completed .step-icon { background: var(--accent-color); border-color: var(--accent-color); color: white; }
+                .step-line { width: 40px; height: 2px; background: var(--border-color); margin-top: -14px; }
+                .step-line.filled { background: var(--accent-color); }
+                .step-label { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+                .status-message-large { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 0.5rem; }
+
                 .spinner {
-                    width: 40px; height: 40px;
-                    border: 3px solid rgba(255, 255, 255, 0.1);
+                    width: 60px; height: 60px;
+                    border: 4px solid rgba(255, 255, 255, 0.1);
                     border-left-color: #6366f1;
                     border-radius: 50%;
                     animation: spin 1s linear infinite;

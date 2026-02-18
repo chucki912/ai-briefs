@@ -103,139 +103,141 @@ export default function HomePage() {
   }, [brief]);
 
   return (
-    <div className="container">
-      {/* Header */}
-      <header className="header">
-        <Link href="/" className="logo">
-          🤖 AI Daily Brief
-        </Link>
-        <nav className="nav">
-          <Link href="/archive" className="nav-link">
-            아카이브
+    <>
+      <div className="container">
+        {/* Header */}
+        <header className="header">
+          <Link href="/" className="logo">
+            🤖 AI Daily Brief
           </Link>
-          <ThemeToggle />
-        </nav>
-      </header>
+          <nav className="nav">
+            <Link href="/archive" className="nav-link">
+              아카이브
+            </Link>
+            <ThemeToggle />
+          </nav>
+        </header>
 
-      {/* Main Content */}
-      <main>
-        {loading ? (
-          <div className="loading-container">
-            <div className="premium-spinner" />
-            <span className="loading-text">인텔리전스 데이터를 구성 중입니다...</span>
-          </div>
-        ) : brief ? (
-          <>
-            {/* Brief Header - Hero Section */}
-            <div className="hero-section">
-              <div className="hero-content">
-                <div className="hero-header-row">
-                  <div className="date-badge">
-                    <span className="calendar-icon">📅</span>
-                    {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
+        {/* Main Content */}
+        <main>
+          {loading ? (
+            <div className="loading-container">
+              <div className="premium-spinner" />
+              <span className="loading-text">인텔리전스 데이터를 구성 중입니다...</span>
+            </div>
+          ) : brief ? (
+            <>
+              {/* Brief Header - Hero Section */}
+              <div className="hero-section">
+                <div className="hero-content">
+                  <div className="hero-header-row">
+                    <div className="date-badge">
+                      <span className="calendar-icon">📅</span>
+                      {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
+                    </div>
+                    <button
+                      className="weekly-report-btn-top"
+                      onClick={handleWeeklyReport}
+                      disabled={reportLoading}
+                    >
+                      <span>📊</span>
+                      주간 트렌드 리포트
+                    </button>
                   </div>
-                  <button
-                    className="weekly-report-btn-top"
-                    onClick={handleWeeklyReport}
-                    disabled={reportLoading}
-                  >
-                    <span>📊</span>
-                    주간 트렌드 리포트
-                  </button>
-                </div>
-                <h1 className="hero-title">
-                  AI Daily <span className="highlight">Intelligence</span>
-                </h1>
-                <p className="hero-subtitle">
-                  글로벌 AI 산업의 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
-                </p>
-                <div className="hero-meta">
-                  <div className="meta-item">
-                    <span className="meta-label">Total Signals</span>
-                    <span className="meta-value">{brief.totalIssues} Issues</span>
-                  </div>
-                  <div className="meta-divider" />
-                  <div className="meta-item">
-                    <span className="meta-label">Generated At</span>
-                    <span className="meta-value">{new Date(brief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} KST</span>
-                  </div>
-                  <div className="meta-filler" />
-                  <button
-                    className="regenerate-button"
-                    onClick={() => generateBrief(true)}
-                    disabled={generating}
-                  >
-                    {generating ? (
-                      <>
-                        <div className="mini-spinner" />
-                        분석 중...
-                      </>
-                    ) : (
-                      <>
-                        <span className="sparkle">✨</span>
-                        새로고침
-                      </>
-                    )}
-                  </button>
+                  <h1 className="hero-title">
+                    AI Daily <span className="highlight">Intelligence</span>
+                  </h1>
+                  <p className="hero-subtitle">
+                    글로벌 AI 산업의 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
+                  </p>
+                  <div className="hero-meta">
+                    <div className="meta-item">
+                      <span className="meta-label">Total Signals</span>
+                      <span className="meta-value">{brief.totalIssues} Issues</span>
+                    </div>
+                    <div className="meta-divider" />
+                    <div className="meta-item">
+                      <span className="meta-label">Generated At</span>
+                      <span className="meta-value">{new Date(brief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} KST</span>
+                    </div>
+                    <div className="meta-filler" />
+                    <button
+                      className="regenerate-button"
+                      onClick={() => generateBrief(true)}
+                      disabled={generating}
+                    >
+                      {generating ? (
+                        <>
+                          <div className="mini-spinner" />
+                          분석 중...
+                        </>
+                      ) : (
+                        <>
+                          <span className="sparkle">✨</span>
+                          새로고침
+                        </>
+                      )}
+                    </button>
 
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Issues Grid */}
-            <div className="issues-container">
-              {brief.issues.length > 0 ? (
-                brief.issues.map((issue, index) => (
-                  <IssueCard
-                    key={index}
-                    issue={issue}
-                    index={index}
-                    onDeepDive={handleDeepDive}
-                    briefDate={brief.date}
-                  />
-                ))
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon">📭</div>
-                  <h2 className="empty-title">금일 수집된 주요 이슈가 없습니다</h2>
-                  <p className="empty-description">
-                    내일 다시 확인해주세요.
-                  </p>
-                </div>
-              )}
+              {/* Issues Grid */}
+              <div className="issues-container">
+                {brief.issues.length > 0 ? (
+                  brief.issues.map((issue, index) => (
+                    <IssueCard
+                      key={index}
+                      issue={issue}
+                      index={index}
+                      onDeepDive={handleDeepDive}
+                      briefDate={brief.date}
+                    />
+                  ))
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon">📭</div>
+                    <h2 className="empty-title">금일 수집된 주요 이슈가 없습니다</h2>
+                    <p className="empty-description">
+                      내일 다시 확인해주세요.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">🚀</div>
+              <h2 className="empty-title">아직 생성된 브리핑이 없습니다</h2>
+              <p className="empty-description">
+                {error || '지금 바로 오늘의 AI 뉴스 브리핑을 생성해보세요.'}
+              </p>
+              <button
+                className="btn"
+                onClick={() => generateBrief()}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <div className="spinner" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    ✨ 브리핑 생성하기
+                  </>
+                )}
+              </button>
             </div>
-          </>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">🚀</div>
-            <h2 className="empty-title">아직 생성된 브리핑이 없습니다</h2>
-            <p className="empty-description">
-              {error || '지금 바로 오늘의 AI 뉴스 브리핑을 생성해보세요.'}
-            </p>
-            <button
-              className="btn"
-              onClick={() => generateBrief()}
-              disabled={generating}
-            >
-              {generating ? (
-                <>
-                  <div className="spinner" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  ✨ 브리핑 생성하기
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
 
-      {/* Footer */}
-      <footer className="footer">
-        <p>© 2026 AI Daily Brief. 매일 오전 7시 자동 업데이트</p>
-      </footer>
+        {/* Footer */}
+        <footer className="footer">
+          <p>© 2026 AI Daily Brief. 매일 오전 7시 자동 업데이트</p>
+        </footer>
+      </div >
 
       <TrendReportModal
         isOpen={isReportModalOpen}
@@ -413,6 +415,6 @@ export default function HomePage() {
           }
         }
       `}</style>
-    </div >
+    </>
   );
 }

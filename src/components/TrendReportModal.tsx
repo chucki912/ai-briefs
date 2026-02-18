@@ -793,15 +793,17 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 <style jsx>{`
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0, 0, 0, 0.7);
+                    background: rgba(0, 0, 0, 0.75);
                     display: flex; justify-content: center; align-items: center;
-                    z-index: 1000; padding: 1rem;
+                    z-index: 9999; padding: 1rem;
+                    backdrop-filter: blur(4px);
                 }
                 .modal-content.report-modal {
                     background: var(--bg-card);
                     width: 95%; max-width: 900px; height: 90vh;
                     border-radius: 12px; display: flex; flex-direction: column;
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    position: relative;
                 }
                 .modal-header {
                     padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color);
@@ -821,6 +823,14 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     height: 100%; gap: 1rem; color: var(--text-secondary);
                 }
+                .spinner {
+                    width: 40px; height: 40px;
+                    border: 3px solid rgba(255, 255, 255, 0.1);
+                    border-left-color: #6366f1;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 .loading-tip { font-size: 0.9rem; opacity: 0.8; }
                 
                 .report-content { color: var(--text-primary); }

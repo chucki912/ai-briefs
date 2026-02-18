@@ -181,6 +181,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         } else if (isOpen && loading && weeklyMode) {
             // Weekly Report mode
             const fetchWeeklyReport = async () => {
+                console.log('[TrendReportModal] Starting weekly report fetch');
+                alert('Starting weekly report fetch (Debug)');
                 setIsPolling(true);
                 setStatusMessage('최근 7일 이슈를 수집 중...');
                 try {
@@ -227,6 +229,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                 } catch (e) {
                     console.error('Error starting weekly report', e);
+                    alert('Error starting weekly report: ' + e);
                     setParseError(true);
                     setIsPolling(false);
                     onGenerationComplete?.();

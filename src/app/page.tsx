@@ -85,8 +85,6 @@ export default function HomePage() {
 
   // 주간 트렌드 리포트 생성
   const handleWeeklyReport = () => {
-    alert('Weekly Report Button Clicked (Debug)');
-    console.log('Weekly Report Button Clicked');
     setIsReportModalOpen(true);
     setSelectedReportIssue(undefined);
     setReportContent('');

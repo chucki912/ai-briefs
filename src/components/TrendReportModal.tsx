@@ -181,8 +181,6 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         } else if (isOpen && loading && weeklyMode) {
             // Weekly Report mode
             const fetchWeeklyReport = async () => {
-                console.log('[TrendReportModal] Starting weekly report fetch');
-                alert('Starting weekly report fetch (Debug)');
                 setIsPolling(true);
                 setStatusMessage('최근 7일 이슈를 수집 중...');
                 try {
@@ -217,23 +215,21 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             } else if (statusData.status === 'failed') {
                                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                                 setParseError(true);
-                                alert('주간 리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
+                                setLocalReport(`## 🚨 리포트 생성 실패\n\n${statusData.error || '알 수 없는 오류가 발생했습니다.'}`);
                                 setIsPolling(false);
                                 onGenerationComplete?.();
-                                onClose();
                             }
                         } catch (e) {
                             console.error('Weekly polling error', e);
                         }
                     }, 3000); // 3초 간격 — 주간 리포트는 더 오래 걸림
 
-                } catch (e) {
+                } catch (e: any) {
                     console.error('Error starting weekly report', e);
-                    alert('Error starting weekly report: ' + e);
                     setParseError(true);
+                    setLocalReport(`## 🚨 리포트 요청 실패\n\n${e.message || '알 수 없는 오류가 발생했습니다.'}`);
                     setIsPolling(false);
                     onGenerationComplete?.();
-                    onClose();
                 }
             };
 
@@ -608,7 +604,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         <div className="report-content">
                             {/* Weekly Mode or Raw Markdown Fallback */}
                             {(weeklyMode || !parsedReport) && (
-                                <div className="markdown-body">
+                                <div className="markdown-content">
                                     <ReactMarkdown>{localReport}</ReactMarkdown>
                                 </div>
                             )}

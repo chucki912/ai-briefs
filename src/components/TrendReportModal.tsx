@@ -248,6 +248,13 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const processReport = (inputStr: string) => {
         setLocalReport(inputStr); // Fallback storage
 
+        // Weekly Mode: Skip structured parsing and use raw markdown
+        if (weeklyMode) {
+            setParsedReport(null);
+            setParseError(false);
+            return;
+        }
+
         // 1. Try standard JSON parse
         try {
             let cleanJson = inputStr.trim();
@@ -594,184 +601,197 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             <p>{statusMessage}</p>
                             <span className="loading-tip">💡 다수의 관련 기사를 실시간으로 수집 및 분석하고 있습니다.</span>
                         </div>
-                    ) : parsedReport ? (
+                    ) : (
                         <div className="report-content">
-                            <div className="report-meta-box">
-                                <h1 className="report-title">{parsedReport.report_meta?.title}</h1>
-                                <div className="report-badge-row">
-                                    <span className="badge">대상: {parsedReport.report_meta?.coverage}</span>
-                                    <span className="badge">기간: {parsedReport.report_meta?.time_window}</span>
-                                    <span className="badge">관점: {parsedReport.report_meta?.lens}</span>
+                            {/* Weekly Mode or Raw Markdown Fallback */}
+                            {(weeklyMode || !parsedReport) && (
+                                <div className="markdown-body">
+                                    <ReactMarkdown>{localReport}</ReactMarkdown>
                                 </div>
-                            </div>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Executive Summary</h2>
-                                <div className="summary-group">
-                                    <h4>[Signal Summary]</h4>
-                                    <ul className="report-list">
-                                        {parsedReport.executive_summary?.signal_summary?.map((s, i) => <li key={i}>{s.text}</li>)}
-                                    </ul>
-                                    <h4>[What Changed]</h4>
-                                    <ul className="report-list">
-                                        {parsedReport.executive_summary?.what_changed?.map((s, i) => <li key={i}>{s.text}</li>)}
-                                    </ul>
-                                    <h4>[So What]</h4>
-                                    <ul className="report-list">
-                                        {parsedReport.executive_summary?.so_what?.map((s, i) => <li key={i}>{s.text}</li>)}
-                                    </ul>
-                                </div>
-                            </section>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Key Developments</h2>
-                                {parsedReport.key_developments?.map((d, i) => (
-                                    <div key={i} className="development-item">
-                                        <h3 className="development-headline">[{d.headline}]</h3>
-                                        <div className="evidence-badge" data-level={d.evidence_level}>Evidence: {d.evidence_level}</div>
-                                        <ul className="report-list">
-                                            {d.facts?.map((f, fi) => <li key={fi}>- (Fact) {f.text}</li>)}
-                                            {d.analysis?.map((a, ai) => (
-                                                <li key={ai}>
-                                                    - (Analysis) {a.text}
-                                                    <div className="analysis-basis">Basis: {a.basis}</div>
-                                                </li>
-                                            ))}
-                                            {d.why_it_matters?.map((w, wi) => <li key={wi}>- (Why) {w.text}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </section>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Core Themes</h2>
-                                {parsedReport.themes?.map((t, i) => (
-                                    <div key={i} className="theme-item">
-                                        <h4>#{t.theme}</h4>
-                                        <ul className="report-list">
-                                            {t.drivers?.map((d, di) => <li key={di}>{d.text}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </section>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Implications</h2>
-                                <div className="implications-grid">
-                                    <div className="implication-box">
-                                        <strong>[Market & Business]</strong>
-                                        <ul>{parsedReport.implications?.market_business?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
-                                    </div>
-                                    <div className="implication-box">
-                                        <strong>[Tech & Product]</strong>
-                                        <ul>{parsedReport.implications?.tech_product?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
-                                    </div>
-                                    <div className="implication-box">
-                                        <strong>[Competitive Landscape]</strong>
-                                        <ul>{parsedReport.implications?.competitive_landscape?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
-                                    </div>
-                                    <div className="implication-box">
-                                        <strong>[Policy & Regulation]</strong>
-                                        <ul>{parsedReport.implications?.policy_regulation?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Risks & Uncertainties</h2>
-                                {parsedReport.risks_and_uncertainties?.map((r, i) => (
-                                    <div key={i} className="risk-item">
-                                        <strong>[{r.type}] {r.risk}</strong>
-                                        <div className="evidence-badge" data-level={r.evidence_level}>Evidence: {r.evidence_level}</div>
-                                        <ul className="report-list">
-                                            {r.impact_paths?.map((p, pi) => <li key={pi}>{p.text}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </section>
-
-                            <section className="report-section">
-                                <h2 className="section-title">■ Watchlist</h2>
-                                <div className="watchlist-grid">
-                                    {parsedReport.watchlist?.map((w, i) => (
-                                        <div key={i} className="watch-item">
-                                            <div className="watch-signal">{w.signal}</div>
-                                            <div className="watch-why">Why: {w.why}</div>
-                                            <div className="watch-how">How: {w.how_to_monitor}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* 🔧 FIX #4: 빈 Sources 섹션 숨김 */}
-                            {(parsedReport.sources?.length ?? 0) > 0 && (
-                                <section className="report-section">
-                                    <h2 className="section-title">■ Sources</h2>
-                                    <div className="source-chips">
-                                        {parsedReport.sources?.map((src, i) => {
-                                            const { url, title } = getSourceInfo(src);
-                                            return (
-                                                <a
-                                                    key={i}
-                                                    href={url}
-                                                    className="source-chip"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    title={`[${src.sid}] ${title} (${src.publisher})\n${url}`}
-                                                >
-                                                    <span className="source-sid">{src.sid}</span>
-                                                    <span className="source-host">{formatUrl(url)}</span>
-                                                </a>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
                             )}
 
-                            {/* 🔧 FIX #4: 빈 Analysis Quality 섹션 완전 숨김 */}
-                            {((parsedReport.quality?.coverage_gaps?.length ?? 0) > 0 ||
-                                (parsedReport.quality?.conflicts?.length ?? 0) > 0 ||
-                                (parsedReport.quality?.low_evidence_points?.length ?? 0) > 0) && (
-                                    <section className="report-section quality-section">
-                                        <h2 className="section-title">■ Analysis Quality</h2>
-                                        {parsedReport.quality?.coverage_gaps?.length && parsedReport.quality.coverage_gaps.length > 0 ? (
-                                            <div className="quality-item">
-                                                <strong>Coverage Gaps:</strong>
-                                                <ul>{parsedReport.quality.coverage_gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
-                                            </div>
-                                        ) : null}
-                                        {parsedReport.quality?.conflicts?.length && parsedReport.quality.conflicts.length > 0 ? (
-                                            <div className="quality-item">
-                                                <strong>Conflicts:</strong>
-                                                <ul>{parsedReport.quality.conflicts.map((c, i) => <li key={i}>{c}</li>)}</ul>
-                                            </div>
-                                        ) : null}
+                            {/* Structured Report View (Only for Deep Dive) */}
+                            {!weeklyMode && parsedReport && (
+                                <>
+                                    <div className="report-meta-box">
+                                        <h1 className="report-title">{parsedReport.report_meta?.title}</h1>
+                                        <div className="report-badge-row">
+                                            <span className="badge">대상: {parsedReport.report_meta?.coverage}</span>
+                                            <span className="badge">기간: {parsedReport.report_meta?.time_window}</span>
+                                            <span className="badge">관점: {parsedReport.report_meta?.lens}</span>
+                                        </div>
+                                    </div>
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Executive Summary</h2>
+                                        <div className="summary-group">
+                                            <h4>[Signal Summary]</h4>
+                                            <ul className="report-list">
+                                                {parsedReport.executive_summary?.signal_summary?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                            </ul>
+                                            <h4>[What Changed]</h4>
+                                            <ul className="report-list">
+                                                {parsedReport.executive_summary?.what_changed?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                            </ul>
+                                            <h4>[So What]</h4>
+                                            <ul className="report-list">
+                                                {parsedReport.executive_summary?.so_what?.map((s, i) => <li key={i}>{s.text}</li>)}
+                                            </ul>
+                                        </div>
                                     </section>
-                                )}
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Key Developments</h2>
+                                        {parsedReport.key_developments?.map((d, i) => (
+                                            <div key={i} className="development-item">
+                                                <h3 className="development-headline">[{d.headline}]</h3>
+                                                <div className="evidence-badge" data-level={d.evidence_level}>Evidence: {d.evidence_level}</div>
+                                                <ul className="report-list">
+                                                    {d.facts?.map((f, fi) => <li key={fi}>- (Fact) {f.text}</li>)}
+                                                    {d.analysis?.map((a, ai) => (
+                                                        <li key={ai}>
+                                                            - (Analysis) {a.text}
+                                                            <div className="analysis-basis">Basis: {a.basis}</div>
+                                                        </li>
+                                                    ))}
+                                                    {d.why_it_matters?.map((w, wi) => <li key={wi}>- (Why) {w.text}</li>)}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </section>
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Core Themes</h2>
+                                        {parsedReport.themes?.map((t, i) => (
+                                            <div key={i} className="theme-item">
+                                                <h4>#{t.theme}</h4>
+                                                <ul className="report-list">
+                                                    {t.drivers?.map((d, di) => <li key={di}>{d.text}</li>)}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </section>
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Implications</h2>
+                                        <div className="implications-grid">
+                                            <div className="implication-box">
+                                                <strong>[Market & Business]</strong>
+                                                <ul>{parsedReport.implications?.market_business?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                            </div>
+                                            <div className="implication-box">
+                                                <strong>[Tech & Product]</strong>
+                                                <ul>{parsedReport.implications?.tech_product?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                            </div>
+                                            <div className="implication-box">
+                                                <strong>[Competitive Landscape]</strong>
+                                                <ul>{parsedReport.implications?.competitive_landscape?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                            </div>
+                                            <div className="implication-box">
+                                                <strong>[Policy & Regulation]</strong>
+                                                <ul>{parsedReport.implications?.policy_regulation?.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Risks & Uncertainties</h2>
+                                        {parsedReport.risks_and_uncertainties?.map((r, i) => (
+                                            <div key={i} className="risk-item">
+                                                <strong>[{r.type}] {r.risk}</strong>
+                                                <div className="evidence-badge" data-level={r.evidence_level}>Evidence: {r.evidence_level}</div>
+                                                <ul className="report-list">
+                                                    {r.impact_paths?.map((p, pi) => <li key={pi}>{p.text}</li>)}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </section>
+
+                                    <section className="report-section">
+                                        <h2 className="section-title">■ Watchlist</h2>
+                                        <div className="watchlist-grid">
+                                            {parsedReport.watchlist?.map((w, i) => (
+                                                <div key={i} className="watch-item">
+                                                    <div className="watch-signal">{w.signal}</div>
+                                                    <div className="watch-why">Why: {w.why}</div>
+                                                    <div className="watch-how">How: {w.how_to_monitor}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+
+                                    {/* 🔧 FIX #4: 빈 Sources 섹션 숨김 */}
+                                    {(parsedReport.sources?.length ?? 0) > 0 && (
+                                        <section className="report-section">
+                                            <h2 className="section-title">■ Sources</h2>
+                                            <div className="source-chips">
+                                                {parsedReport.sources?.map((src, i) => {
+                                                    const { url, title } = getSourceInfo(src);
+                                                    return (
+                                                        <a
+                                                            key={i}
+                                                            href={url}
+                                                            className="source-chip"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title={`[${src.sid}] ${title} (${src.publisher})\n${url}`}
+                                                        >
+                                                            <span className="source-sid">{src.sid}</span>
+                                                            <span className="source-host">{formatUrl(url)}</span>
+                                                        </a>
+                                                    );
+                                                })}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {/* 🔧 FIX #4: 빈 Analysis Quality 섹션 완전 숨김 */}
+                                    {((parsedReport.quality?.coverage_gaps?.length ?? 0) > 0 ||
+                                        (parsedReport.quality?.conflicts?.length ?? 0) > 0 ||
+                                        (parsedReport.quality?.low_evidence_points?.length ?? 0) > 0) && (
+                                            <section className="report-section quality-section">
+                                                <h2 className="section-title">■ Analysis Quality</h2>
+                                                {parsedReport.quality?.coverage_gaps?.length && parsedReport.quality.coverage_gaps.length > 0 ? (
+                                                    <div className="quality-item">
+                                                        <strong>Coverage Gaps:</strong>
+                                                        <ul>{parsedReport.quality.coverage_gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
+                                                    </div>
+                                                ) : null}
+                                                {parsedReport.quality?.conflicts?.length && parsedReport.quality.conflicts.length > 0 ? (
+                                                    <div className="quality-item">
+                                                        <strong>Conflicts:</strong>
+                                                        <ul>{parsedReport.quality.conflicts.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                                                    </div>
+                                                ) : null}
+                                            </section>
+                                        )}
+                                </>
+                            )}
+
+                            {!weeklyMode && !parsedReport && (
+                                <div className="markdown-content">
+                                    <ReactMarkdown>{localReport || report}</ReactMarkdown>
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="markdown-content">
-                            <ReactMarkdown>{localReport || report}</ReactMarkdown>
+                    )}
+
+                    {!loading && (
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={handleCopy}>
+                                📋 텍스트로 복사
+                            </button>
+                            <button className="btn" onClick={onClose}>닫기</button>
+                        </div>
+                    )}
+
+                    {showCopyToast && (
+                        <div className="copy-toast">
+                            복사 완료
                         </div>
                     )}
                 </div>
-
-                {!loading && (
-                    <div className="modal-footer">
-                        <button className="btn btn-secondary" onClick={handleCopy}>
-                            📋 텍스트로 복사
-                        </button>
-                        <button className="btn" onClick={onClose}>닫기</button>
-                    </div>
-                )}
-
-                {showCopyToast && (
-                    <div className="copy-toast">
-                        복사 완료
-                    </div>
-                )}
-            </div>
-            <style jsx>{`
+                <style jsx>{`
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                     background: rgba(0, 0, 0, 0.7);
@@ -1073,6 +1093,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     }
                 }
             `}</style>
+            </div>
         </div>
     );
 }

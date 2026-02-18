@@ -19,6 +19,7 @@ export default function HomePage() {
   const [reportContent, setReportContent] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
   const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
+  const [isWeeklyMode, setIsWeeklyMode] = useState(false);
 
   // 브리핑 로드
   const loadBrief = async () => {
@@ -77,8 +78,18 @@ export default function HomePage() {
   const handleDeepDive = async (issue: IssueItem) => {
     setIsReportModalOpen(true);
     setSelectedReportIssue(issue);
-    setReportContent(''); // Reset previous report
-    setReportLoading(true); // Signal to Modal to start generation
+    setReportContent('');
+    setReportLoading(true);
+    setIsWeeklyMode(false);
+  };
+
+  // 주간 트렌드 리포트 생성
+  const handleWeeklyReport = () => {
+    setIsReportModalOpen(true);
+    setSelectedReportIssue(undefined);
+    setReportContent('');
+    setReportLoading(true);
+    setIsWeeklyMode(true);
   };
 
   useEffect(() => {
@@ -156,6 +167,14 @@ export default function HomePage() {
                       </>
                     )}
                   </button>
+                  <button
+                    className="weekly-report-button"
+                    onClick={handleWeeklyReport}
+                    disabled={reportLoading}
+                  >
+                    <span>📈</span>
+                    주간 리포트
+                  </button>
                 </div>
               </div>
             </div>
@@ -217,12 +236,14 @@ export default function HomePage() {
 
       <TrendReportModal
         isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
+        onClose={() => { setIsReportModalOpen(false); setIsWeeklyMode(false); }}
         report={reportContent}
         loading={reportLoading}
         issue={selectedReportIssue}
         onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
         onGenerationComplete={() => setReportLoading(false)}
+        weeklyMode={isWeeklyMode}
+        weeklyDomain="ai"
       />
       <style jsx>{`
         .hero-meta {
@@ -294,6 +315,31 @@ export default function HomePage() {
           cursor: not-allowed;
         }
 
+        .weekly-report-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 14px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .weekly-report-button:hover:not(:disabled) {
+          transform: translateY(-2px) scale(1.02);
+          box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        .weekly-report-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
         @media (max-width: 640px) {
           .hero-meta {
             flex-direction: column;
@@ -319,7 +365,8 @@ export default function HomePage() {
             display: none;
           }
 
-          .regenerate-button {
+          .regenerate-button,
+          .weekly-report-button {
             width: 100%;
             justify-content: center;
             padding: 12px;

@@ -23,6 +23,7 @@ export default function BatteryBriefPage() {
     const [reportContent, setReportContent] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
     const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
+    const [isWeeklyMode, setIsWeeklyMode] = useState(false);
 
     // 배터리 브리핑 로드
     const loadBrief = async () => {
@@ -83,6 +84,16 @@ export default function BatteryBriefPage() {
         setSelectedReportIssue(issue);
         setReportContent('');
         setReportLoading(true);
+        setIsWeeklyMode(false);
+    };
+
+    // 주간 트렌드 리포트 생성
+    const handleWeeklyReport = () => {
+        setIsReportModalOpen(true);
+        setSelectedReportIssue(undefined);
+        setReportContent('');
+        setReportLoading(true);
+        setIsWeeklyMode(true);
     };
 
     useEffect(() => {
@@ -150,23 +161,33 @@ export default function BatteryBriefPage() {
 
                                     <div className="meta-action-group">
                                         {isAdmin ? (
-                                            <button
-                                                className="regenerate-button"
-                                                onClick={() => generateBrief(true)}
-                                                disabled={generating}
-                                            >
-                                                {generating ? (
-                                                    <span className="flex-center gap-2">
-                                                        <div className="mini-spinner" />
-                                                        분석 중...
-                                                    </span>
-                                                ) : (
-                                                    <span className="flex-center gap-2">
-                                                        <span className="icon">⚡</span>
-                                                        새로고침
-                                                    </span>
-                                                )}
-                                            </button>
+                                            <>
+                                                <button
+                                                    className="regenerate-button"
+                                                    onClick={() => generateBrief(true)}
+                                                    disabled={generating}
+                                                >
+                                                    {generating ? (
+                                                        <span className="flex-center gap-2">
+                                                            <div className="mini-spinner" />
+                                                            분석 중...
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex-center gap-2">
+                                                            <span className="icon">⚡</span>
+                                                            새로고침
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    className="weekly-report-button"
+                                                    onClick={handleWeeklyReport}
+                                                    disabled={reportLoading}
+                                                >
+                                                    <span>📈</span>
+                                                    주간 리포트
+                                                </button>
+                                            </>
                                         ) : (
                                             <div className="sentinel-badge">
                                                 <div className="pulse-dot"></div>
@@ -237,13 +258,15 @@ export default function BatteryBriefPage() {
 
             <TrendReportModal
                 isOpen={isReportModalOpen}
-                onClose={() => setIsReportModalOpen(false)}
+                onClose={() => { setIsReportModalOpen(false); setIsWeeklyMode(false); }}
                 report={reportContent}
                 loading={reportLoading}
                 issue={selectedReportIssue}
                 onRetry={() => selectedReportIssue && handleDeepDive(selectedReportIssue)}
                 onGenerationComplete={() => setReportLoading(false)}
                 trendReportApiUrl="/api/battery/trend-report"
+                weeklyMode={isWeeklyMode}
+                weeklyDomain="battery"
             />
             <style jsx>{`
                 .hero-meta-container {
@@ -322,6 +345,32 @@ export default function BatteryBriefPage() {
                     cursor: not-allowed;
                     transform: none;
                     box-shadow: none;
+                }
+
+                .weekly-report-button {
+                    background: linear-gradient(135deg, #059669, #10b981);
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 0.95rem;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .weekly-report-button:hover:not(:disabled) {
+                    filter: brightness(1.1);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+                }
+
+                .weekly-report-button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
 
                 .sentinel-badge {
@@ -422,7 +471,8 @@ export default function BatteryBriefPage() {
                         justify-content: center;
                     }
 
-                    .regenerate-button {
+                    .regenerate-button,
+                    .weekly-report-button {
                         width: 100%;
                         justify-content: center;
                         padding: 12px;

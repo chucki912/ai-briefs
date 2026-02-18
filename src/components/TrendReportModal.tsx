@@ -14,6 +14,8 @@ interface TrendReportModalProps {
     onRetry?: () => void;
     onGenerationComplete?: () => void;
     trendReportApiUrl?: string; // 배터리 등 다른 산업용 API URL 지원
+    weeklyMode?: boolean; // 주간 리포트 모드
+    weeklyDomain?: 'ai' | 'battery'; // 주간 리포트 도메인
 }
 
 // URL을 축약된 형태로 변환하는 헬퍼 함수
@@ -103,7 +105,7 @@ interface Inference {
     citations: string[];
 }
 
-export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry, onGenerationComplete, trendReportApiUrl = '/api/trend-report' }: TrendReportModalProps) {
+export default function TrendReportModal({ isOpen, onClose, report, loading, issue, onRetry, onGenerationComplete, trendReportApiUrl = '/api/trend-report', weeklyMode = false, weeklyDomain = 'ai' }: TrendReportModalProps) {
     const [parsedReport, setParsedReport] = useState<TrendReportData | null>(null);
     const [localReport, setLocalReport] = useState<string>('');
     const [parseError, setParseError] = useState(false);
@@ -124,14 +126,14 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
 
     useEffect(() => {
-        if (!loading && report && !issue) {
+        if (!loading && report && !issue && !weeklyMode) {
             processReport(report);
-        } else if (isOpen && loading && issue) {
+        } else if (isOpen && loading && issue && !weeklyMode) {
+            // Single Issue Deep Dive mode
             const fetchTrendReport = async () => {
                 setIsPolling(true);
                 setStatusMessage('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
                 try {
-                    // 1. 작업 시작 요청
                     const startRes = await fetch(trendReportApiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -141,7 +143,6 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     if (!startRes.ok) throw new Error('Failed to start report generation');
                     const { data: { jobId } } = await startRes.json();
 
-                    // 2. 작업 상태 폴링 (Polling)
                     pollIntervalRef.current = setInterval(async () => {
                         try {
                             const statusRes = await fetch(`${trendReportApiUrl}/status?jobId=${jobId}`);
@@ -165,7 +166,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         } catch (e) {
                             console.error('Polling error', e);
                         }
-                    }, 2000); // 2초 간격 확인
+                    }, 2000);
 
                 } catch (e) {
                     console.error('Error starting trend report', e);
@@ -177,8 +178,65 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             };
 
             fetchTrendReport();
+        } else if (isOpen && loading && weeklyMode) {
+            // Weekly Report mode
+            const fetchWeeklyReport = async () => {
+                setIsPolling(true);
+                setStatusMessage('최근 7일 이슈를 수집 중...');
+                try {
+                    const startRes = await fetch('/api/weekly-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ domain: weeklyDomain })
+                    });
+
+                    if (!startRes.ok) throw new Error('Failed to start weekly report generation');
+                    const { data: { jobId } } = await startRes.json();
+
+                    pollIntervalRef.current = setInterval(async () => {
+                        try {
+                            const statusRes = await fetch(`/api/weekly-report/status?jobId=${jobId}`);
+                            if (!statusRes.ok) return;
+
+                            const { data: statusData } = await statusRes.json();
+
+                            // Update status message based on progress
+                            if (statusData.status === 'collecting') {
+                                setStatusMessage('최근 7일 이슈를 수집 중...');
+                            } else if (statusData.status === 'clustering') {
+                                setStatusMessage(statusData.message || '이슈를 주제별로 분류 중...');
+                            } else if (statusData.status === 'generating') {
+                                setStatusMessage(statusData.message || '종합 심층 리포트 작성 중... (최대 3분 소요)');
+                            } else if (statusData.status === 'completed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                processReport(statusData.report);
+                                setIsPolling(false);
+                                onGenerationComplete?.();
+                            } else if (statusData.status === 'failed') {
+                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                setParseError(true);
+                                alert('주간 리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
+                                setIsPolling(false);
+                                onGenerationComplete?.();
+                                onClose();
+                            }
+                        } catch (e) {
+                            console.error('Weekly polling error', e);
+                        }
+                    }, 3000); // 3초 간격 — 주간 리포트는 더 오래 걸림
+
+                } catch (e) {
+                    console.error('Error starting weekly report', e);
+                    setParseError(true);
+                    setIsPolling(false);
+                    onGenerationComplete?.();
+                    onClose();
+                }
+            };
+
+            fetchWeeklyReport();
         }
-    }, [isOpen, loading, issue, report]);
+    }, [isOpen, loading, issue, report, weeklyMode]);
 
     useEffect(() => {
         if (isOpen && parsedReport && issue) {

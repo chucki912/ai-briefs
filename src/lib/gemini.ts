@@ -81,7 +81,7 @@ async function generateIssueFromCluster(
     // 뉴스 리스트에 인덱스 부여
     const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n출처: ${n.url}`).join('\n\n');
 
-    const prompt = `당신은 AI 산업 전문 분석가입니다. 아래 제공된 뉴스 클러스터를 분석하여 한국어 브리핑을 작성해주세요.
+    const prompt = `당신은 **글로벌 AI 산업 전략 애널리스트**입니다. 아래 제공된 뉴스 클러스터를 분석하여 한국어 브리핑을 작성해주세요.
 
 ## 뉴스 클러스터 정보 (인덱스 부여됨)
 ${indexedNews}
@@ -96,9 +96,8 @@ ${getFrameworkNames(frameworks)}
    - 각 항목은 구체적인 수치, 기업명, 제품명 등을 포함해야 합니다.
    - 문장은 간결하고 명확하게 작성하세요.
 3. **전략적 인사이트 (Strategic Insight)**:
-   - 위에서 추출한 **3가지 핵심 사실을 기반으로** 심층적인 분석을 제공하세요.
-   - 단일한 핵심 주제(Single Core Topic)에 집중하여 분석하세요. 여러 주제가 섞이지 않도록 주의하십시오.
-   - 단순한 요약이 아니라, 이 이슈가 AI 산업 전반에 미칠 영향, 시장의 변화, 향후 전망 등을 논리적으로 서술하세요.
+   - **단일 주제 집중 (Strictly Single Topic)**: 하나의 브리프 카드는 반드시 하나의 구체적이고 명확한 주제만 다루어야 합니다. 서로 다른 여러 소식을 병렬로 나열하지 마세요.
+   - **So What? (한국 AI 산업 관점)**: 추출된 3가지 사실이 **한국 AI 기업(Naver, Kakao, SKT, LG AI 연구원, LG CNS, AI 스타트업 등)**이나 국내 산업 생태계에 어떤 기회나 위협이 되는지 구체적으로 분석하세요. 단순 요약이 아닌, 파급 효과와 대응 전략을 포함해야 합니다.
    - 전문가 수준의 통찰력을 보여주어야 합니다.
 4. **연관 키워드**: 이 이슈와 관련된 핵심 키워드를 해시태그 형태로 3개 추출하세요.
 5. **JSON 포맷**: 결과는 반드시 아래 JSON 스키마를 따라야 합니다.
@@ -106,7 +105,7 @@ ${getFrameworkNames(frameworks)}
 ## JSON 스키마
 \`\`\`json
 {
-  "title": "이슈를 관통하는 핵심 제목 (50자 이내)",
+  "title": "이슈를 관통하는 핵심 제목 (50자 이내, 단일 핵심 주제 중심)",
   "category": "적절한 카테고리 (예: Tech Giant, Regulation, Model, Hardware, Industry 과 같은 영어 카테고리)",
   "koreanCategory": "한국어 카테고리 (예: 빅테크 동향, 규제 및 정책, AI 모델, 하드웨어, 산업 동향)",
   "oneLineSummary": "이슈 전체를 요약하는 한 문장 (100자 이내)",
@@ -115,7 +114,7 @@ ${getFrameworkNames(frameworks)}
     "핵심 사실 2",
     "핵심 사실 3"
   ],
-  "strategicInsight": "3가지 핵심 사실을 종합하여 도출한 심층적인 전략적 인사이트 (300자 내외)",
+  "strategicInsight": "3가지 핵심 사실을 종합하여 도출한 심층적인 전략적 인사이트 (300자 내외) - 한국 AI 산업에 미치는 영향(So What?) 필수 포함",
   "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
   "relatedStocks": [
     {"name": "연관 종목명", "reason": "연관 이유 (간략히)"}
@@ -181,7 +180,7 @@ JSON만 출력하세요.`;
 // API 연결 테스트
 export async function testGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
         const result = await model.generateContent('Hello');
         const response = await result.response;
         return !!response.text();
@@ -206,7 +205,7 @@ export async function generateTrendReport(
 ## 핵심 목표: 소스 일관성 및 확장 (Critical)
 1) **소스 상속**: 입력된 'ISSUE_URLS'는 이미 검증된 브리프의 원본 소스들입니다. 이들은 리포트의 기반이며, 모든 분석의 출발점이 되어야 합니다.
 2) **소스 확장**: 당신은 상세 리포트 작성자로서 전문가적인 깊이를 더하기 위해, 제공된 소스 외에 **최소 1~2개 이상의 새로운 고품질 소스**를 스스로 검색하여 추가해야 합니다.
-3) **검색 활용**: 'googleSearch' 도구를 적극적으로 사용하여 기술적 상세 내용, 시장 데이터, 또는 경쟁사의 반응 등을 찾아 리포트를 보완하십시오.
+3) **검색 활용**: 'googleSearch', 'Brave Search', 'Tavily' 도구를 적극적으로 사용하여 기술적 상세 내용, 시장 데이터, 또는 경쟁사의 반응 등을 찾아 리포트를 보완하십시오.
 
 ## Critical Rules
 1) 출력 포맷: 반드시 아래 “OUTPUT TEMPLATE” 그대로 작성.

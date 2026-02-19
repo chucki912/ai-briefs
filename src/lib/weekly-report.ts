@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { IssueItem } from '@/types';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -55,7 +55,7 @@ ${issueList}
 JSON만 출력하세요.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await generateWithRetry(model, prompt);
         const response = result.response;
         const text = response.text();
 
@@ -244,9 +244,27 @@ ${clusterContext}
 
     try {
         console.log(`[Weekly Report] 주간 리포트 생성 시작(${clusters.length} clusters, ${allIssues.length} issues)...`);
-        const result = await model.generateContent(userPrompt);
+
+        let result;
+        let isFallback = false;
+
+        try {
+            // 1. Primary Attempt: Pro Model with Retry
+            result = await generateWithRetry(model, userPrompt, 2, 3000);
+        } catch (primaryError: any) {
+            console.warn('[Weekly Report] Primary Pro Model failed, trying Fallback Flash Model...', primaryError.message);
+            // 2. Fallback Attempt: Flash Model (Faster, more available)
+            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+            result = await generateWithRetry(fallbackModel, userPrompt, 2, 2000);
+            isFallback = true;
+        }
+
         const response = result.response;
         let text = response.text();
+
+        if (isFallback) {
+            text = `> [!NOTE]\n> 현재 서비스 부하로 인해 AI 모델이 일시적으로 변경되었습니다. 분석의 깊이가 다소 차이날 수 있습니다.\n\n${text}`;
+        }
 
         // Extract new sources from grounding metadata
         const briefingSources = allIssues.flatMap(i => i.sources || []);
@@ -293,7 +311,28 @@ ${clusterContext}
         return finalReport;
 
     } catch (error) {
-        console.error('[Weekly Report] Generation failed:', error);
+        console.error('[Weekly Report] Generation failed after all attempts:', error);
         return null;
     }
+}
+
+// ─── Helper: Retry logic ───────────────────────────────────────────────────
+async function generateWithRetry(model: GenerativeModel, prompt: string | any, retries = 3, delay = 2000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await model.generateContent(prompt);
+        } catch (error: any) {
+            const isOverloaded = error.status === 503 || error.message?.includes('overloaded') || error.message?.includes('high demand');
+            const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
+
+            if ((isOverloaded || isRateLimit) && i < retries - 1) {
+                console.warn(`[Gemini Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('Retry attempts exhausted');
 }

@@ -232,12 +232,10 @@ export default function HomePage() {
             </div>
           )}
         </main>
-
-        {/* Footer */}
         <footer className="footer">
           <p>© 2026 AI Daily Brief. 매일 오전 7시 자동 업데이트</p>
         </footer>
-      </div >
+      </div>
 
       <TrendReportModal
         isOpen={isReportModalOpen}

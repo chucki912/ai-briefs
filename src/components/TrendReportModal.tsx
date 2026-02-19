@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import { IssueItem } from '@/types';
 import { logger } from '@/lib/logger';
@@ -114,6 +115,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [isPolling, setIsPolling] = useState(false);
     const [loadingStep, setLoadingStep] = useState(0); // 0: Start, 1: Collecting, 2: Clustering, 3: Generating
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
 
     useEffect(() => {
         // 클린업 함수 정의
@@ -310,11 +317,17 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 quality: {}
             };
 
-            // 1. Meta Extraction
-            const titleMatch = md.match(/#\s*\[트렌드 리포트\]\s*(.*)/);
+            // 1. Meta Extraction - Flexible matching for titles like [# 브리프 심층 리포트] or [# [트렌드 리포트]]
+            const titleMatch = md.match(/#\s*(?:\[트렌드 리포트\]|브리프 심층 리포트|\[Deep Dive\])?\s*:?\s*(.*)/i);
             if (titleMatch) data.report_meta.title = titleMatch[1].trim();
 
-            const metaSection = md.split('■ Executive Summary')[0];
+            // Fallback meta extraction if title regex is tricky
+            if (!data.report_meta.title) {
+                const firstLine = md.split('\n')[0].replace(/^#+\s*/, '').replace(/\[.*?\]/g, '').replace(/^:\s*/, '').trim();
+                data.report_meta.title = firstLine || 'Strategic Intelligence Report';
+            }
+
+            const metaSection = md.split('■')[0]; // Everything before the first symbol
             const coverage = metaSection.match(/분석대상:\s*(.*)/);
             const audience = metaSection.match(/타겟:\s*(.*)/);
             const timeWindow = metaSection.match(/기간:\s*(.*)/);
@@ -326,27 +339,29 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             if (lens) data.report_meta.lens = lens[1].trim();
             data.report_meta.generated_at = new Date().toISOString();
 
-            // 2. Sections Splitting
-            const sections = md.split(/##?\s*■/);
+            // 2. Sections Splitting - More flexible regex for headers like [## ■ Section] or [■ Section]
+            const sections = md.split(/(?=##?\s*■|(?<=\n)■)/);
 
             sections.forEach(section => {
-                const cleanSection = section.trim();
+                const cleanSection = section.replace(/##?\s*■/, '').trim();
 
                 // Executive Summary
-                if (cleanSection.startsWith('Executive Summary')) {
+                if (cleanSection.includes('Executive Summary')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
-                        const cleanLine = line.replace(/\*\*/g, '').trim(); // strip all ** first
-                        if (cleanLine.includes('[Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*\[Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('[Change]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*\[Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('[So What]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*\[So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        const cleanLine = line.replace(/\*\*/g, '').trim();
+                        if (cleanLine.includes('Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('Change]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('So What]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        // Support for alternative labels
+                        if (cleanLine.includes('Strategic Recommendation]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*Strategic Recommendation\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                     });
                 }
 
                 // Key Developments
-                if (cleanSection.startsWith('Key Developments')) {
+                if (cleanSection.includes('Key Developments') || cleanSection.includes('Strategic Analysis')) {
                     const devBlocks = cleanSection.split('###');
-                    devBlocks.shift(); // remove header
+                    devBlocks.shift();
                     devBlocks.forEach(block => {
                         const lines = block.trim().split('\n');
                         const headline = lines[0].replace(/\[|\]/g, '').trim();
@@ -354,15 +369,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const analysis: any[] = [];
 
                         lines.slice(1).forEach(line => {
-                            if (line.includes('(Fact)')) facts.push({ text: line.replace(/-\s*\(Fact\)/, '').trim() });
-                            if (line.includes('(Analysis)')) {
-                                const parts = line.split('(Basis:');
-                                const text = parts[0].replace(/-\s*\(Analysis\)/, '').trim();
-                                // 🔧 FIX #2: 빈 Basis 처리 - 기본값 제공
-                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
-                                if (!basis || basis.length < 3) {
-                                    basis = '구조적 분석 기반';
-                                }
+                            const cleanLine = line.replace(/\*\*/g, '').trim();
+                            if (cleanLine.includes('Fact]')) facts.push({ text: cleanLine.replace(/.*Fact\]\s*/, '').replace(/^-\s*/, '').trim() });
+                            if (cleanLine.includes('Analysis]')) {
+                                const parts = cleanLine.split('Basis:');
+                                const text = parts[0].replace(/.*Analysis\]\s*/, '').replace(/^-\s*/, '').trim();
+                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '구조적 분석 기반';
                                 analysis.push({ text, basis });
                             }
                         });
@@ -398,30 +410,31 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 }
 
                 // Implications
-                if (cleanSection.startsWith('Implications')) {
+                if (cleanSection.includes('Implications')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
-                        const cleanLine = line.replace(/\*\*/g, '').trim(); // Remove bolding
-                        if (cleanLine.includes('[Market]')) data.implications.market_business.push({ text: cleanLine.replace(/.*\[Market\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('[Tech]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*\[Tech\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('[Comp]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*\[Comp\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('[Policy]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*\[Policy\]/, '').replace(/^-/, '').trim() });
+                        const cleanLine = line.replace(/\*\*/g, '').trim();
+                        if (cleanLine.includes('Market]')) data.implications.market_business.push({ text: cleanLine.replace(/.*Market\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Tech]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*Tech\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Comp]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*Comp\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Policy]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*Policy\]/, '').replace(/^-/, '').trim() });
                     });
                 }
 
                 // Risks (🔧 FIX #3: 대소문자 불일치 리스크 태그 정규화)
-                if (cleanSection.startsWith('Risks & Uncertainties')) {
+                if (cleanSection.includes('Risks') || cleanSection.includes('Uncertainties')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
                         let type = '';
                         let risk = '';
 
-                        // Case-insensitive matching for risk tags, but storing as lowercase as per QA standard
+                        // Case-insensitive matching for risk tags
                         const upperLine = cleanLine.toUpperCase();
-                        if (upperLine.includes('[TECH]')) { type = 'tech'; risk = cleanLine.replace(/.*\[(?:TECH|tech)\]/i, '').replace(/^-/, '').trim(); }
-                        else if (upperLine.includes('[MARKET]')) { type = 'market'; risk = cleanLine.replace(/.*\[(?:MARKET|market)\]/i, '').replace(/^-/, '').trim(); }
-                        else if (upperLine.includes('[REG]')) { type = 'reg'; risk = cleanLine.replace(/.*\[(?:REG|reg)\]/i, '').replace(/^-/, '').trim(); }
+                        if (upperLine.includes('[TECH]')) { type = 'tech'; risk = cleanLine.replace(/.*\[TECH\]/i, '').replace(/^-/, '').trim(); }
+                        else if (upperLine.includes('[MARKET]')) { type = 'market'; risk = cleanLine.replace(/.*\[MARKET\]/i, '').replace(/^-/, '').trim(); }
+                        else if (upperLine.includes('[REG]')) { type = 'reg'; risk = cleanLine.replace(/.*\[REG\]/i, '').replace(/^-/, '').trim(); }
+                        else if (upperLine.includes('[SURVIVAL]')) { type = 'survival'; risk = cleanLine.replace(/.*\[SURVIVAL\]/i, '').replace(/^-/, '').trim(); }
 
                         if (type && risk) {
                             data.risks_and_uncertainties.push({ type, risk, evidence_level: 'medium', impact_paths: [] });
@@ -429,26 +442,32 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     });
                 }
 
-                // Watchlist Parser (Enhanced for Why/How extraction)
-                if (cleanSection.startsWith('Watchlist')) {
-                    const blocks = cleanSection.split(/\r?\n(?=-)/); // Split by list items starting with -
+                // Watchlist Parser (Enhanced for Why/How/Threshold extraction)
+                if (cleanSection.includes('Watchlist')) {
+                    const blocks = cleanSection.split(/\r?\n(?=-)/);
                     blocks.forEach(block => {
                         const cleanBlock = block.replace(/Watchlist/i, '').trim();
-                        if (!cleanBlock) return;
+                        if (!cleanBlock || !cleanBlock.startsWith('-')) return;
 
-                        // 1. Extract Signal (first line or bolded part)
-                        const signalMatch = cleanBlock.match(/-\s*\*\*(.*?)\*\*/); // Expecting - **Signal Name**
-                        const signalText = signalMatch ? signalMatch[1] : cleanBlock.split('\n')[0].replace(/^-/, '').trim();
+                        // 1. Extract Signal
+                        const firstLine = cleanBlock.split('\n')[0];
+                        const signalMatch = firstLine.match(/-\s*(?:\*\*)?(.*?)(?:\*\*)?(?::|\s*$)/);
+                        let signalText = signalMatch ? signalMatch[1].replace(/<|>|\[|\]/g, '').trim() : '';
 
-                        // 2. Extract Why (optional)
+                        // 2. Extract Why
                         const whyMatch = cleanBlock.match(/\(Why\)\s*([^\n]+)/i);
-                        const whyText = whyMatch ? whyMatch[1].trim() : '';
+                        let whyText = whyMatch ? whyMatch[1].trim() : '';
 
-                        // 3. Extract How (optional)
-                        const howMatch = cleanBlock.match(/\(How\)\s*([^\n]+)/i);
+                        // Fallback: If (Why) is missing but there's text after a colon on the first line
+                        if (!whyText && firstLine.includes(':')) {
+                            whyText = firstLine.split(':')[1].trim();
+                        }
+
+                        // 3. Extract How/Threshold
+                        const howMatch = cleanBlock.match(/\((?:How|Threshold)\)\s*([^\n]+)/i);
                         const howText = howMatch ? howMatch[1].trim() : '';
 
-                        if (signalText && signalText !== 'Watchlist') {
+                        if (signalText && signalText.length > 1) {
                             data.watchlist.push({
                                 signal: signalText,
                                 why: whyText,
@@ -589,13 +608,46 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         setTimeout(() => setShowCopyToast(false), 2000);
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content report-modal" onClick={e => e.stopPropagation()}>
+    return createPortal(
+        <div
+            className="modal-overlay"
+            onClick={onClose}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 10000,
+                backdropFilter: 'blur(8px)',
+                padding: '20px'
+            }}
+        >
+            <div
+                className="modal-content report-modal"
+                onClick={e => e.stopPropagation()}
+                style={{
+                    backgroundColor: 'var(--bg-card)',
+                    width: '100%',
+                    maxWidth: '900px',
+                    maxHeight: '90vh',
+                    height: 'auto',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    position: 'relative',
+                    zIndex: 10001
+                }}
+            >
                 <div className="modal-header">
-                    <h2>📊 트렌드 센싱 리포트 (Deep Dive)</h2>
+                    <h2>📊 브리프 심층 리포트</h2>
                     <button className="close-btn" onClick={onClose}>&times;</button>
                 </div>
 
@@ -815,19 +867,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     )}
                 </div>
                 <style jsx>{`
-                .modal-overlay {
-                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0, 0, 0, 0.75);
-                    display: flex; justify-content: center; align-items: center;
-                    z-index: 9999; padding: 1rem;
-                    backdrop-filter: blur(4px);
+                @keyframes modalFadeUp {
+                    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 .modal-content.report-modal {
-                    background: var(--bg-card);
-                    width: 95%; max-width: 900px; height: 90vh;
-                    border-radius: 12px; display: flex; flex-direction: column;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    position: relative;
+                    animation: modalFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
                 }
                 .modal-header {
                     padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color);
@@ -845,7 +890,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 }
                 .loading-state {
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    height: 100%; gap: 1rem; color: var(--text-secondary);
+                    min-height: 400px; height: 100%; gap: 1rem; color: var(--text-secondary);
                 }
                 .loading-visual { margin-bottom: 2rem; }
                 .progress-stepper { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
@@ -918,51 +963,14 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     display: flex;
                     align-items: center;
                     gap: 6px;
-                @media (max-width: 480px) {
-                    .modal-overlay {
-                        padding: 0; /* Full screen on mobile */
-                        align-items: flex-end; /* Bottom sheet style or just full screen */
-                    }
-                    .modal-content.report-modal {
-                        width: 100%;
-                        height: 100%; /* Full screen height */
-                        border-radius: 0;
-                        max-width: none;
-                    }
-                    .modal-header {
-                        padding: 1rem;
-                    }
-                    .modal-header h2 {
-                        font-size: 1.1rem;
-                    }
-                    .modal-body {
-                        padding: 1.25rem;
-                    }
-                    .report-title {
-                        font-size: 1.4rem;
-                    }
-                    .report-badge-row {
-                        gap: 0.4rem;
-                    }
-                    .implications-grid {
-                        grid-template-columns: 1fr; /* Stack implications */
-                    }
-                    .watchlist-grid {
-                        grid-template-columns: 1fr; /* Stack watchlist */
-                    }
-                    .source-chip {
-                        max-width: 100%;
-                    }
-                    .source-host {
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    }
-                }
                     text-decoration: none;
                     font-size: 0.8rem;
                     color: var(--text-primary);
                     transition: all 0.2s;
+                    border: 1px solid var(--border-color);
+                    padding: 4px 8px;
+                    border-radius: 6px;
+                    background: var(--bg-body);
                 }
                 .source-chip:hover {
                     background: var(--accent-light);
@@ -1003,143 +1011,32 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     100% { opacity: 0; transform: translate(-50%, -60%); }
                 }
 
-                /* Markdown Content Styling (Premium Look) */
                 .markdown-content {
                     color: var(--text-primary);
                     line-height: 1.7;
                     font-size: 1rem;
                 }
-
-                .markdown-content h1 {
-                    font-size: 1.8rem;
-                    font-weight: 800;
-                    margin-bottom: 1.5rem;
-                    padding-bottom: 1rem;
-                    border-bottom: 2px solid var(--border-color);
-                    color: var(--text-primary);
-                }
-
-                .markdown-content h2 {
-                    font-size: 1.2rem;
-                    font-weight: 800;
-                    margin-top: 2.5rem;
-                    margin-bottom: 1.25rem;
-                    color: var(--accent-color);
-                    border-left: 5px solid var(--accent-color);
-                    padding-left: 0.75rem;
-                    background: linear-gradient(90deg, var(--bg-body) 0%, transparent 100%);
-                    padding-top: 0.5rem;
-                    padding-bottom: 0.5rem;
-                    border-radius: 0 4px 4px 0;
-                }
-
-                .markdown-content h3 {
-                    font-size: 1.1rem;
-                    font-weight: 700;
-                    margin-top: 1.5rem;
-                    margin-bottom: 0.75rem;
-                    color: var(--text-primary);
-                    background-color: var(--bg-body);
-                    padding: 0.5rem 1rem;
-                    border-radius: 6px;
-                    border: 1px solid var(--border-color);
-                    display: inline-block;
-                }
-
-                .markdown-content h4 {
-                    font-size: 1rem;
-                    font-weight: 700;
-                    margin-top: 1rem;
-                    color: var(--text-secondary);
-                }
-
-                .markdown-content p {
-                    margin-bottom: 1rem;
-                    color: var(--text-secondary);
-                }
-
-                .markdown-content ul, .markdown-content ol {
-                    padding-left: 1.2rem;
-                    margin-bottom: 1.25rem;
-                }
-
-                .markdown-content li {
-                    margin-bottom: 0.5rem;
-                    position: relative;
-                    color: var(--text-secondary);
-                }
-
-                .markdown-content blockquote {
-                    border-left: 4px solid var(--accent-color);
-                    margin: 1.5rem 0;
-                    padding: 1rem 1.5rem;
-                    background: var(--bg-body);
-                    color: var(--text-secondary);
-                    font-style: italic;
-                    border-radius: 0 8px 8px 0;
-                }
-
-                .markdown-content strong {
-                    font-weight: 700;
-                    color: var(--text-primary);
-                }
-
-                .markdown-content a {
-                    color: var(--accent-color);
-                    text-decoration: underline;
-                    text-underline-offset: 2px;
-                }
-
-                .markdown-content hr {
-                    margin: 3rem 0;
-                    border: 0;
-                    border-top: 1px solid var(--border-color);
-                }
+                .markdown-content h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); color: var(--text-primary); }
+                .markdown-content h2 { font-size: 1.2rem; font-weight: 800; margin-top: 2.5rem; margin-bottom: 1.25rem; color: var(--accent-color); border-left: 5px solid var(--accent-color); padding-left: 0.75rem; background: linear-gradient(90deg, var(--bg-body) 0%, transparent 100%); padding-top: 0.5rem; padding-bottom: 0.5rem; border-radius: 0 4px 4px 0; }
+                .markdown-content h3 { font-size: 1.1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); background-color: var(--bg-body); padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); display: inline-block; }
+                .markdown-content p { margin-bottom: 1rem; color: var(--text-secondary); }
+                .markdown-content ul { padding-left: 1.2rem; margin-bottom: 1.25rem; }
+                .markdown-content li { margin-bottom: 0.5rem; color: var(--text-secondary); }
 
                 @media (max-width: 640px) {
+                    .modal-overlay { padding: 1rem; }
                     .modal-content.report-modal {
-                        width: 100%;
-                        height: 100%;
-                        border-radius: 0;
-                        max-width: none;
+                        width: 98%; height: 92vh; border-radius: 12px;
                     }
-                    
-                    .modal-body { 
-                        padding: 1.25rem; 
-                    }
-
-                    .implications-grid, .watchlist-grid { 
-                        grid-template-columns: 1fr; 
-                    }
-
-                    .report-title { 
-                        font-size: 1.4rem; 
-                    }
-
-                    .markdown-content h1 { 
-                        font-size: 1.5rem; 
-                    }
-
-                    .markdown-content h2 { 
-                        font-size: 1.1rem; 
-                    }
-                    
-                    .modal-footer {
-                        flex-direction: column-reverse;
-                        padding: 1rem;
-                    }
-
-                    .modal-footer .btn {
-                        width: 100%;
-                        justify-content: center;
-                    }
-
-                    .close-btn {
-                        padding: 8px;
-                    }
+                    .modal-body { padding: 1.25rem; }
+                    .report-title { font-size: 1.4rem; }
+                    .implications-grid, .watchlist-grid { grid-template-columns: 1fr; }
+                    .modal-footer { flex-direction: column-reverse; padding: 1rem; }
+                    .modal-footer .btn { width: 100%; justify-content: center; }
                 }
             `}</style>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

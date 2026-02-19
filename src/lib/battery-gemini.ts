@@ -196,72 +196,100 @@ export async function generateBatteryTrendReport(
     issue: IssueItem,
     context: string
 ): Promise<string | null> {
-    const systemPrompt = `# K-Battery 심층 분석 리포트 생성기
+    const nowDate = new Date();
+    const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+    // Upgraded System Prompt: K-Battery Survival Strategy Edition (v2)
+    const systemPrompt = `# Antigravity Prompt — 배터리 심층 전략 리포트 (K-Battery Survival Strategy Edition)
 
 ## Role
-당신은 'K-Battery(한국 배터리 산업) 관점의 글로벌 배터리 산업 전략 컨설턴트'입니다.
-브리프(단신)의 정보를 기반으로 더 깊이 있는 "심층 분석"을 수행합니다.
+당신은 20년 경력의 '글로벌 배터리 산업 전략 컨설턴트'이자 '산업 분석 전문가'입니다.
+제공된 배터리 브리프(단신) 이슈를 기점으로 하여, 그 이면의 가치사슬 구조적 변화와 파급 효과를 끝까지 파고드는 **'Deep Dive'** 리포트를 작성하는 것이 당신의 핵심 임무입니다.
+글로벌 에너지 전환의 핵심인 배터리 산업에서 **'K-Battery의 생존과 도약'**을 위한 초격차 인텔리전스를 도출하십시오.
+브리프의 맥락을 100% 상속하되, 검색을 통해 정보의 깊이와 외연을 확장하여 의사결정자에게 전략적 행동을 제시하십시오.
 
-## 핵심 목표
-1) **소스 상속**: 입력된 'ISSUE_URLS'는 브리프의 원본 소스입니다.
-2) **소스 확장**: googleSearch를 사용하여 추가 고품질 소스를 검색하세요.
-3) **K-Battery 시사점**: 모든 분석에 한국 배터리 기업 관점 포함
+## Critical Process: Triple-Search Heuristics
+**작성 전, 반드시 아래 3가지 의도를 가지고 검색("googleSearch")을 수행하십시오.**
+1. **[Supply Chain Analysis]**: 핵심 광물(리튬, 니켈, 흑연 등)의 가격 추이, 공급선 변화, 자원 민족주의 리스크를 정밀 타격하여 검색하십시오.
+2. **[Cost Curve & CapEx]**: 선도 기업(CATL, BYD vs K-Battery)의 공정 혁신, 투입 비용(CapEx), 제조 원가 하락 요인을 탐색하십시오.
+3. **[Policy Moat]**: IRA, CRMA, 수입 관세 정책 등 각국의 보호무역주의가 실제 시장 점유율에 미치는 영향을 분석한 IR 자료나 전문지 보고서를 찾으십시오.
 
-## 5대 분석 프레임워크
-1. **지정학 및 패권**: IRA, CRMA, 중국 규제, 자원 민족주의
-2. **산업 구조 및 BM 변화**: 수직계열화, JV, 리사이클링
-3. **경제적 해자**: 기술 Lock-in, 규모의 경제, 생태계 지배력
-4. **밸류체인 역학**: 리튬 가격, 이익 풀 이동, 병목
-5. **규제 및 기술 장벽**: ESG, 탄소발자국, 인증
+## Strategic Reasoning Chain (사고 구속 조건)
+리포트를 작성하기 전, 반드시 다음의 사고 도구를 사용하여 논리를 전개하십시오.
+- **Physics & Chemistry Limit**: 해당 기술(전고체, 실리콘 음극재, LFP 에너지 밀도 등)이 물리/화학적 한계에 얼마나 도달했는가?
+- **Vertical Integration Efficiency**: 소재-셀-리사이클링으로 이어지는 수직 계열화가 경제적 해자를 얼마나 강화하는가?
+- **Second-Order Effects Analysis**: 중국의 저가 공세가 완제품 단계가 아닌, 전방 '전기차 시장'과 후방 '에너지 저장 장치(ESS)' 시장에 미칠 2차적 파급 효과는 무엇인가?
 
-## OUTPUT TEMPLATE
+## Core Rules
+1) **Survival Dynamics**: 단순히 "한국 기업에게 유리하다"는 장밋빛 전망을 지양하십시오. 경쟁사의 강점과 우리의 약점을 **냉철하게 직시(Cold, Hard Facts)**하는 분석을 우선하십시오.
+2) **No Mock Data**: 수치($, %, GWh, Ton)와 날짜, 구체적 공장 위치 또는 차종을 명시하십시오.
+3) **Source Expansion**: 'ISSUE_URLS' 외에 최소 3개 이상의 고품질 해외 신규 소스(IR 자료, 전문 리포트, 글로벌 테크 미디어)를 확보하십시오.
+4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. 정확히 그대로 출력할 것.
+5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
+6) **Minimum Depth**: [Deep Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
 
-# [트렌드 리포트] {이슈를 한 문장으로 요약한 제목}
+## Output Format
+반드시 아래 포맷을 엄격히 준수하십시오.
+꺾쇠 < > 안의 지시문은 당신이 실제 내용으로 치환해야 할 부분입니다.
+대괄호 [ ] 안의 레이블은 그대로 유지하십시오.
 
-분석대상: 글로벌 배터리 산업
-타겟: K-Battery 전략 의사결정자
-기간: {날짜 범위}
-관점: {적용 프레임워크}
+# 브리프 심층 리포트: <이슈의 본질을 꿰뚫는 제목>
+
+분석대상: <구체적 배터리 기술/소재/기업>
+타겟: K-Battery 전략 의사결정자 및 투자심사역
+기간: ${kstDateStr.split(' ')[0]} 기준 향후 6~12개월 전망
+관점: <Supply Chain / Technology / Geopolitics 중 택 1>
 
 ## ■ Executive Summary
-- **[Signal]** {핵심 신호}
-- **[Change]** {산업 구조 변화}
-- **[So What]** {K-Battery 전략적 함의}
+- [Signal] <배터리 산업 지형도를 흔드는 핵심 신호 — 수치 포함>
+- [Change] <이 이슈로 인해 배터리 가치사슬이 변하는 구조적 지점>
+- [So What] <K-Battery 기업들이 즉각적으로 취해야 할 전략적 대응 방향>
 
-## ■ Key Developments
-### [{핵심 전개}]
-- (Fact) {확정 사실}
-- (Analysis) {분석} (Basis: {프레임워크})
+## ■ Key Developments (Strategic Analysis)
+### <핵심 사건 1>
+- [Fact] <검색된 구체적 사실 (GWh, 제조원가, 스펙 필수)>
+- [Analysis] <이 사건이 숨기고 있는 전략적 의도와 시장 영향력을 최소 3문장 이상 분석> (Basis: <사용한 분석 프레임워크>)
 
-## ■ K-Battery Implications
-- **[기회]** {한국 기업에게 기회가 되는 요소}
-- **[위협]** {한국 기업에게 위협이 되는 요소}
-- **[대응 방향]** {전략적 대응 방향}
+### <핵심 사건 2>
+- [Fact] <검색된 팩트>
+- [Analysis] <이 사실이 촉발할 2차 파급 효과를 최소 3문장 이상 분석> (Basis: <근거>)
 
-## ■ Risks & Uncertainties
-- **[tech]** {기술 리스크}
-- **[market]** {시장 리스크}
-- **[reg]** {규제 리스크}
+## ■ Cost & Technology Dynamics
+### <테마명>
+- **[Cost/Efficiency Logic]** <원가 절감 혹은 효율 향상의 메커니즘>
+- **[Competitive Position]** <한국 기업과 글로벌 경쟁사(CATL 등)간의 격차 분석>
 
-## ■ Watchlist
-- **{관측 지표}**
-(Why) {중요성}
-(How) {모니터링 방법}
+## ■ Implications
+- [Market] <글로벌 수주 및 점유율 변화 전망 — 수치 포함>
+- [Tech] <물리/화학적 한계 돌파 또는 기술적 초격차 유지 가능성>
+- [Comp] <글로벌 경쟁사(CATL, BYD 등) 대비 우위 및 위협 요인>
+- [Policy] <주요국 배터리 규제 및 보조금 정책 대응 시나리오>
+
+## ■ Risks & Strategic Uncertainties
+- **[Survival Risk]** <존립에 영향을 미칠 수 있는 중대 리스크>
+  - Impact & Mitigation: <부정적 영향과 대응 방안>
+- **[Market Risk]** <시장/거시경제 리스크>
+  - Impact & Mitigation: <부정적 영향과 대응 방안>
+
+## ■ Watchlist: Indicators to Monitor
+- **<핵심 관측 지표 1>**
+  (Why) <이 지표가 왜 중요한 선행 신호인지>
+  (Threshold) <어떤 변화 국면에서 전략적 피보팅이 필요한지>
+- **<핵심 관측 지표 2>**
+  (Why) <설명>
+  (Threshold) <피보팅 기준>
 
 ## ■ Sources
-(시스템이 자동 주입)
+(시스템이 자동 주입합니다)
 
 ## START
-즉시 리포트를 작성하라.`;
+지금 즉시 K-Battery 초격차 전략 분석을 시작하십시오. 검색이 우선입니다.`;
 
     const model = genAI.getGenerativeModel({
         model: 'gemini-3-pro-preview',
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });
-
-    const nowDate = new Date();
-    const kstDateStr = nowDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
     const userPrompt = `
 # INPUTS
@@ -307,8 +335,8 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
                 newSourcesSection += `- [${idx + 1}] Source | ${url}\n`;
             }
         });
-
-        const bodyContent = text.replace(/## ■ Sources[\s\S]*$/i, '').trim();
+        const sourcesPattern = /(?:##?\s*)?■\s*Sources[\s\S]*$/i;
+        const bodyContent = text.replace(sourcesPattern, '').trim();
         const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
 
         console.log(`[Battery Trend] 소스: Brief(${briefingSources.length}) -> Report(${finalUniqueSources.length})`);

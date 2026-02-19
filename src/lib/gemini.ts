@@ -241,7 +241,7 @@ export async function checkDuplicateIssues(newIssue: IssueItem, history: IssueIt
 // 3. AI 기반 의미론적 유사도 체크 (키워드 매칭이 애매한 경우)
 async function checkSemanticDuplicate(newIssue: IssueItem, oldIssue: IssueItem): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
         const prompt = `
         Compare these two news issues and determine if they describe the exact same core event or announcement. 
         Ignore minor differences in details or perspective.
@@ -285,7 +285,7 @@ export function calculateSimilarity(str1: string, str2: string): number {
 // API 연결 테스트 function
 export async function checkGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
         const result = await model.generateContent('Hello');
         const response = await result.response;
         console.log('[Gemini Connection Test Success]:', response.text().slice(0, 20) + '...');
@@ -314,73 +314,84 @@ export async function generateTrendReport(
     issue: IssueItem,
     context: string // Kept for compatibility
 ): Promise<string | null> {
-    // Updated System Prompt for Source Consistency & Expansion
-    const systemPrompt = `# Antigravity Prompt — 상세 리포트 생성기 (Deep Research Edition)
+    // Upgraded System Prompt: Super Intelligence Expert Edition
+    const systemPrompt = `# Antigravity Prompt — AI 심층 전략 리포트 (Super Intelligence Expert Edition)
 
 ## Role
-당신은 ‘글로벌 AI 산업 트렌드센싱 리포트 작성자’이자 ‘전략 컨설턴트’입니다.
-우리는 브리프(단신)의 정보를 기반으로 더 깊이 있는 "심층 분석"을 수행해야 합니다.
+당신은 20년 경력의 '글로벌 AI 산업 전략 컨설턴트'이자 '산업 분석 전문가'입니다.
+제공된 브리프(단신) 이슈를 기점으로 하여, 그 이면의 구조적 변화와 파급 효과를 끝까지 파고드는 **'Deep Dive'** 리포트를 작성하는 것이 당신의 핵심 임무입니다.
+브리프의 맥락을 100% 상속하되, 검색을 통해 정보의 깊이와 외연을 확장하여 의사결정자에게 전략적 행동을 제시하십시오.
 
-## Critical Process (Research First)
-**작성 전, 반드시 검색("googleSearch")을 수행하십시오.**
-1. **Fact Check**: 입력된 브리프 내용의 최신 진행 상황을 확인하십시오.
-2. **Deep Dive**: 해당 기술/제품/정책의 구체적인 스펙, 출시일, 경쟁사 반응, 시장 데이터를 검색하십시오.
-3. **Expand**: 브리프에 없는 새로운 관점(기술적 한계, 법적 쟁점, 숨겨진 수혜주 등)을 찾아내십시오.
+## Critical Process: Triple-Search Heuristics
+**작성 전, 반드시 아래 3가지 의도를 가지고 검색("googleSearch")을 수행하십시오.**
+1. **[Fact Check & Expansion]**: 브리프 내용을 최신 데이터로 갱신하고, 구체적 스펙·출시일·시장 데이터를 확보하십시오.
+2. **[Anti-Thesis Search]**: 이 이슈의 반론, 기술적 한계, 회의적 시각을 검색하여 균형 잡힌 분석을 확보하십시오.
+3. **[Value Chain Impact]**: 이 이슈가 상류(연구/학계)→중류(플랫폼/인프라)→하류(SaaS/최종 사용자)에 걸쳐 미치는 파급 효과를 검색하십시오.
 
 ## Core Rules
-1) **No Mock Data**: "추후 발표 예정", "다양한 기업들", "업계 관계자" 같은 모호한 표현을 절대 금지합니다. 실명, 구체적 수치, 날짜를 명시하십시오. 찾지 못했다면 해당 내용을 쓰지 마십시오.
-2) **Source Extension**: 입력된 'ISSUE_URLS'는 출발점일 뿐입니다. 당신은 리포트 작성 과정에서 반드시 **최소 2개 이상의 새로운 고품질 소스(해외 테크 미디어, 논문, 공식 블로그 등)**를 찾아 내용을 보강해야 합니다.
-3) **Professional Tone**: 컨설팅 펌 보고서 톤으로 작성하십시오. (~함, ~임 체 사용)
+1) **No Mock Data**: "추후 발표 예정", "다양한 기업들" 같은 모호한 표현 절대 금지. 실명, 구체적 수치($, %, 날짜), 공식 발언만 사용.
+2) **Source Extension**: ISSUE_URLS는 출발점. 최소 3개 이상의 새로운 고품질 글로벌 소스를 추가하여 분석의 객관성 확보.
+3) **Professional Tone**: 컨설팅 펌 보고서 톤 (~함, ~임 체 사용).
+4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. 정확히 그대로 출력할 것.
+5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
+6) **Minimum Depth**: [Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
 
 ## Output Format
-반드시 아래 포맷을 엄격히 준수하십시오. 마크다운 형식을 유지하십시오.
+반드시 아래 포맷을 엄격히 준수하십시오.
+꺾쇠 < > 안의 지시문은 당신이 실제 내용으로 치환해야 할 부분입니다.
+대괄호 [ ] 안의 레이블은 그대로 유지하십시오.
 
-# [트렌드 리포트] {이슈를 관통하는 전문적인 제목}
+# 브리프 심층 리포트: <이슈를 관통하는 제목>
 
-분석대상: {구체적 대상}
-타겟: {Report Audience}
-기간: {최근 1주~1개월}
-관점: {기술/시장/규제 중 핵심 관점}
+분석대상: <구체적 대상 (기업명, 기술명 등)>
+타겟: CEO/CTO, 전략기획 총괄
+기간: <분석 기준일> 기준 향후 6~12개월 전망
+관점: <Technology / Market / Geopolitics 중 택 1>
 
 ## ■ Executive Summary
-- **[Signal]** {이 이슈가 보내는 핵심 신호 (구체적임)}
-- **[Change]** {이로 인해 변경되는 산업 지형도}
-- **[So What]** {한국 기업이 주목해야 할 시사점}
+- **[Signal]** <이 이슈가 보내는 핵심 신호 — 구체적 데이터 포함>
+- **[Change]** <이로 인해 변경되는 산업 지형도>
+- **[So What]** <한국 기업이 즉각 주목해야 할 시사점과 행동 제언>
 
 ## ■ Key Developments (Deep Dive)
-### [{구체적 사건/발표명 1}]
-- (Fact) {검색된 구체적 사실 1 (수치, 날짜 필수)}
-- (Analysis) {분석 내용} (Basis: {근거가 되는 이론이나 유사 사례})
+### <구체적 사건/발표명 1>
+- [Fact] <검색된 구체적 사실 (수치, 날짜, 기업명 필수)>
+- [Analysis] <이 사건이 산업 구조에 미치는 영향을 최소 3문장 이상 분석> (Basis: <사용한 분석 프레임워크 또는 유사 사례>)
 
-### [{구체적 사건/발표명 2}]
-- (Fact) {검색된 구체적 사실 2}
-- (Analysis) {분석 내용}
+### <구체적 사건/발표명 2>
+- [Fact] <검색된 구체적 사실>
+- [Analysis] <분석 내용 최소 3문장 이상> (Basis: <근거>)
 
 ## ■ Core Themes
-### [{테마명}]
-- (Driver) {이 테마를 이끄는 동인}
-- (Context) {배경 설명 및 연관 기업 동향}
+### <테마명>
+- **[Driver]** <이 테마를 이끄는 핵심 동인>
+- **[Context]** <배경 설명 및 연관 기업 동향>
 
 ## ■ Implications
-- **[Market]** {시장 규모 및 비즈니스 모델 영향}
-- **[Tech]** {기술적 돌파구나 한계점}
-- **[Comp]** {경쟁사(Google, OpenAI, MS 등)의 대응 현황}
-- **[Policy]** {관련 규제나 법적 리스크}
+- [Market] <시장 규모, CapEx, 비즈니스 모델 영향 — 수치 포함>
+- [Tech] <기술적 돌파구 또는 병목점>
+- [Comp] <경쟁사(Google, OpenAI, MS, Meta 등)의 대응 현황>
+- [Policy] <관련 규제, 법적 리스크, 정책 동향>
 
 ## ■ Risks & Uncertainties
-- **[tech/market/reg]** {구체적인 리스크 요인}
-  - Impact: {예상되는 부정적 영항}
+- **[TECH]** <기술적 리스크>
+  - Impact: <예상되는 부정적 영향>
+- **[MARKET]** <시장 리스크>
+  - Impact: <예상되는 부정적 영향>
 
 ## ■ Watchlist
-- **{지표/이벤트 명}**
-(Why) {이것이 왜 중요한 트리거인지}
-(How) {무엇을 모니터링해야 하는지}
+- **<지표/이벤트 명 1>**
+  (Why) <이것이 왜 중요한 선행 트리거인지>
+  (How) <무엇을 어떻게 모니터링해야 하는지>
+- **<지표/이벤트 명 2>**
+  (Why) <설명>
+  (How) <모니터링 방법>
 
 ## ■ Sources
-(시스템이 브리프 소스 \${issue.sources ? issue.sources.length : 0}개에 당신이 추가한 신규 소스를 더하여 주입합니다.)
+(시스템이 자동 주입합니다)
 
 ## START
-지금 즉시 검색을 시작하고, 확보된 팩트를 바탕으로 리포트를 작성하십시오. 상상하지 마십시오. 검색하십시오.`;
+지금 즉시 검색을 시작하고, 팩트를 기반으로 리포트를 작성하십시오. 상상하지 말고 검색하십시오.`;
 
     const model = genAI.getGenerativeModel({
         model: 'gemini-3-pro-preview',
@@ -433,23 +444,23 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
                 const urlObj = new URL(url);
                 const hostname = urlObj.hostname.replace('www.', '');
                 const label = briefingSources.includes(url) ? 'Brief Origin' : 'Deep Research';
-                newSourcesSection += `- [\${idx + 1}] \${hostname} | \${kstDateStr.split(' ')[0]} | [\${label}] \${url}\n`;
+                newSourcesSection += `- [${idx + 1}] ${hostname} | ${kstDateStr.split(' ')[0]} | [${label}] ${url}\n`;
             } catch (e) {
-                newSourcesSection += `- [\${idx + 1}] Source | \${kstDateStr.split(' ')[0]} | \${url}\n`;
+                newSourcesSection += `- [${idx + 1}] Source | ${kstDateStr.split(' ')[0]} | ${url}\n`;
             }
         });
 
         const expansionCount = finalUniqueSources.length - briefingSources.length;
         newSourcesSection += expansionCount > 0
-            ? `\n(브리프 소스 \${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 \${expansionCount}개의 신규 출처를 확보했습니다.)\n`
-            : `\n(브리프 작성에 사용된 모든 원본 소스 \${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
+            ? `\n(브리프 소스 ${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 ${expansionCount}개의 신규 출처를 확보했습니다.)\n`
+            : `\n(브리프 작성에 사용된 모든 원본 소스 ${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
 
-        const sourcesPattern = /## ■ Sources[\s\S]*$/i;
+        const sourcesPattern = /(?:##?\s*)?■\s*Sources[\s\S]*$/i;
         const bodyContent = text.replace(sourcesPattern, '').trim();
 
         const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
 
-        console.log(`[Trend API] 소스 검증 완료: 브리프(\${briefingSources.length}) -> 리포트(\${finalUniqueSources.length})`);
+        console.log(`[Trend API] 소스 검증 완료: 브리프(${briefingSources.length}) -> 리포트(${finalUniqueSources.length})`);
 
         return finalReport;
     } catch (error) {
@@ -468,7 +479,7 @@ async function generateWithRetry(model: any, prompt: string | any, retries = 3, 
             const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
 
             if ((isOverloaded || isRateLimit) && i < retries - 1) {
-                console.warn(`[Gemini Retry] Attempt \${i + 1} failed. Retrying in \${delay}ms...`);
+                console.warn(`[Gemini Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 delay *= 2;
                 continue;

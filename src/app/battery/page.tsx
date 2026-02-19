@@ -189,9 +189,19 @@ export default function BatteryBriefPage() {
                                                 </button>
                                             </>
                                         ) : (
-                                            <div className="sentinel-badge">
-                                                <div className="pulse-dot"></div>
-                                                <span className="sentinel-text">Market Sentinel Active</span>
+                                            <div className="sentinel-badge-row" style={{ display: 'flex', gap: '10px' }}>
+                                                <div className="sentinel-badge">
+                                                    <div className="pulse-dot"></div>
+                                                    <span className="sentinel-text">Market Sentinel Active</span>
+                                                </div>
+                                                <button
+                                                    className="weekly-report-button"
+                                                    onClick={handleWeeklyReport}
+                                                    disabled={reportLoading}
+                                                >
+                                                    <span>📈</span>
+                                                    주간 리포트
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -207,7 +217,7 @@ export default function BatteryBriefPage() {
                                         key={index}
                                         issue={issue}
                                         index={index}
-                                        onDeepDive={isAdmin ? handleDeepDive : undefined}
+                                        onDeepDive={handleDeepDive}
                                     />
                                 ))
                             ) : (

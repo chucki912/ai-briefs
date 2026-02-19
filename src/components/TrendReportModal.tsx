@@ -367,14 +367,28 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const facts: any[] = [];
                         const analysis: any[] = [];
 
+                        const why_it_matters: any[] = [];
+
                         lines.slice(1).forEach(line => {
                             const cleanLine = line.replace(/\*\*/g, '').trim();
-                            if (cleanLine.includes('Fact]')) facts.push({ text: cleanLine.replace(/.*Fact\]\s*/, '').replace(/^-\s*/, '').trim() });
-                            if (cleanLine.includes('Analysis]')) {
-                                const parts = cleanLine.split('Basis:');
-                                const text = parts[0].replace(/.*Analysis\]\s*/, '').replace(/^-\s*/, '').trim();
+
+                            // Flexible regex for tags: [Fact], (Fact), Fact:, [Analysis], [Structural Linkage], etc.
+                            const factMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?Fact[\)\]:]?\s*(.*)/i);
+                            const analysisMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Strategic\s+)?Analysis[\)\]:]?\s*(.*)/i);
+                            const linkageMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Structural\s+)?Linkage[\)\]:]?|[\(\[]?Why[\)\]:]?\s*(.*)/i);
+
+                            if (factMatch) {
+                                facts.push({ text: factMatch[1].trim() });
+                            } else if (analysisMatch) {
+                                const analysisText = analysisMatch[1].trim();
+                                const parts = analysisText.split(/Basis:/i);
+                                const text = parts[0].trim();
                                 let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '구조적 분석 기반';
                                 analysis.push({ text, basis });
+                            } else if (linkageMatch) {
+                                // For linkage, prioritize text after the tag, fallback to cleanLine if match is empty
+                                const linkageText = linkageMatch[1] ? linkageMatch[1].trim() : cleanLine.replace(/.*Linkage\]|.*Why\]\s*/i, '').replace(/^-\s*/, '').trim();
+                                if (linkageText) why_it_matters.push({ text: linkageText });
                             }
                         });
 
@@ -383,6 +397,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 headline,
                                 facts,
                                 analysis,
+                                why_it_matters,
                                 evidence_level: 'high' // Default default
                             });
                         }
@@ -416,30 +431,59 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
-                        if (cleanLine.includes('Market]') || cleanLine.includes('Market & CapEx]') || cleanLine.includes('Market & Business]')) data.implications.market_business.push({ text: cleanLine.replace(/.*Market & CapEx\]|.*Market & Business\]|.*Market\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Tech]') || cleanLine.includes('Technology Frontier]') || cleanLine.includes('Tech & Product]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*Technology Frontier\]|.*Tech & Product\]|.*Tech\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Comp]') || cleanLine.includes('Competitive Edge]') || cleanLine.includes('Competitive Landscape]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*Competitive Edge\]|.*Competitive Landscape\]|.*Comp\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Policy]') || cleanLine.includes('Regulation]') || cleanLine.includes('Policy & Regulation]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*Policy & Regulation\]|.*Policy\]|.*Regulation\]/, '').replace(/^-/, '').trim() });
+
+                        // Flexible regex for implications tags
+                        const marketMatch = cleanLine.match(/[\(\[]?(?:Market|Market\s*&\s*CapEx|Market\s*&\s*Business)[\)\]:]?\s*(.*)/i);
+                        const techMatch = cleanLine.match(/[\(\[]?(?:Tech|Technology\s*Frontier|Tech\s*&\s*Product)[\)\]:]?\s*(.*)/i);
+                        const compMatch = cleanLine.match(/[\(\[]?(?:Comp|Competitive\s*Edge|Competitive\s*Landscape|Competitive\s*Position)[\)\]:]?\s*(.*)/i);
+                        const policyMatch = cleanLine.match(/[\(\[]?(?:Policy|Regulation|Policy\s*&\s*Regulation)[\)\]:]?\s*(.*)/i);
+
+                        if (marketMatch && marketMatch[1]) data.implications.market_business.push({ text: marketMatch[1].replace(/^-/, '').trim() });
+                        else if (techMatch && techMatch[1]) data.implications.tech_product.push({ text: techMatch[1].replace(/^-/, '').trim() });
+                        else if (compMatch && compMatch[1]) data.implications.competitive_landscape.push({ text: compMatch[1].replace(/^-/, '').trim() });
+                        else if (policyMatch && policyMatch[1]) data.implications.policy_regulation.push({ text: policyMatch[1].replace(/^-/, '').trim() });
                     });
                 }
 
-                // Risks (🔧 FIX #3: 대소문자 불일치 리스크 태그 정규화)
+                // Risks & Uncertainties (🔧 FIX: Hierarchical Parser for Impacts)
                 if (cleanSection.includes('Risks') || cleanSection.includes('Uncertainties')) {
                     const lines = cleanSection.split('\n');
+                    let currentRisk: any = null;
+
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
-                        let type = '';
-                        let risk = '';
+                        if (!cleanLine) return;
 
-                        // Case-insensitive matching for risk tags
-                        const upperLine = cleanLine.toUpperCase();
-                        if (upperLine.includes('[TECH]')) { type = 'tech'; risk = cleanLine.replace(/.*\[TECH\]/i, '').replace(/^-/, '').trim(); }
-                        else if (upperLine.includes('[MARKET]')) { type = 'market'; risk = cleanLine.replace(/.*\[MARKET\]/i, '').replace(/^-/, '').trim(); }
-                        else if (upperLine.includes('[REG]')) { type = 'reg'; risk = cleanLine.replace(/.*\[REG\]/i, '').replace(/^-/, '').trim(); }
-                        else if (upperLine.includes('[SURVIVAL]')) { type = 'survival'; risk = cleanLine.replace(/.*\[SURVIVAL\]/i, '').replace(/^-/, '').trim(); }
+                        // Identify new risk category line
+                        const riskMatch = cleanLine.match(/^[-\s]*[\(\[]?(TECH|MARKET|REG|REGULATION|POLICY|SURVIVAL|SURVIVAL\s+RISK|MARKET\s+RISK)[\)\]:]?\s*(.*)/i);
 
-                        if (type && risk) {
-                            data.risks_and_uncertainties.push({ type, risk, evidence_level: 'medium', impact_paths: [] });
+                        // Identify impact line
+                        const impactMatch = cleanLine.match(/^[-\s]*(?:Impact(?:\s*&\s*Mitigation)?|Mitigation)[:]?\s*(.*)/i);
+
+                        if (riskMatch) {
+                            // Start a new risk block
+                            let type = riskMatch[1].toLowerCase().replace(' risk', '').replace('regulation', 'reg').replace('policy', 'reg');
+                            let risk = riskMatch[2].trim();
+
+                            currentRisk = {
+                                type,
+                                risk,
+                                evidence_level: 'medium',
+                                impact_paths: []
+                            };
+                            data.risks_and_uncertainties.push(currentRisk);
+                        } else if (impactMatch && currentRisk) {
+                            // Add impact to the current risk block
+                            const impactText = impactMatch[1] ? impactMatch[1].trim() : cleanLine.replace(/.*Impact(?:\s*&\s*Mitigation)?[:]?\s*/i, '').replace(/^-\s*/, '').trim();
+                            if (impactText) {
+                                currentRisk.impact_paths.push({ text: impactText });
+                            }
+                        } else if (currentRisk && cleanLine.startsWith('-') && !riskMatch) {
+                            // Handle case where it's a sub-item but doesn't have "Impact" label or is just detail
+                            const detailText = cleanLine.replace(/^-\s*/, '').trim();
+                            if (detailText && !detailText.toLowerCase().includes('fact]') && !detailText.toLowerCase().includes('analysis]')) {
+                                currentRisk.impact_paths.push({ text: detailText });
+                            }
                         }
                     });
                 }

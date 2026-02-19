@@ -159,9 +159,7 @@ ${issueDetails}`;
 #### Key Developments & Context
 - **[Fact]** <검색된 팩트 — 수치, 날짜, 기업명 필수>
 - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 최소 3문장 이상 분석> (Basis: <분석 근거 프레임워크 또는 유사 사례>)
-
-#### Structural Linkage
-- <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
+- **[Structural Linkage]** <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
 
 ## ■ Second-Order Economic Insights
 ### <가시화되는 산업적 변화 제목>
@@ -172,6 +170,7 @@ ${issueDetails}`;
 - **[Market & CapEx]** <시장 규모 및 기업들의 자본 투자 방향 변화 — 수치 포함>
 - **[Technology Frontier]** <기술적 병목 구간과 이를 돌파하려는 혁신 주체들의 동향>
 - **[Competitive Edge]** <이 흐름에서 승자와 패자를 가를 핵심 경쟁 요소>
+- **[Policy & Regulation]** <주요국 정책 및 규제 환경 변화가 산업에 미치는 실질적 영향>
 
 ## ■ Risks & Uncertainties
 - **[TECH]** <기술적 리스크>

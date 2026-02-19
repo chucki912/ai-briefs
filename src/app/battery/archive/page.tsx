@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
 import ManualSourceInput from '@/components/ManualSourceInput';
+import ArchiveListView from '@/components/ArchiveListView';
 import { BriefReport, IssueItem } from '@/types';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +25,7 @@ export default function BatteryArchivePage() {
     const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
     // Trend Report State
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -41,7 +43,8 @@ export default function BatteryArchivePage() {
     const loadBriefs = async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/battery/brief?list=true');
+            const query = viewMode === 'list' ? '?list=true&include_issues=true' : '?list=true';
+            const res = await fetch(`/api/battery/brief${query}`);
             const data = await res.json();
 
             if (data.success) {
@@ -56,7 +59,7 @@ export default function BatteryArchivePage() {
 
     useEffect(() => {
         loadBriefs();
-    }, []);
+    }, [viewMode]);
 
     // 특정 날짜 배터리 브리핑 로드
     const loadBriefDetail = async (date: string) => {
@@ -198,6 +201,23 @@ export default function BatteryArchivePage() {
                     <p className="archive-subtitle">
                         글로벌 배터리 산업의 과거 리포트를 확인하고 K-Battery의 흐름을 추적하세요.
                     </p>
+
+                    {!selectedBrief && (
+                        <div className="view-switcher">
+                            <button
+                                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                📅 날짜별 보기
+                            </button>
+                            <button
+                                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                📋 리스트 보기
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {loading ? (
@@ -205,28 +225,10 @@ export default function BatteryArchivePage() {
                         <div className="premium-spinner" style={{ borderTopColor: '#22c55e' }} />
                         <span className="loading-text">배터리 아카이브를 불러오는 중...</span>
                     </div>
-                ) : selectedBrief ? (
+                ) : (
                     <>
-                        {/* Action Buttons */}
-                        <div className="action-row animate-in">
-                            <button
-                                className="back-button"
-                                onClick={() => { setSelectedBrief(null); setIsSelectionMode(false); }}
-                            >
-                                <span className="icon">←</span> 전체 목록
-                            </button>
-                            {isAdmin && (
-                                <button
-                                    className="delete-brief-btn"
-                                    onClick={(e) => handleDeleteBrief(e, selectedBrief.date)}
-                                >
-                                    🗑️ 삭제
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Admin-only: Selection Mode Toolbar */}
-                        {isAdmin && (
+                        {/* Action Toolbar - Persistent in Detail or List View Selection Mode */}
+                        {(selectedBrief || (viewMode === 'list' && briefs.length > 0)) && (
                             <div className="selection-toolbar animate-in">
                                 <button
                                     className={`selection-toggle-btn ${isSelectionMode ? 'active' : ''}`}
@@ -246,8 +248,8 @@ export default function BatteryArchivePage() {
                             </div>
                         )}
 
-                        {/* Admin-only: Manual Source Input */}
-                        {isAdmin && isSelectionMode && (
+                        {/* Manual Source Input Section */}
+                        {isSelectionMode && (selectedBrief || viewMode === 'list') && (
                             <ManualSourceInput
                                 manualUrls={manualUrls}
                                 setManualUrls={setManualUrls}
@@ -256,102 +258,134 @@ export default function BatteryArchivePage() {
                             />
                         )}
 
-                        {/* Brief Detail - Battery Styled */}
-                        <div className="hero-section animate-in" style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.05))' }}>
-                            <div className="hero-content">
-                                <div className="date-badge">
-                                    <span className="calendar-icon">🔋</span>
-                                    {selectedBrief.date.replace('battery-', '').split('-')[0]}년 {selectedBrief.date.replace('battery-', '').split('-')[1]}월 {selectedBrief.date.replace('battery-', '').split('-')[2]}일
-                                </div>
-                                <h1 className="hero-title">
-                                    Battery Daily <span className="highlight" style={{ color: '#22c55e' }}>Intelligence</span>
-                                </h1>
-                                <p className="hero-subtitle">
-                                    K-Battery 관점의 글로벌 배터리 산업 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
-                                </p>
-                                <div className="hero-meta">
-                                    <div className="meta-item">
-                                        <span className="meta-label">Total Signals</span>
-                                        <span className="meta-value">{selectedBrief.totalIssues} Issues</span>
-                                    </div>
-                                    <div className="meta-divider" />
-                                    <div className="meta-item">
-                                        <span className="meta-label">Generated At</span>
-                                        <span className="meta-value">
-                                            {new Date(selectedBrief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' KST'}
-                                        </span>
-                                    </div>
-                                    <div className="meta-filler" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="issues-container">
-                            {selectedBrief.issues.map((issue, index) => (
-                                <IssueCard
-                                    key={index}
-                                    issue={issue}
-                                    index={index}
-                                    onDeepDive={isAdmin ? handleDeepDive : undefined}
-                                    isSelectionMode={isAdmin && isSelectionMode}
-                                    isSelected={selectedIssues.some(i => i.headline === issue.headline)}
-                                    onSelect={() => toggleIssueSelection(issue)}
-                                    briefDate={selectedBrief.date}
-                                />
-                            ))}
-                        </div>
-                    </>
-                ) : briefs.length > 0 ? (
-                    <div className="archive-grid animate-in">
-                        {briefs.map((brief) => (
-                            <div key={brief.id} style={{ position: 'relative' }}>
-                                <a
-                                    href="#"
-                                    className="premium-archive-card"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        loadBriefDetail(brief.date);
-                                    }}
-                                >
-                                    <div className="archive-card-date">{formatDate(brief.date)}</div>
-                                    <div className="archive-card-day">{brief.dayOfWeek}</div>
-                                    <div className="archive-card-footer">
-                                        <span className="count" style={{ color: '#22c55e' }}>{brief.totalIssues} Signals</span>
-                                        <span className="arrow">→</span>
-                                    </div>
-                                </a>
-                                {isAdmin && (
+                        {selectedBrief ? (
+                            <>
+                                {/* Action Buttons */}
+                                <div className="action-row animate-in">
                                     <button
-                                        className="delete-button"
-                                        onClick={(e) => handleDeleteBrief(e, brief.date)}
-                                        title="삭제"
+                                        className="back-button"
+                                        onClick={() => { setSelectedBrief(null); setIsSelectionMode(false); }}
                                     >
-                                        ×
+                                        <span className="icon">←</span> 전체 목록
                                     </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="empty-state">
-                        <div className="empty-icon">🔋</div>
-                        <h2 className="empty-title">아직 저장된 배터리 브리핑이 없습니다</h2>
-                        <p className="empty-description">
-                            브리핑이 생성되면 여기에 자동으로 보관됩니다.
-                        </p>
-                        <Link href="/battery" className="btn" style={{ background: '#22c55e' }}>
-                            오늘의 배터리 브리핑 보기
-                        </Link>
-                    </div>
-                )}
+                                    {isAdmin && (
+                                        <button
+                                            className="delete-brief-btn"
+                                            onClick={(e) => handleDeleteBrief(e, selectedBrief.date)}
+                                        >
+                                            🗑️ 삭제
+                                        </button>
+                                    )}
+                                </div>
 
-                {loadingDetail && (
-                    <div className="modal-overlay">
-                        <div className="loading-container">
-                            <div className="premium-spinner" style={{ borderTopColor: '#22c55e' }} />
-                            <span className="loading-text">리포트를 구성 중입니다...</span>
-                        </div>
-                    </div>
+                                {/* Brief Detail - Battery Styled */}
+                                <div className="hero-section animate-in" style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.05))' }}>
+                                    <div className="hero-content">
+                                        <div className="date-badge">
+                                            <span className="calendar-icon">🔋</span>
+                                            {selectedBrief.date.replace('battery-', '').split('-')[0]}년 {selectedBrief.date.replace('battery-', '').split('-')[1]}월 {selectedBrief.date.replace('battery-', '').split('-')[2]}일
+                                        </div>
+                                        <h1 className="hero-title">
+                                            Battery Daily <span className="highlight" style={{ color: '#22c55e' }}>Intelligence</span>
+                                        </h1>
+                                        <p className="hero-subtitle">
+                                            K-Battery 관점의 글로벌 배터리 산업 핵심 변화를 감지하고 전략적 통찰을 제공합니다.
+                                        </p>
+                                        <div className="hero-meta">
+                                            <div className="meta-item">
+                                                <span className="meta-label">Total Signals</span>
+                                                <span className="meta-value">{selectedBrief.totalIssues} Issues</span>
+                                            </div>
+                                            <div className="meta-divider" />
+                                            <div className="meta-item">
+                                                <span className="meta-label">Generated At</span>
+                                                <span className="meta-value">
+                                                    {new Date(selectedBrief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' KST'}
+                                                </span>
+                                            </div>
+                                            <div className="meta-filler" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="issues-container">
+                                    {selectedBrief.issues.map((issue, index) => (
+                                        <IssueCard
+                                            key={index}
+                                            issue={issue}
+                                            index={index}
+                                            onDeepDive={isAdmin ? handleDeepDive : undefined}
+                                            isSelectionMode={isAdmin && isSelectionMode}
+                                            isSelected={selectedIssues.some(i => i.headline === issue.headline)}
+                                            onSelect={() => toggleIssueSelection(issue)}
+                                            briefDate={selectedBrief.date}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        ) : briefs.length > 0 ? (
+                            viewMode === 'grid' ? (
+                                <div className="archive-grid animate-in">
+                                    {briefs.map((brief) => (
+                                        <div key={brief.id} style={{ position: 'relative' }}>
+                                            <a
+                                                href="#"
+                                                className="premium-archive-card"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    loadBriefDetail(brief.date);
+                                                }}
+                                            >
+                                                <div className="archive-card-date">{formatDate(brief.date)}</div>
+                                                <div className="archive-card-day">{brief.dayOfWeek}</div>
+                                                <div className="archive-card-footer">
+                                                    <span className="count" style={{ color: '#22c55e' }}>{brief.totalIssues} Signals</span>
+                                                    <span className="arrow">→</span>
+                                                </div>
+                                            </a>
+                                            {isAdmin && (
+                                                <button
+                                                    className="delete-button"
+                                                    onClick={(e) => handleDeleteBrief(e, brief.date)}
+                                                    title="삭제"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <ArchiveListView
+                                    briefs={briefs}
+                                    selectedIssues={selectedIssues}
+                                    onToggleSelection={toggleIssueSelection}
+                                    accentColor="#22c55e"
+                                    isSelectionMode={isSelectionMode}
+                                />
+                            )
+                        ) : (
+                            <div className="empty-state">
+                                <div className="empty-icon">🔋</div>
+                                <h2 className="empty-title">아직 저장된 배터리 브리핑이 없습니다</h2>
+                                <p className="empty-description">
+                                    브리핑이 생성되면 여기에 자동으로 보관됩니다.
+                                </p>
+                                <Link href="/battery" className="btn" style={{ background: '#22c55e' }}>
+                                    오늘의 배터리 브리핑 보기
+                                </Link>
+                            </div>
+                        )}
+
+                        {loadingDetail && (
+                            <div className="modal-overlay">
+                                <div className="loading-container">
+                                    <div className="premium-spinner" style={{ borderTopColor: '#22c55e' }} />
+                                    <span className="loading-text">리포트를 구성 중입니다...</span>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </main>
 
@@ -374,6 +408,35 @@ export default function BatteryArchivePage() {
                 .archive-header { margin-bottom: 4rem; text-align: center; }
                 .archive-title { font-size: 3rem; font-weight: 900; margin-bottom: 1rem; letter-spacing: -0.04em; }
                 .archive-subtitle { color: var(--text-secondary); font-size: 1.1rem; }
+                .view-switcher {
+                    display: flex;
+                    justify-content: center;
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+                .view-btn {
+                    background: var(--bg-secondary);
+                    border: 1.5px solid var(--border-color);
+                    border-radius: 12px;
+                    padding: 8px 16px;
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .view-btn:hover {
+                    border-color: #22c55e;
+                    color: #22c55e;
+                }
+                .view-btn.active {
+                    background: #22c55e;
+                    color: white;
+                    border-color: #22c55e;
+                }
                 .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
                 
                 .premium-archive-card {

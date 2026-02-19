@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
 
         // 목록 조회
         if (list === 'true') {
+            const includeIssues = searchParams.get('include_issues') === 'true';
             const allBriefs = await getAllBriefs(50);
             // AI 브리프만 필터링 (battery- 접두사가 없는 것)
             const aiBriefs = allBriefs.filter(b => !b.id.startsWith('battery-'));
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
                     date: b.date,
                     dayOfWeek: b.dayOfWeek,
                     totalIssues: b.totalIssues,
-                    generatedAt: b.generatedAt
+                    generatedAt: b.generatedAt,
+                    issues: includeIssues ? b.issues : undefined
                 }))
             });
         }

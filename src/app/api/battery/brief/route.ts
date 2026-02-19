@@ -10,6 +10,7 @@ export async function GET(request: Request) {
 
         // 1. 배터리 브리핑 목록 조회
         if (list === 'true') {
+            const includeIssues = searchParams.get('include_issues') === 'true';
             const allBriefs = await getAllBriefs(50);
             // battery- 접두사가 붙은 리포트만 필터링
             const batteryBriefs = allBriefs.filter(b => b.id.startsWith('battery-'));
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
                     date: b.date.replace('battery-', ''), // UI 표시용 날짜 정규화
                     dayOfWeek: b.dayOfWeek,
                     totalIssues: b.totalIssues,
-                    generatedAt: b.generatedAt
+                    generatedAt: b.generatedAt,
+                    issues: includeIssues ? b.issues : undefined
                 }))
             });
         }

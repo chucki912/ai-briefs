@@ -1,22 +1,17 @@
-import { NextResponse } from 'next/server';
-import { getLogs } from '@/lib/store';
+import { NextRequest, NextResponse } from 'next/server';
+import { getStorage } from '@/lib/store';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+    const adminParam = request.nextUrl.searchParams.get('admin');
+    if (adminParam !== 'true' && adminParam !== 'secret_key') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        const { searchParams } = new URL(request.url);
-        const limit = parseInt(searchParams.get('limit') || '100', 10);
-
-        const logs = await getLogs(limit);
-
-        return NextResponse.json({
-            success: true,
-            data: logs
-        });
+        const storage = getStorage();
+        const logs = await storage.getLogs(100);
+        return NextResponse.json({ logs });
     } catch (error) {
-        console.error('Failed to fetch logs:', error);
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch logs' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
     }
 }

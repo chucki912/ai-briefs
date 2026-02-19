@@ -6,9 +6,11 @@ import ThemeToggle from '@/components/ThemeToggle';
 import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
 import { BriefReport, IssueItem } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/lib/logger';
 
 export default function HomePage() {
+  const { isAdmin } = useAuth();
   const [brief, setBrief] = useState<BriefReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -135,14 +137,16 @@ export default function HomePage() {
                       <span className="calendar-icon">📅</span>
                       {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
                     </div>
-                    <button
-                      className="weekly-report-btn-top"
-                      onClick={handleWeeklyReport}
-                      disabled={reportLoading}
-                    >
-                      <span>📊</span>
-                      주간 트렌드 리포트
-                    </button>
+                    {isAdmin && (
+                      <button
+                        className="weekly-report-btn-top"
+                        onClick={handleWeeklyReport}
+                        disabled={reportLoading}
+                      >
+                        <span>📊</span>
+                        주간 트렌드 리포트
+                      </button>
+                    )}
                   </div>
                   <h1 className="hero-title">
                     AI Daily <span className="highlight">Intelligence</span>
@@ -161,23 +165,25 @@ export default function HomePage() {
                       <span className="meta-value">{new Date(brief.generatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} KST</span>
                     </div>
                     <div className="meta-filler" />
-                    <button
-                      className="regenerate-button"
-                      onClick={() => generateBrief(true)}
-                      disabled={generating}
-                    >
-                      {generating ? (
-                        <>
-                          <div className="mini-spinner" />
-                          분석 중...
-                        </>
-                      ) : (
-                        <>
-                          <span className="sparkle">✨</span>
-                          새로고침
-                        </>
-                      )}
-                    </button>
+                    {isAdmin && (
+                      <button
+                        className="regenerate-button"
+                        onClick={() => generateBrief(true)}
+                        disabled={generating}
+                      >
+                        {generating ? (
+                          <>
+                            <div className="mini-spinner" />
+                            분석 중...
+                          </>
+                        ) : (
+                          <>
+                            <span className="sparkle">✨</span>
+                            새로고침
+                          </>
+                        )}
+                      </button>
+                    )}
 
                   </div>
                 </div>
@@ -213,22 +219,24 @@ export default function HomePage() {
               <p className="empty-description">
                 {error || '지금 바로 오늘의 AI 뉴스 브리핑을 생성해보세요.'}
               </p>
-              <button
-                className="btn"
-                onClick={() => generateBrief()}
-                disabled={generating}
-              >
-                {generating ? (
-                  <>
-                    <div className="spinner" />
-                    생성 중...
-                  </>
-                ) : (
-                  <>
-                    ✨ 브리핑 생성하기
-                  </>
-                )}
-              </button>
+              {isAdmin && (
+                <button
+                  className="btn"
+                  onClick={() => generateBrief()}
+                  disabled={generating}
+                >
+                  {generating ? (
+                    <>
+                      <div className="spinner" />
+                      생성 중...
+                    </>
+                  ) : (
+                    <>
+                      ✨ 브리핑 생성하기
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </main>

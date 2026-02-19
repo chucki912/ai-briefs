@@ -260,12 +260,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const processReport = (inputStr: string) => {
         setLocalReport(inputStr); // Fallback storage
 
-        // Weekly Mode: Skip structured parsing and use raw markdown
-        if (weeklyMode) {
-            setParsedReport(null);
-            setParseError(false);
-            return;
-        }
+
 
         // 1. Try standard JSON parse
         try {
@@ -317,8 +312,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 quality: {}
             };
 
-            // 1. Meta Extraction - Flexible matching for titles like [# 브리프 심층 리포트] or [# [트렌드 리포트]]
-            const titleMatch = md.match(/#\s*(?:\[트렌드 리포트\]|브리프 심층 리포트|\[Deep Dive\])?\s*:?\s*(.*)/i);
+            // 1. Meta Extraction - Flexible matching for titles
+            const titleMatch = md.match(/#\s*(?:\[트렌드 리포트\]|브리프 심층 리포트|\[Deep Dive\]|\[주간 전략 리포트\]|\[주간 트렌드 리포트\])?\s*:?\s*(.*)/i);
             if (titleMatch) data.report_meta.title = titleMatch[1].trim();
 
             // Fallback meta extraction if title regex is tricky
@@ -339,27 +334,31 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             if (lens) data.report_meta.lens = lens[1].trim();
             data.report_meta.generated_at = new Date().toISOString();
 
-            // 2. Sections Splitting - More flexible regex for headers like [## ■ Section] or [■ Section]
-            const sections = md.split(/(?=##?\s*■|(?<=\n)■)/);
+            // 2. Sections Splitting - Support various symbols (■, ●, ◆, ★, 🔹) and header levels
+            const sections = md.split(/(?=##?\s*[■●◆★🔹]|(?<=\n)[■●◆★🔹])/);
 
             sections.forEach(section => {
-                const cleanSection = section.replace(/##?\s*■/, '').trim();
+                const cleanSection = section.replace(/##?\s*[■●◆★🔹]/, '').trim();
 
                 // Executive Summary
                 if (cleanSection.includes('Executive Summary')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
+                        // Deep Dive labels
                         if (cleanLine.includes('Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                         if (cleanLine.includes('Change]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                         if (cleanLine.includes('So What]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        // Support for alternative labels
+
+                        // Weekly Edition labels
+                        if (cleanLine.includes('Top Strategic Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Top Strategic Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('Converged Mega Trend]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Converged Mega Trend\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                         if (cleanLine.includes('Strategic Recommendation]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*Strategic Recommendation\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
                     });
                 }
 
-                // Key Developments
-                if (cleanSection.includes('Key Developments') || cleanSection.includes('Strategic Analysis')) {
+                // Key Developments (including Cluster Analysis)
+                if (cleanSection.includes('Key Developments') || cleanSection.includes('Strategic Analysis') || cleanSection.includes('Cluster Analysis')) {
                     const devBlocks = cleanSection.split('###');
                     devBlocks.shift();
                     devBlocks.forEach(block => {
@@ -390,8 +389,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     });
                 }
 
-                // Core Themes
-                if (cleanSection.startsWith('Core Themes')) {
+                // Core Themes (including Economic Insights)
+                if (cleanSection.includes('Core Themes') || cleanSection.includes('Economic Insights')) {
                     const themeBlocks = cleanSection.split('###');
                     themeBlocks.shift();
                     themeBlocks.forEach(block => {
@@ -400,7 +399,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const drivers: any[] = [];
 
                         lines.slice(1).forEach(line => {
-                            if (line.includes('(Driver)')) drivers.push({ text: line.replace(/-\s*\(Driver\)/, '').trim() });
+                            const cleanLine = line.replace(/\*\*/g, '').trim();
+                            if (cleanLine.includes('(Driver)') || cleanLine.startsWith('- [Primary Driver]') || cleanLine.startsWith('- [Ripple Effects]')) {
+                                drivers.push({ text: cleanLine.replace(/-\s*\(Driver\)/, '').replace(/\[Primary Driver\]|\[Ripple Effects\]/, '').replace(/^-/, '').trim() });
+                            }
                         });
 
                         if (themeName) {
@@ -409,15 +411,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     });
                 }
 
-                // Implications
+                // Implications (Strategic & Professional)
                 if (cleanSection.includes('Implications')) {
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
-                        if (cleanLine.includes('Market]')) data.implications.market_business.push({ text: cleanLine.replace(/.*Market\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Tech]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*Tech\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Comp]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*Comp\]/, '').replace(/^-/, '').trim() });
-                        if (cleanLine.includes('Policy]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*Policy\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Market]') || cleanLine.includes('Market & CapEx]') || cleanLine.includes('Market & Business]')) data.implications.market_business.push({ text: cleanLine.replace(/.*Market & CapEx\]|.*Market & Business\]|.*Market\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Tech]') || cleanLine.includes('Technology Frontier]') || cleanLine.includes('Tech & Product]')) data.implications.tech_product.push({ text: cleanLine.replace(/.*Technology Frontier\]|.*Tech & Product\]|.*Tech\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Comp]') || cleanLine.includes('Competitive Edge]') || cleanLine.includes('Competitive Landscape]')) data.implications.competitive_landscape.push({ text: cleanLine.replace(/.*Competitive Edge\]|.*Competitive Landscape\]|.*Comp\]/, '').replace(/^-/, '').trim() });
+                        if (cleanLine.includes('Policy]') || cleanLine.includes('Regulation]') || cleanLine.includes('Policy & Regulation]')) data.implications.policy_regulation.push({ text: cleanLine.replace(/.*Policy & Regulation\]|.*Policy\]|.*Regulation\]/, '').replace(/^-/, '').trim() });
                     });
                 }
 
@@ -647,7 +649,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 }}
             >
                 <div className="modal-header">
-                    <h2>📊 브리프 심층 리포트</h2>
+                    <h2>{weeklyMode ? '🗓️ 주간 트렌드 리포트' : '📊 브리프 심층 리포트'}</h2>
                     <button className="close-btn" onClick={onClose}>&times;</button>
                 </div>
 
@@ -678,15 +680,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         </div>
                     ) : (
                         <div className="report-content">
-                            {/* Weekly Mode or Raw Markdown Fallback */}
-                            {(weeklyMode || !parsedReport) && (
+                            {/* Raw Markdown Fallback or Failed Parsing */}
+                            {!parsedReport && (
                                 <div className="markdown-content">
-                                    <ReactMarkdown>{localReport}</ReactMarkdown>
+                                    <ReactMarkdown>{localReport || report}</ReactMarkdown>
                                 </div>
                             )}
 
-                            {/* Structured Report View (Only for Deep Dive) */}
-                            {!weeklyMode && parsedReport && (
+                            {/* Structured Report View (Unified for Weekly & Deep Dive) */}
+                            {parsedReport && (
                                 <>
                                     <div className="report-meta-box">
                                         <h1 className="report-title">{parsedReport.report_meta?.title}</h1>
@@ -700,15 +702,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                     <section className="report-section">
                                         <h2 className="section-title">■ Executive Summary</h2>
                                         <div className="summary-group">
-                                            <h4>[Signal Summary]</h4>
+                                            <h4>{weeklyMode ? '[Top Strategic Signal]' : '[Signal Summary]'}</h4>
                                             <ul className="report-list">
                                                 {parsedReport.executive_summary?.signal_summary?.map((s, i) => <li key={i}>{s.text}</li>)}
                                             </ul>
-                                            <h4>[What Changed]</h4>
+                                            <h4>{weeklyMode ? '[Converged Mega Trend]' : '[What Changed]'}</h4>
                                             <ul className="report-list">
                                                 {parsedReport.executive_summary?.what_changed?.map((s, i) => <li key={i}>{s.text}</li>)}
                                             </ul>
-                                            <h4>[So What]</h4>
+                                            <h4>{weeklyMode ? '[Strategic Recommendation]' : '[So What]'}</h4>
                                             <ul className="report-list">
                                                 {parsedReport.executive_summary?.so_what?.map((s, i) => <li key={i}>{s.text}</li>)}
                                             </ul>
@@ -716,7 +718,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                     </section>
 
                                     <section className="report-section">
-                                        <h2 className="section-title">■ Key Developments</h2>
+                                        <h2 className="section-title">{weeklyMode ? '■ Structural Cluster Analysis' : '■ Key Developments'}</h2>
                                         {parsedReport.key_developments?.map((d, i) => (
                                             <div key={i} className="development-item">
                                                 <h3 className="development-headline">[{d.headline}]</h3>
@@ -736,7 +738,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                     </section>
 
                                     <section className="report-section">
-                                        <h2 className="section-title">■ Core Themes</h2>
+                                        <h2 className="section-title">{weeklyMode ? '■ Second-Order Economic Insights' : '■ Core Themes'}</h2>
                                         {parsedReport.themes?.map((t, i) => (
                                             <div key={i} className="theme-item">
                                                 <h4>#{t.theme}</h4>
@@ -841,12 +843,6 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                             </section>
                                         )}
                                 </>
-                            )}
-
-                            {!weeklyMode && !parsedReport && (
-                                <div className="markdown-content">
-                                    <ReactMarkdown>{localReport || report}</ReactMarkdown>
-                                </div>
                             )}
                         </div>
                     )}

@@ -3,6 +3,7 @@
 import { logger } from '@/lib/logger';
 import { IssueItem } from '@/types';
 import { useBriefCart } from '@/contexts/BriefCartContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface IssueCardProps {
     issue: IssueItem;
@@ -26,6 +27,7 @@ const formatUrl = (url: string) => {
 };
 
 export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, isSelected, onSelect, briefDate }: IssueCardProps) {
+    const { isAdmin } = useAuth();
     const { addToCart, removeFromCart, isInCart } = useBriefCart();
     const inCart = isInCart(issue.headline);
 
@@ -69,7 +71,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     >
                         {inCart ? "🛒✓" : "🛒+"}
                     </button>
-                    {onDeepDive && (
+                    {onDeepDive && isAdmin && (
                         <button
                             className="btn-text-icon"
                             onClick={handleDeepDiveClick}

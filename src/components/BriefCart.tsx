@@ -27,6 +27,7 @@ export default function BriefCart() {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportContent, setReportContent] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
+    const [usageInfo, setUsageInfo] = useState<{ remainingUsage: number } | null>(null);
 
     const handleGenerateReport = async () => {
         const validUrls = manualUrls.filter((url: string) => url.trim() !== '');
@@ -205,6 +206,11 @@ export default function BriefCart() {
                             >
                                 ✨ 통합 리포트 생성
                             </button>
+                            {usageInfo && (
+                                <div className="usage-info">
+                                    오늘의 잔여 횟수: {usageInfo.remainingUsage}회
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -508,6 +514,13 @@ export default function BriefCart() {
                 .generate-btn:hover:not(:disabled) {
                     transform: translateY(-1px);
                     box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+                }
+                .usage-info {
+                    text-align: center;
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                    margin-top: 12px;
+                    font-weight: 500;
                 }
                 .generate-btn:disabled {
                     opacity: 0.5;

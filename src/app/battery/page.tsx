@@ -161,7 +161,16 @@ export default function BatteryBriefPage() {
 
                                     <div className="meta-action-group">
                                         {isAdmin ? (
-                                            <>
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <button
+                                                    className="weekly-report-button"
+                                                    onClick={handleWeeklyReport}
+                                                    disabled={reportLoading}
+                                                    style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}
+                                                >
+                                                    <span>📊</span>
+                                                    주간 트렌드 리포트
+                                                </button>
                                                 <button
                                                     className="regenerate-button"
                                                     onClick={() => generateBrief(true)}
@@ -174,34 +183,18 @@ export default function BatteryBriefPage() {
                                                         </span>
                                                     ) : (
                                                         <span className="flex-center gap-2">
-                                                            <span className="icon">⚡</span>
+                                                            <span className="sparkle">✨</span>
                                                             새로고침
                                                         </span>
                                                     )}
                                                 </button>
-                                                <button
-                                                    className="weekly-report-button"
-                                                    onClick={handleWeeklyReport}
-                                                    disabled={reportLoading}
-                                                >
-                                                    <span>📈</span>
-                                                    주간 리포트
-                                                </button>
-                                            </>
+                                            </div>
                                         ) : (
                                             <div className="sentinel-badge-row" style={{ display: 'flex', gap: '10px' }}>
                                                 <div className="sentinel-badge">
                                                     <div className="pulse-dot"></div>
-                                                    <span className="sentinel-text">Market Sentinel Active</span>
+                                                    <span className="sentinel-text">Battery Sentinel Active</span>
                                                 </div>
-                                                <button
-                                                    className="weekly-report-button"
-                                                    onClick={handleWeeklyReport}
-                                                    disabled={reportLoading}
-                                                >
-                                                    <span>📈</span>
-                                                    주간 리포트
-                                                </button>
                                             </div>
                                         )}
                                     </div>

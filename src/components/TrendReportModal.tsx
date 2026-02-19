@@ -345,15 +345,24 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     const lines = cleanSection.split('\n');
                     lines.forEach(line => {
                         const cleanLine = line.replace(/\*\*/g, '').trim();
-                        // Deep Dive labels
-                        if (cleanLine.includes('Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('Change]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('So What]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        // Weekly Edition labels (check first — longer match takes priority)
+                        if (cleanLine.includes('Top Strategic Signal]')) {
+                            data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Top Strategic Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        } else if (cleanLine.includes('Signal]')) {
+                            data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        }
 
-                        // Weekly Edition labels
-                        if (cleanLine.includes('Top Strategic Signal]')) data.executive_summary.signal_summary.push({ text: cleanLine.replace(/.*Top Strategic Signal\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('Converged Mega Trend]')) data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Converged Mega Trend\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
-                        if (cleanLine.includes('Strategic Recommendation]')) data.executive_summary.so_what.push({ text: cleanLine.replace(/.*Strategic Recommendation\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        if (cleanLine.includes('Converged Mega Trend]')) {
+                            data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Converged Mega Trend\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        } else if (cleanLine.includes('Change]')) {
+                            data.executive_summary.what_changed.push({ text: cleanLine.replace(/.*Change\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        }
+
+                        if (cleanLine.includes('Strategic Recommendation]')) {
+                            data.executive_summary.so_what.push({ text: cleanLine.replace(/.*Strategic Recommendation\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        } else if (cleanLine.includes('So What]')) {
+                            data.executive_summary.so_what.push({ text: cleanLine.replace(/.*So What\]\s*/, '').replace(/^-\s*/, '').trim(), citations: [] });
+                        }
                     });
                 }
 
@@ -404,8 +413,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     });
                 }
 
-                // Core Themes (including Economic Insights)
-                if (cleanSection.includes('Core Themes') || cleanSection.includes('Economic Insights')) {
+                // Core Themes (including Economic Insights, Cost & Technology Dynamics)
+                if (cleanSection.includes('Core Themes') || cleanSection.includes('Economic Insights') || cleanSection.includes('Cost') || cleanSection.includes('Technology Dynamics')) {
                     const themeBlocks = cleanSection.split('###');
                     themeBlocks.shift();
                     themeBlocks.forEach(block => {
@@ -415,8 +424,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
                         lines.slice(1).forEach(line => {
                             const cleanLine = line.replace(/\*\*/g, '').trim();
-                            if (cleanLine.includes('(Driver)') || cleanLine.startsWith('- [Primary Driver]') || cleanLine.startsWith('- [Ripple Effects]')) {
-                                drivers.push({ text: cleanLine.replace(/-\s*\(Driver\)/, '').replace(/\[Primary Driver\]|\[Ripple Effects\]/, '').replace(/^-/, '').trim() });
+                            const driverMatch = cleanLine.match(/[\(\[]?(?:Primary\s+)?Driver[\)\]:]?|[\(\[]?Ripple\s+Effects[\)\]:]?|[\(\[]?Context[\)\]:]?|[\(\[]?Cost\/Efficiency\s+Logic[\)\]:]?|[\(\[]?Competitive\s+Position[\)\]:]?/i);
+                            if (driverMatch) {
+                                drivers.push({ text: cleanLine.replace(/[\(\[]?(?:Primary\s+)?Driver[\)\]:]?|[\(\[]?Ripple\s+Effects[\)\]:]?|[\(\[]?Context[\)\]:]?|[\(\[]?Cost\/Efficiency\s+Logic[\)\]:]?|[\(\[]?Competitive\s+Position[\)\]:]?/gi, '').replace(/^[-\s]*/, '').trim() });
                             }
                         });
 
@@ -604,6 +614,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         textToCopy += `\n[${d.headline}]\n`;
                         d.facts?.forEach(f => textToCopy += `- (Fact) ${f.text}\n`);
                         d.analysis?.forEach(a => textToCopy += `- (Analysis) ${a.text} (Basis: ${a.basis})\n`);
+                        d.why_it_matters?.forEach(w => textToCopy += `- (Structural Linkage) ${w.text}\n`);
                     });
                 }
 
@@ -627,6 +638,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     textToCopy += `\n■ Risks & Uncertainties\n`;
                     parsedReport.risks_and_uncertainties.forEach(r => {
                         textToCopy += `- [${r.type.toUpperCase()}] ${r.risk}\n`;
+                        r.impact_paths?.forEach(p => textToCopy += `  - Impact: ${p.text}\n`);
                     });
                 }
 
@@ -819,7 +831,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                         <h2 className="section-title">■ Risks & Uncertainties</h2>
                                         {parsedReport.risks_and_uncertainties?.map((r, i) => (
                                             <div key={i} className="risk-item">
-                                                <strong>[{r.type}] {r.risk}</strong>
+                                                <strong>[{r.type.toUpperCase()}] {r.risk}</strong>
                                                 <div className="evidence-badge" data-level={r.evidence_level}>Evidence: {r.evidence_level}</div>
                                                 <ul className="report-list">
                                                     {r.impact_paths?.map((p, pi) => <li key={pi}>{p.text}</li>)}

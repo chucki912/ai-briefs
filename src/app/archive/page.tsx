@@ -7,7 +7,6 @@ import IssueCard from '@/components/IssueCard';
 import TrendReportModal from '@/components/TrendReportModal';
 import ManualSourceInput from '@/components/ManualSourceInput';
 import ArchiveListView from '@/components/ArchiveListView';
-import { useAuth } from '@/contexts/AuthContext';
 import { BriefReport, IssueItem } from '@/types';
 
 interface BriefSummary {
@@ -20,7 +19,6 @@ interface BriefSummary {
 }
 
 export default function ArchivePage() {
-    const { isAdmin } = useAuth();
     const [briefs, setBriefs] = useState<BriefSummary[]>([]);
     const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
     const [loading, setLoading] = useState(true);

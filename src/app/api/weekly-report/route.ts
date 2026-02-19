@@ -24,7 +24,7 @@ export async function POST(req: Request) {
                 console.log(`[Weekly Report] Collecting issues for domain: ${domain}...`);
                 await kvSet(`weekly_job:${jobId}`, { status: 'collecting', progress: 10 }, 3600);
 
-                const issues = await getRecentIssues(7);
+                const issues = await getRecentIssues(7, domain as 'ai' | 'battery');
 
                 if (issues.length === 0) {
                     await kvSet(`weekly_job:${jobId}`, {

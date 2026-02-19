@@ -11,7 +11,7 @@ export interface IssueCluster {
 }
 
 // ─── 1. AI-Driven Issue Clustering ──────────────────────────────────────────
-export async function clusterIssuesByAI(issues: IssueItem[]): Promise<IssueCluster[]> {
+export async function clusterIssuesByAI(issues: IssueItem[], domain: 'ai' | 'battery' = 'ai'): Promise<IssueCluster[]> {
     if (issues.length === 0) return [];
 
     const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
@@ -20,8 +20,14 @@ export async function clusterIssuesByAI(issues: IssueItem[]): Promise<IssueClust
         `[${idx}] ${issue.headline}\n    Facts: ${issue.keyFacts.slice(0, 2).join(' | ')}`
     ).join('\n');
 
-    const prompt = `당신은 AI/테크 산업 이슈 분류 전문가입니다.
+    const domainExpert = domain === 'ai' ? 'AI/테크 산업 이슈 분류 전문가' : '글로벌 배터리 산업 전략 분석가';
+    const focusItems = domain === 'ai'
+        ? '모델 아키텍처, 빅테크 경쟁 구도, 규제, 반도체 공급망'
+        : '공급망(Up/Mid/Downstream), 기술 로드맵(LFP/Soli-state 등), OEM 협력, 정책(IRA 등)';
+
+    const prompt = `당신은 ${domainExpert}입니다.
 아래 ${issues.length}개의 뉴스 이슈를 분석하고, **주제적 관련성이 높은 이슈끼리 클러스터**로 묶어주세요.
+분석 시 특히 **[${focusItems}]** 관점에 중점을 두십시오.
 
 ## Rules
 1. 각 클러스터는 최소 2개 이상의 이슈를 포함해야 합니다.
@@ -106,11 +112,29 @@ export async function generateWeeklyReport(
 ${issueDetails}`;
     }).join('\n\n---\n');
 
+    const aiRole = {
+        title: '글로벌 AI 산업 전략 컨설턴트',
+        reasoning: `
+- **Cross-Layer Connectivity**: 모델 계층(Foundation)과 애플리케이션 계층, 인프라(HW) 간의 수직적 통합 또는 분리 흐름을 포착하십시오.
+- **Compute Economics**: 추론 비용, 에너지 효율, 칩 공급망이 소프트웨어 비즈니스 모델에 미치는 영향을 분석하십시오.
+- **Algorithmic Frontier**: 단순한 성능 향상이 아닌, 추론 방식의 근본적 변화가 가져올 파괴적 혁신을 기술하십시오.`
+    };
+
+    const batteryRole = {
+        title: '글로벌 배터리/에너지 산업 수석 전략가',
+        reasoning: `
+- **Value Chain Integration**: 광물 수급부타 전구체, 양극재, 셀 제조, OEM 탑재로 이어지는 밸류체인 전반의 병목을 분석하십시오.
+- **Geopolitical Arb**: IRA, CRMA 등 주요국의 정책 보조금과 무역 장벽이 생산 기지 및 수익성에 미치는 실질적 영향을 계산하십시오.
+- **Tech Roadmap Competition**: NCM 대비 LFP의 점유율 변화, 4680 원통형 폼팩터 도입, 전고체(Solid-state) 진영의 실질적 양산 시점 등 기술 경쟁 우위를 분석하십시오.`
+    };
+
+    const expert = domain === 'ai' ? aiRole : batteryRole;
+
     // Upgraded System Prompt: Expert Weekly Insight Edition (v2 — 7 Defect Fixes)
     const systemPrompt = `# Antigravity Prompt — 주간 심층 전략 리포트 (Expert Weekly Insight Edition)
 
 ## Role
-당신은 20년 경력의 '글로벌 산업 전략 컨설턴트'이자 '데이터 사이언티스트'입니다.
+당신은 20년 경력의 '${expert.title}'이자 '데이터 사이언티스트'입니다.
 개별 이슈들을 파편적으로 보는 것이 아니라, **'구조적 연결고리(Structural Linkage)'**를 찾아내어 거대한 산업의 흐름을 예측하는 것이 당신의 핵심 임무입니다.
 
 ## Critical Process: Triple-Search Heuristics (Weekly Edition)
@@ -121,7 +145,7 @@ ${issueDetails}`;
 
 ## Strategic Reasoning Chain
 리포트를 작성하기 전, 반드시 다음의 논리 전개를 거치십시오.
-- **Cross-Cluster Connectivity**: 서로 무관해 보이는 A 테마와 B 테마가 동일한 기술적/지정학적 동인(Driver)을 공유하고 있는가?
+${expert.reasoning}
 - **Second-Order Consequences**: 이번 주의 트렌드가 6개월 뒤 유관 산업 생태계(Ecosystem)에 미칠 연쇄 반응은 무엇인가?
 - **Decision Matrix**: 독자가 이 데이터를 기반으로 자원 배분(Resource Allocation)을 어떻게 변경해야 하는가?
 

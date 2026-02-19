@@ -37,6 +37,13 @@ export default function ArchivePage() {
     const [reportLoading, setReportLoading] = useState(false);
     const [selectedReportIssue, setSelectedReportIssue] = useState<IssueItem | undefined>(undefined);
 
+    // Weekly Report Generation State
+    const [weeklyJobId, setWeeklyJobId] = useState<string | null>(null);
+    const [weeklyStatus, setWeeklyStatus] = useState<'collecting' | 'clustering' | 'generating' | 'completed' | 'failed' | null>(null);
+    const [weeklyProgress, setWeeklyProgress] = useState(0);
+    const [weeklyMessage, setWeeklyMessage] = useState('');
+    const [showWeeklySection, setShowWeeklySection] = useState(false);
+
     // 브리핑 목록 로드
     useEffect(() => {
         async function loadBriefs() {
@@ -130,6 +137,67 @@ export default function ArchivePage() {
         }
     };
 
+    // 주간 리포트 생성 시작
+    const handleGenerateWeeklyReport = async () => {
+        try {
+            setWeeklyStatus('collecting');
+            setWeeklyProgress(5);
+            setWeeklyMessage('데이터 수집 준비 중...');
+            setShowWeeklySection(true);
+
+            const res = await fetch('/api/weekly-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: 'ai' })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setWeeklyJobId(data.data.jobId);
+            } else {
+                throw new Error(data.error || '발급 실패');
+            }
+        } catch (err: any) {
+            console.error('Weekly report start failed:', err);
+            setWeeklyStatus('failed');
+            setWeeklyMessage(err.message || '리포트 생성 시작 실패');
+        }
+    };
+
+    // 주간 리포트 상태 폴링
+    useEffect(() => {
+        if (!weeklyJobId || weeklyStatus === 'completed' || weeklyStatus === 'failed') return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/weekly-report/status?jobId=${weeklyJobId}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    const { status, progress, message, report, error } = data.data;
+                    setWeeklyStatus(status);
+                    setWeeklyProgress(progress);
+                    setWeeklyMessage(message || '');
+
+                    if (status === 'completed' && report) {
+                        setReportContent(report);
+                        setIsReportModalOpen(true);
+                        setWeeklyJobId(null); // Stop polling
+                        clearInterval(interval);
+                    } else if (status === 'failed') {
+                        setWeeklyMessage(error || '생성 실패');
+                        setWeeklyJobId(null);
+                        clearInterval(interval);
+                    }
+                }
+            } catch (err) {
+                console.error('Status check failed:', err);
+            }
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [weeklyJobId, weeklyStatus]);
+
     const handleGenerateAggregatedReport = async () => {
         const validUrls = manualUrls.filter(url => url.trim() !== '');
         const validTexts = manualTexts.filter(t => t.trim() !== '');
@@ -203,19 +271,59 @@ export default function ArchivePage() {
                     </p>
 
                     {!selectedBrief && (
-                        <div className="view-switcher">
-                            <button
-                                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                                onClick={() => setViewMode('grid')}
-                            >
-                                📅 날짜별 보기
-                            </button>
-                            <button
-                                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                📋 리스트 보기
-                            </button>
+                        <div className="view-switcher-container animate-in">
+                            <div className="view-switcher">
+                                <button
+                                    className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('grid')}
+                                >
+                                    📅 날짜별 보기
+                                </button>
+                                <button
+                                    className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('list')}
+                                >
+                                    📋 리스트 보기
+                                </button>
+                            </div>
+
+                            <div className="weekly-trigger-container">
+                                {!showWeeklySection ? (
+                                    <button className="weekly-start-btn" onClick={() => setShowWeeklySection(true)}>
+                                        ✨ 주간 트렌드 분석 생성
+                                    </button>
+                                ) : (
+                                    <div className="weekly-control-panel card-glow animate-in">
+                                        <div className="panel-header">
+                                            <div className="panel-info">
+                                                <h3 className="panel-title">주간 테크 인텔리전스 분석</h3>
+                                                <p className="panel-desc">최근 7일간의 모든 이슈를 클러스터링하고 글로벌 시장 동향을 융합 분석합니다.</p>
+                                            </div>
+                                            <button className="panel-close" onClick={() => setShowWeeklySection(false)}>×</button>
+                                        </div>
+
+                                        {!weeklyStatus || weeklyStatus === 'failed' ? (
+                                            <div className="panel-action">
+                                                <button className="weekly-action-btn" onClick={handleGenerateWeeklyReport}>
+                                                    분석 시작 (약 2-3분 소요)
+                                                </button>
+                                                {weeklyStatus === 'failed' && <p className="status-error">{weeklyMessage}</p>}
+                                            </div>
+                                        ) : (
+                                            <div className="progress-container">
+                                                <div className="progress-info">
+                                                    <span className="status-badge pulse">{weeklyStatus}...</span>
+                                                    <span className="progress-percent">{weeklyProgress}%</span>
+                                                </div>
+                                                <div className="progress-track">
+                                                    <div className="progress-fill" style={{ width: `${weeklyProgress}%` }} />
+                                                </div>
+                                                <p className="progress-msg">{weeklyMessage}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -620,33 +728,134 @@ export default function ArchivePage() {
 
                 @media (max-width: 480px) {
                     .archive-header { margin-bottom: 2.5rem; }
-                    .archive-title { font-size: 2rem; letter-spacing: -0.05em; word-break: keep-all; }
+                    .archive-title { font-size: 2rem; letter-spacing: -0.04em; }
                     .archive-subtitle { font-size: 0.9rem; }
-                    
-                    .view-switcher { gap: 0.5rem; margin-top: 1.5rem; }
-                    .view-btn { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
+                    .view-switcher-container { flex-direction: column; gap: 1rem; }
+                    .weekly-start-btn { width: 100%; justify-content: center; }
+                }
 
-                    .action-row { flex-direction: column; gap: 1rem; align-items: stretch; }
-                    .selection-toolbar { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-                    
-                    .back-button, .delete-button, .selection-toggle-btn, .generate-report-btn { 
-                        width: 100%; justify-content: center; padding: 12px;
-                    }
-
-                    .archive-grid { grid-template-columns: 1fr; gap: 1rem; }
-
-                    .premium-archive-card {
-                        padding: 1.25rem;
-                    }
-
-                    .detail-hero {
-                        padding: 2rem 1.5rem;
-                        border-radius: 20px;
-                    }
-
-                    .detail-title {
-                        font-size: 1.5rem;
-                    }
+                /* Weekly Panel Styles */
+                .view-switcher-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 2rem;
+                    gap: 20px;
+                }
+                .weekly-trigger-container {
+                    flex: 1;
+                    max-width: 600px;
+                    display: flex;
+                    justify-content: flex-end;
+                }
+                .weekly-start-btn {
+                    background: linear-gradient(135deg, #6366f1, #a855f7);
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 14px;
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+                    transition: all 0.2s;
+                }
+                .weekly-start-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+                }
+                .weekly-control-panel {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 20px;
+                    padding: 20px;
+                    width: 100%;
+                    position: relative;
+                }
+                .card-glow {
+                    box-shadow: 0 0 20px rgba(99,102,241, 0.1);
+                }
+                .panel-header {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 20px;
+                }
+                .panel-title {
+                    font-size: 1rem;
+                    font-weight: 800;
+                    margin-bottom: 4px;
+                    color: var(--text-primary);
+                }
+                .panel-desc {
+                    font-size: 0.85rem;
+                    color: var(--text-secondary);
+                }
+                .panel-close {
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    line-height: 1;
+                }
+                .weekly-action-btn {
+                    background: var(--accent-color);
+                    color: white;
+                    border: none;
+                    width: 100%;
+                    padding: 12px;
+                    border-radius: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                }
+                .progress-container {
+                    padding-top: 10px;
+                }
+                .progress-info {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 8px;
+                }
+                .status-badge {
+                    font-size: 0.75rem;
+                    font-weight: 900;
+                    text-transform: uppercase;
+                    color: var(--accent-color);
+                }
+                .progress-percent {
+                    font-size: 0.8rem;
+                    font-weight: 800;
+                }
+                .progress-track {
+                    height: 8px;
+                    background: var(--bg-secondary);
+                    border-radius: 4px;
+                    overflow: hidden;
+                    margin-bottom: 8px;
+                }
+                .progress-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #6366f1, #a855f7);
+                    transition: width 0.4s ease;
+                }
+                .progress-msg {
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    text-align: center;
+                }
+                .status-error {
+                    color: var(--error-color);
+                    font-size: 0.8rem;
+                    margin-top: 8px;
+                    text-align: center;
+                }
+                .pulse {
+                    animation: pulse 2s infinite;
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
                 }
             `}</style>
         </div>

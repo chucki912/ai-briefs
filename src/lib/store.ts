@@ -11,7 +11,7 @@ export interface StorageAdapter {
     getAllBriefs(limit?: number): Promise<BriefReport[]>;
     deleteBrief(date: string): Promise<boolean>;
     // Generic KV Operations for temporary jobs
-    getRecentIssues(days?: number): Promise<IssueItem[]>;
+    getRecentIssues(days?: number, domain?: 'ai' | 'battery'): Promise<IssueItem[]>;
     getIssuesByDateRange(startDate: Date, endDate: Date): Promise<IssueItem[]>;
     kvSet(key: string, value: any, ttlSeconds?: number): Promise<void>;
     kvGet<T>(key: string): Promise<T | null>;
@@ -111,7 +111,7 @@ class FileSystemStorage implements StorageAdapter {
         }
     }
 
-    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+    async getRecentIssues(days = 3, domain: 'ai' | 'battery' = 'ai'): Promise<IssueItem[]> {
         await this.ensureDir();
         try {
             const cutoffDate = new Date();
@@ -122,8 +122,16 @@ class FileSystemStorage implements StorageAdapter {
             const recentBriefFiles = files
                 .filter(f => f.endsWith('.json'))
                 .filter(f => {
-                    const fileDate = f.replace('.json', '');
-                    return fileDate >= cutoffDateStr;
+                    const fileName = f.replace('.json', '');
+                    const isBatteryFile = fileName.startsWith('battery-');
+                    const fileDateOnly = isBatteryFile ? fileName.replace('battery-', '') : fileName;
+
+                    // 1. Domain filtering
+                    if (domain === 'battery' && !isBatteryFile) return false;
+                    if (domain === 'ai' && isBatteryFile) return false;
+
+                    // 2. Date filtering
+                    return fileDateOnly >= cutoffDateStr;
                 })
                 .sort()
                 .reverse();
@@ -240,13 +248,14 @@ class FileSystemStorage implements StorageAdapter {
 
 // 2. Vercel KV 스토리지 (프로덕션 배포용)
 class VercelKvStorage implements StorageAdapter {
-    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+    async getRecentIssues(days = 3, domain: 'ai' | 'battery' = 'ai'): Promise<IssueItem[]> {
         // Calculate date range
         const dates: string[] = [];
         for (let i = 0; i < days; i++) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            dates.push(d.toISOString().split('T')[0]);
+            const dateStr = d.toISOString().split('T')[0];
+            dates.push(domain === 'battery' ? `battery-${dateStr}` : dateStr);
         }
 
         try {
@@ -366,13 +375,21 @@ class InMemoryStorage implements StorageAdapter {
     private store = new Map<string, BriefReport>();
     private kvStore = new Map<string, { value: any, expiry: number }>();
 
-    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+    async getRecentIssues(days = 3, domain: 'ai' | 'battery' = 'ai'): Promise<IssueItem[]> {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
         const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
 
         const recentBriefs = Array.from(this.store.values())
-            .filter(b => b.date >= cutoffDateStr);
+            .filter(b => {
+                const isBattery = b.date.startsWith('battery-');
+                const dateOnly = isBattery ? b.date.replace('battery-', '') : b.date;
+
+                if (domain === 'battery' && !isBattery) return false;
+                if (domain === 'ai' && isBattery) return false;
+
+                return dateOnly >= cutoffDateStr;
+            });
 
         return recentBriefs.flatMap(b => b.issues);
     }
@@ -480,7 +497,7 @@ class RedisStorage implements StorageAdapter {
         this.clientPromise = getRedisClient(url);
     }
 
-    async getRecentIssues(days = 3): Promise<IssueItem[]> {
+    async getRecentIssues(days = 3, domain: 'ai' | 'battery' = 'ai'): Promise<IssueItem[]> {
         const client = await this.clientPromise;
 
         // Calculate date range
@@ -488,7 +505,8 @@ class RedisStorage implements StorageAdapter {
         for (let i = 0; i < days; i++) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            dates.push(d.toISOString().split('T')[0]);
+            const dateStr = d.toISOString().split('T')[0];
+            dates.push(domain === 'battery' ? `battery-${dateStr}` : dateStr);
         }
 
         try {
@@ -645,7 +663,7 @@ export const getBriefByDate = (date: string) => storage.getBriefByDate(date);
 export const getLatestBrief = () => storage.getLatestBrief();
 export const getAllBriefs = (limit?: number) => storage.getAllBriefs(limit);
 export const deleteBrief = (date: string) => storage.deleteBrief(date);
-export const getRecentIssues = (days?: number) => storage.getRecentIssues(days);
+export const getRecentIssues = (days?: number, domain?: 'ai' | 'battery') => storage.getRecentIssues(days, domain);
 export const getIssuesByDateRange = (startDate: Date, endDate: Date) => storage.getIssuesByDateRange(startDate, endDate);
 
 // KV Helper Exports

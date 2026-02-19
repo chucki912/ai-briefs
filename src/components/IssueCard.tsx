@@ -387,47 +387,29 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     .btn-text-icon {
                         flex: 1; /* Make deep dive button take available space */
                         justify-content: center;
-                        padding: 10px;
-                        height: 42px; /* Ensure 44px touch target height */
+                        padding: 12px;
+                        height: 44px; /* Standard touch target height */
+                        font-size: 0.95rem;
                     }
 
                     .btn-icon-only {
-                        width: 42px;
-                        height: 42px;
+                        width: 44px;
+                        height: 44px;
+                        font-size: 1.1rem;
                     }
 
                     .issue-headline {
-                        font-size: 1.35rem; /* Slightly larger for readability */
-                        margin-bottom: 1rem;
-                        line-height: 1.3;
+                        font-size: 1.3rem;
+                        margin-bottom: 1.25rem;
+                        line-height: 1.4;
                         word-break: keep-all; 
                     }
 
-                    .issue-facts li {
-                        font-size: 0.95rem;
-                        padding-left: 1.25rem;
-                        margin-bottom: 0.5rem;
-                    }
-
-                    .issue-insight-container {
-                        padding: 1.25rem;
-                        margin-bottom: 1.5rem;
-                    }
-
-                    .issue-insight-content {
-                        font-size: 0.95rem;
-                        line-height: 1.6;
-                    }
-
-                    .sources-list {
-                        gap: 8px;
-                    }
-
-                    .source-link-chip {
-                        max-width: 100%;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
+                    .selection-checkbox {
+                        top: 1.25rem;
+                        right: 1.25rem;
+                        width: 22px;
+                        height: 22px;
                     }
                 }
 

@@ -228,6 +228,21 @@ export default function AdminDashboard() {
                 .admin-loading { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
                 .spinner { width: 40px; height: 40px; border: 4px solid var(--accent-light); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
                 @keyframes spin { to { transform: rotate(360deg); } }
+
+                @media (max-width: 640px) {
+                    .admin-container { padding: 20px; }
+                    .admin-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+                    h1 { font-size: 1.8rem; }
+                    .refresh-btn { width: 100%; justify-content: center; }
+                    .admin-nav { overflow-x: auto; padding-bottom: 8px; }
+                    .nav-item { white-space: nowrap; padding: 6px 12px; font-size: 0.9rem; }
+                    
+                    /* Make table scrollable on mobile */
+                    .grid-list { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                    .admin-table { min-width: 600px; }
+                    
+                    .request-cards { grid-template-columns: 1fr; }
+                }
             `}</style>
         </div>
     );

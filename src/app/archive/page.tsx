@@ -619,45 +619,21 @@ export default function ArchivePage() {
                 }
 
                 @media (max-width: 480px) {
-                    .archive-header {
-                        margin-bottom: 2rem;
+                    .archive-header { margin-bottom: 2.5rem; }
+                    .archive-title { font-size: 2rem; letter-spacing: -0.05em; word-break: keep-all; }
+                    .archive-subtitle { font-size: 0.9rem; }
+                    
+                    .view-switcher { gap: 0.5rem; margin-top: 1.5rem; }
+                    .view-btn { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
+
+                    .action-row { flex-direction: column; gap: 1rem; align-items: stretch; }
+                    .selection-toolbar { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+                    
+                    .back-button, .delete-button, .selection-toggle-btn, .generate-report-btn { 
+                        width: 100%; justify-content: center; padding: 12px;
                     }
 
-                    .archive-title {
-                        font-size: 2rem;
-                    }
-
-                    .archive-subtitle {
-                        font-size: 0.95rem;
-                    }
-
-                    .action-row {
-                        flex-direction: column;
-                        gap: 1rem;
-                    }
-
-                    .selection-toolbar {
-                        flex-direction: column;
-                        gap: 0.75rem;
-                    }
-
-                    .selection-toggle-btn,
-                    .generate-report-btn {
-                        width: 100%;
-                        justify-content: center;
-                    }
-
-
-                    .back-button, .delete-button {
-                        width: 100%;
-                        justify-content: center;
-                        padding: 12px;
-                    }
-
-                    .archive-grid {
-                        grid-template-columns: 1fr;
-                        gap: 1rem;
-                    }
+                    .archive-grid { grid-template-columns: 1fr; gap: 1rem; }
 
                     .premium-archive-card {
                         padding: 1.25rem;

@@ -476,15 +476,13 @@ body {
   }
 
   .logo {
-    font-size: 1.8rem;
-    /* Make logo slightly smaller but still prominent */
+    font-size: 1.6rem;
   }
 
   .nav {
     width: 100%;
     justify-content: center;
-    /* Center nav items */
-    gap: 1.5rem;
+    gap: 1.25rem;
   }
 
   .hero-section {

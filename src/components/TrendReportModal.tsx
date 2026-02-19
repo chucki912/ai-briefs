@@ -1020,15 +1020,26 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 .markdown-content li { margin-bottom: 0.5rem; color: var(--text-secondary); }
 
                 @media (max-width: 640px) {
-                    .modal-overlay { padding: 1rem; }
+                    .modal-overlay { padding: 10px; }
                     .modal-content.report-modal {
-                        width: 98%; height: 92vh; border-radius: 12px;
+                        width: 100%; height: 100vh; maxHeight: 100vh; border-radius: 0;
                     }
-                    .modal-body { padding: 1.25rem; }
-                    .report-title { font-size: 1.4rem; }
+                    .modal-header h2 { font-size: 1.1rem; }
+                    .modal-body { padding: 1rem; }
+                    .report-title { font-size: 1.3rem; }
+                    .report-badge-row { gap: 0.25rem; }
+                    .badge { font-size: 0.7rem; padding: 2px 4px; }
+                    
+                    .progress-stepper { gap: 0.25rem; }
+                    .step-icon { width: 24px; height: 24px; font-size: 0.7rem; }
+                    .step-line { width: 20px; }
+                    .step-label { font-size: 0.65rem; }
+                    .status-message-large { font-size: 1rem; }
+                    .loading-visual .spinner { width: 40px; height: 40px; }
+
                     .implications-grid, .watchlist-grid { grid-template-columns: 1fr; }
-                    .modal-footer { flex-direction: column-reverse; padding: 1rem; }
-                    .modal-footer .btn { width: 100%; justify-content: center; }
+                    .modal-footer { flex-direction: column-reverse; padding: 1rem; gap: 0.75rem; }
+                    .modal-footer .btn { width: 100%; justify-content: center; height: 44px; }
                 }
             `}</style>
             </div>

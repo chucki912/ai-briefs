@@ -283,11 +283,38 @@ export default function ArchiveListView({
                     opacity: 0.3;
                 }
 
-                @media (max-width: 768px) {
+                @media (max-width: 480px) {
+                    .list-view-container {
+                        gap: 1rem;
+                    }
+                    .search-bar {
+                        padding: 0 1rem;
+                    }
+                    .search-bar input {
+                        padding: 0.75rem 0;
+                        font-size: 0.9rem;
+                    }
+                    .headline-item {
+                        padding: 1rem;
+                        gap: 0.75rem;
+                    }
                     .checkbox-wrapper {
-                        position: static;
-                        top: 0; transform: none;
-                        margin-bottom: 0.5rem;
+                        width: 20px;
+                        height: 20px;
+                    }
+                    .checkmark {
+                        width: 20px;
+                        height: 20px;
+                    }
+                    .checkmark:after {
+                        left: 6px; top: 2px;
+                        width: 4px; height: 8px;
+                    }
+                    .headline-text {
+                        font-size: 0.95rem;
+                    }
+                    .date-tag, .category-tag {
+                        font-size: 0.7rem;
                     }
                 }
             `}</style>

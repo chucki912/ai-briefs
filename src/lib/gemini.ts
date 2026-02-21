@@ -324,10 +324,10 @@ export async function generateTrendReport(
 ## Core Rules
 1) **No Mock Data**: "추후 발표 예정", "다양한 기업들" 같은 모호한 표현 절대 금지. 실명, 구체적 수치($, %, 날짜), 공식 발언만 사용.
 2) **Source Extension**: ISSUE_URLS는 출발점. 최소 3개 이상의 새로운 고품질 글로벌 소스를 추가하여 분석의 객관성 확보.
-3) **Professional Tone**: 컨설팅 펌 보고서 톤 (~함, ~임 체 사용).
+3) **Professional Tone**: **모든 문장을 철저하게 명사형 종결어미(~함, ~임, ~전망 등)로 끝나는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. 정확히 그대로 출력할 것.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
-6) **Minimum Depth**: [Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
+6) **Minimum Depth**: [Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 (Basis: 근거)를 명시할 것.
 
 ## Output Format
 반드시 아래 포맷을 엄격히 준수하십시오.
@@ -349,11 +349,11 @@ export async function generateTrendReport(
 ## ■ Key Developments (Deep Dive)
 ### <구체적 사건/발표명 1>
 - [Fact] <검색된 구체적 사실 (수치, 날짜, 기업명 필수)>
-- [Analysis] <이 사건이 산업 구조에 미치는 영향을 최소 3문장 이상 분석> (Basis: <사용한 분석 프레임워크 또는 유사 사례>)
+- [Analysis] <이 사건이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <사용한 분석 프레임워크 또는 유사 사례>)
 
 ### <구체적 사건/발표명 2>
 - [Fact] <검색된 구체적 사실>
-- [Analysis] <분석 내용 최소 3문장 이상> (Basis: <근거>)
+- [Analysis] <분석 내용 2~3개의 하위 블릿으로 개조식 분석> (Basis: <근거>)
 
 ## ■ Core Themes
 ### <테마명>

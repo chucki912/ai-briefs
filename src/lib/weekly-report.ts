@@ -155,8 +155,8 @@ ${expert.reasoning}
 3) **Source Extension**: 기존 브리프 소스 외에 최소 3~5개의 새로운 고품질 글로벌 소스를 추가하여 분석의 객관성을 확보하십시오.
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. [Top Strategic Signal]을 [Signal]로 축약하는 것을 금지합니다. 정확히 그대로 출력하십시오.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
-6) **Minimum Depth**: [Strategic Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
-7) **Professional Tone**: **모든 출력 텍스트는 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 '개조식 축약 문체'로 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
+6) **Minimum Depth**: [Strategic Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 (Basis: 근거)를 명시할 것.
+7) **Professional Tone**: **모든 출력 텍스트는 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
 반드시 아래 포맷을 엄격히 준수하십시오.
@@ -181,10 +181,10 @@ ${expert.reasoning}
 ### 🔹 <클러스터명>
 **핵심 전략 가치**: <이 클러스터가 미래 경쟁력에 주는 의미 1줄>
 
-#### Key Developments & Context
-- **[Fact]** <검색된 팩트 — 수치, 날짜, 기업명 필수>
-- **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 최소 3문장 이상 분석> (Basis: <분석 근거 프레임워크 또는 유사 사례>)
-- **[Structural Linkage]** <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
+    #### Key Developments & Context
+    - **[Fact]** <검색된 팩트 — 수치, 날짜, 기업명 필수>
+    - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <분석 근거 프레임워크 또는 유사 사례>)
+    - **[Structural Linkage]** <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
 
 ## ■ Second-Order Economic Insights
 ### <가시화되는 산업적 변화 제목>

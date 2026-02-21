@@ -61,8 +61,6 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
             <div className="issue-header-row">
                 <div className="issue-tag-group">
                     <span className="issue-number">ISSUE {index + 1}</span>
-                    <span className="issue-category-tag">{issue.framework.split(',')[0]}</span>
-                    {issue.category && <span className="issue-category-tag secondary">{issue.category}</span>}
                 </div>
                 <div className="actions-group" style={{ display: 'flex', gap: '8px' }}>
                     <button

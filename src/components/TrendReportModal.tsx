@@ -732,7 +732,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 </div>
                             </div>
                             <p className="status-message-large">{statusMessage}</p>
-                            <span className="loading-tip">💡 AI가 지난 1주일간의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
+                            {weeklyMode && (
+                                <span className="loading-tip">💡 AI가 지난 1주일간의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
+                            )}
                         </div>
                     ) : (
                         <div className="report-content">

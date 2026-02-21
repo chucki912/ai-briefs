@@ -4,15 +4,8 @@ import { analyzeBatteryNewsAndGenerateInsights } from '@/lib/battery-gemini';
 import { saveBrief, getBriefByDate } from '@/lib/store';
 import { BriefReport, IssueItem } from '@/types';
 
-// Helper: 요일 한글 변환
-function getDayOfWeek(date: Date): string {
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return days[date.getDay()];
-}
-
 // Helper: Markdown 생성
-function buildBatteryMarkdown(issues: IssueItem[], kstDate: Date): string {
-    const dateStr = kstDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+function buildBatteryMarkdown(issues: IssueItem[], dateStr: string): string {
     let md = `# 🔋 Battery Daily Brief - ${dateStr}\n\n`;
 
     issues.forEach((issue, idx) => {
@@ -31,20 +24,52 @@ function buildBatteryMarkdown(issues: IssueItem[], kstDate: Date): string {
     return md;
 }
 
-// 배터리 브리핑 생성 API
+// 배터리 브리핑 생성 API (Vercel Cron 지원을 위해 GET 추가)
+export async function GET(request: Request) {
+    return handleBatteryGenerate(request);
+}
+
 export async function POST(request: Request) {
+    return handleBatteryGenerate(request);
+}
+
+async function handleBatteryGenerate(request: Request) {
     try {
+        // 보안: Vercel Cron Secret 확인 (설정된 경우)
+        const authHeader = request.headers.get('authorization');
+        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 401 }
+            );
+        }
+
         console.log('[Battery Generate] 배터리 브리핑 생성 시작...');
 
-        const body = await request.json().catch(() => ({}));
-        const force = body.force === true;
-
         const nowDate = new Date();
+        // SV-SE locale with Asia/Seoul timezone gives YYYY-MM-DD in KST
         const dateStr = nowDate.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
-        const kstDate = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+
+        // KST 기준 요일 및 표시용 날짜
+        const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short'
+        });
+        const parts = kstFormatter.formatToParts(nowDate);
+        const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+
+        const kstDisplayDate = `${getPart('year')} ${getPart('month')} ${getPart('day')}`;
+        const kstDayOfWeek = getPart('weekday');
 
         // 배터리 브리프용 키 (날짜 앞에 battery- 접두사)
         const batteryDateKey = `battery-${dateStr}`;
+
+        // GET 요청 시 body가 없을 수 있으므로 처리
+        const body = await request.json().catch(() => ({}));
+        const force = body.force === true;
 
         // 이미 오늘 브리핑이 있는지 확인 (force가 아닐 때만)
         if (!force) {
@@ -57,8 +82,6 @@ export async function POST(request: Request) {
                     message: '이미 생성된 배터리 브리핑이 있습니다.'
                 });
             }
-        } else {
-            console.log('[Battery Generate] 강제 재생성 모드 활성화');
         }
 
         // 1. 배터리 뉴스 수집
@@ -70,11 +93,11 @@ export async function POST(request: Request) {
             const emptyReport: BriefReport = {
                 id: batteryDateKey,
                 date: batteryDateKey,
-                dayOfWeek: getDayOfWeek(kstDate),
-                generatedAt: kstDate.toISOString(),
+                dayOfWeek: kstDayOfWeek,
+                generatedAt: nowDate.toISOString(),
                 totalIssues: 0,
                 issues: [],
-                markdown: '# 🔋 Battery Daily Brief\n\n수집된 배터리 뉴스가 없습니다.'
+                markdown: `# 🔋 Battery Daily Brief - ${kstDisplayDate}\n\n수집된 배터리 뉴스가 없습니다.`
             };
             await saveBrief(emptyReport);
             return NextResponse.json({
@@ -95,11 +118,11 @@ export async function POST(request: Request) {
         const report: BriefReport = {
             id: batteryDateKey,
             date: batteryDateKey,
-            dayOfWeek: getDayOfWeek(kstDate),
-            generatedAt: kstDate.toISOString(),
+            dayOfWeek: kstDayOfWeek,
+            generatedAt: nowDate.toISOString(), // 실제 생성 시간을 UTC ISO 형식으로 저장 (UI에서 현지 시간으로 변환)
             totalIssues: issues.length,
             issues: issues,
-            markdown: buildBatteryMarkdown(issues, kstDate)
+            markdown: buildBatteryMarkdown(issues, kstDisplayDate)
         };
 
         // 4. 데이터베이스 저장

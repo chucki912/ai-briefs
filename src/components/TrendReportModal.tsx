@@ -391,7 +391,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             } else if (analysisMatch) {
                                 const analysisText = analysisMatch[1].trim();
                                 const parts = analysisText.split(/Basis:/i);
-                                const text = parts[0].trim();
+                                const text = parts[0].replace(/\(\s*$/, '').trim();
                                 let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '구조적 분석 기반';
                                 analysis.push({ text, basis });
                             } else if (linkageMatch) {
@@ -732,7 +732,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 </div>
                             </div>
                             <p className="status-message-large">{statusMessage}</p>
-                            <span className="loading-tip">💡 AI가 수백 건의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
+                            <span className="loading-tip">💡 AI가 지난 1주일간의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
                         </div>
                     ) : (
                         <div className="report-content">

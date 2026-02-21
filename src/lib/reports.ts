@@ -173,9 +173,9 @@ export async function generateAggregatedReport(
 
 
     try {
-        // Try Gemini 3 Pro (Preview) first
+        // Try Gemini 3.1 Pro (Preview) first
         // Note: Using Gemini 3 models as per gemini.ts configuration
-        let modelName = 'gemini-3-pro-preview';
+        let modelName = 'gemini-3.1-pro-preview';
 
         console.log(`[Report] Starting generation with model: ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName });

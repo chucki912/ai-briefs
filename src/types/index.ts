@@ -18,6 +18,9 @@ export interface AnalysisFramework {
 
 // 이슈 아이템 타입
 export interface IssueItem {
+  category?: string;
+  oneLineSummary?: string;
+  hashtags?: string[];
   headline: string;
   keyFacts: string[];
   insight: string;

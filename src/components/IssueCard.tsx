@@ -62,6 +62,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                 <div className="issue-tag-group">
                     <span className="issue-number">ISSUE {index + 1}</span>
                     <span className="issue-category-tag">{issue.framework.split(',')[0]}</span>
+                    {issue.category && <span className="issue-category-tag secondary">{issue.category}</span>}
                 </div>
                 <div className="actions-group" style={{ display: 'flex', gap: '8px' }}>
                     <button
@@ -85,6 +86,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
             </div>
 
             <h2 className="issue-headline">{issue.headline}</h2>
+            {issue.oneLineSummary && <p className="issue-summary">{issue.oneLineSummary}</p>}
 
             <ul className="issue-facts">
                 {issue.keyFacts.map((fact, i) => (
@@ -101,6 +103,14 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     {issue.insight}
                 </div>
             </div>
+
+            {issue.hashtags && issue.hashtags.length > 0 && (
+                <div className="issue-hashtags">
+                    {issue.hashtags.map((tag, i) => (
+                        <span key={i} className="hashtag">{tag}</span>
+                    ))}
+                </div>
+            )}
 
             <div className="issue-footer">
                 <div className="issue-sources">
@@ -193,6 +203,12 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     border-radius: 99px;
                 }
 
+                .issue-category-tag.secondary {
+                    background: var(--bg-secondary);
+                    color: var(--text-secondary);
+                    border: 1px solid var(--border-color);
+                }
+
                 .btn-text-icon {
                     background: var(--bg-secondary);
                     border: 1px solid var(--border-color);
@@ -219,9 +235,18 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     font-size: 1.5rem;
                     font-weight: 800;
                     color: var(--text-primary);
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 0.5rem;
                     line-height: 1.35;
                     letter-spacing: -0.02em;
+                }
+
+                .issue-summary {
+                    font-size: 1.05rem;
+                    color: var(--text-secondary);
+                    margin-top: 0;
+                    margin-bottom: 1.5rem;
+                    line-height: 1.5;
+                    font-weight: 500;
                 }
 
                 .btn-icon-only {
@@ -306,6 +331,22 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     font-size: 1.05rem;
                     line-height: 1.6;
                     font-weight: 500;
+                }
+
+                .issue-hashtags {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    margin-bottom: 1.5rem;
+                }
+
+                .hashtag {
+                    color: var(--accent-color);
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    background: rgba(79, 70, 229, 0.05);
+                    padding: 4px 10px;
+                    border-radius: 6px;
                 }
 
                 .issue-footer {

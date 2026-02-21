@@ -219,7 +219,7 @@ ${expert.reasoning}
 지금 즉시 초격차 주간 전략 분석을 시작하십시오. 검색과 연결이 핵심입니다.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro-preview',
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });

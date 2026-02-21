@@ -103,50 +103,39 @@ async function generateIssueFromCluster(
     // 뉴스 리스트에 인덱스 부여
     const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n출처: ${n.url}`).join('\n\n');
 
-    const prompt = `당신은 **글로벌 AI 산업 전략 애널리스트**입니다. 아래 제공된 뉴스 클러스터를 분석하여 한국어 브리핑을 작성해주세요.
+    const prompt = `당신은 **K-AI(한국 AI 산업) 관점의 글로벌 AI 산업 전략 애널리스트**입니다. 
 
 ## 뉴스 클러스터 정보 (인덱스 부여됨)
 ${indexedNews}
 
-## 분석 프레임워크
-${getFrameworkNames(frameworks)}
+## 적용 분석 프레임워크
+${frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 
-## 작성 지침
-1. **분석 대상**: 제공된 뉴스 기사들의 내용을 종합적으로 분석하세요.
-2. **핵심 내용 (Key Facts)**:
-   - 뉴스 클러스터에서 가장 중요한 사실을 **최대 3개**까지 추출하세요.
-   - 각 항목은 구체적인 수치, 기업명, 제품명 등을 포함해야 합니다.
-   - 문장은 간결하고 명확하게 작성하세요.
-3. **전략적 인사이트 (Strategic Insight)**:
-   - **단일 주제 집중 (Strictly Single Topic)**: 하나의 브리프 카드는 반드시 하나의 구체적이고 명확한 주제만 다루어야 합니다. 서로 다른 여러 소식을 병렬로 나열하지 마세요.
-   - **So What? (한국 AI 산업 관점)**: 추출된 3가지 사실이 **한국 AI 기업(Naver, Kakao, SKT, LG AI 연구원, LG CNS, AI 스타트업 등)**이나 국내 산업 생태계에 어떤 기회나 위협이 되는지 구체적으로 분석하세요. 단순 요약이 아닌, 파급 효과와 대응 전략을 포함해야 합니다.
-   - 전문가 수준의 통찰력을 보여주어야 합니다.
-4. **연관 키워드**: 이 이슈와 관련된 핵심 키워드를 해시태그 형태로 3개 추출하세요.
-5. **JSON 포맷**: 결과는 반드시 아래 JSON 스키마를 따라야 합니다.
-
-## JSON 스키마
-\`\`\`json
+## 출력 형식 (JSON)
 {
-  "title": "이슈를 관통하는 핵심 제목 (50자 이내, 단일 핵심 주제 중심)",
-  "category": "적절한 카테고리 (예: Tech Giant, Regulation, Model, Hardware, Industry 과 같은 영어 카테고리)",
-  "koreanCategory": "한국어 카테고리 (예: 빅테크 동향, 규제 및 정책, AI 모델, 하드웨어, 산업 동향)",
+  "headline": "한국어 헤드라인 (30자 이내, 단일 핵심 주제 중심)",
+  "category": "적절한 카테고리 (영어)",
   "oneLineSummary": "이슈 전체를 요약하는 한 문장 (100자 이내)",
+  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
   "keyFacts": [
-    "핵심 사실 1",
+    "핵심 사실 1 (구체적 수치/기업명 포함)",
     "핵심 사실 2",
     "핵심 사실 3"
   ],
-  "strategicInsight": "3가지 핵심 사실을 종합하여 도출한 심층적인 전략적 인사이트 (300자 내외) - 한국 AI 산업에 미치는 영향(So What?) 필수 포함",
-  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
-  "relatedStocks": [
-    {"name": "연관 종목명", "reason": "연관 이유 (간략히)"}
-  ],
+  "insight": "위 3가지 핵심 사실을 종합하여, 한국 AI 산업(K-AI) 생태계에 미치는 파급 효과와 전략적 시사점을 적용 분석 프레임워크에 맞춰 도출한 심층 인사이트 (공백 포함 300자 내외)",
   "relevantSourceIndices": [1, 2]
 }
-\`\`\`
 
-- 감정적 표현 배제, 건조하고 전문적인 분석 톤
-- **단일 사건 집중 원칙**: 제공된 뉴스 클러스터 안에서 **가장 중요하고 시급한 단 하나의 사건(Single Event)**을 선정하세요. 나머지 관련성이 낮은 기사는 과감히 무시하십시오. Key Facts 3가지는 모두 **동일한 하나의 사건**에 대한 세부 내용이어야 합니다.
+## 작성 규칙
+- 100% 한국어 (기업명/전문용어는 영문 병기)
+- **단일 주제 집중 (Strictly Single Topic)**: 하나의 브리프 카드는 반드시 하나의 구체적이고 명확한 주제만 다루어야 합니다. 서로 다른 여러 소식을 병렬로 나열하지 마세요.
+- **중요**: \`relevantSourceIndices\` 필드에는 이 브리핑과 직접 관련된 핵심 기사 번호만 정수 배열로 포함하세요.
+- **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요.
+- **심층 인사이트**:
+  - 단순 요약이 아닌, 추출된 3가지 사실이 **한국 AI 기업(Naver, Kakao, SKT, LG 등)** 이나 국내 산업 생태계에 어떤 기회나 위협이 되는지 철저히 **선택된 분석 프레임워크의 관점에서만** 분석하세요.
+  - 시장의 판도 변화, 기술 주도권, 규제 리스크 등을 전문가 관점에서 연결하여 서술하세요.
+- 객관적 수치, 공식 발언 기반 서술 (수치 데이터가 있다면 반드시 포함)
+- 감정적 표현 배제 (드라이하고 전문적인 톤 유지)
 
 JSON만 출력하세요.`;
 
@@ -172,7 +161,7 @@ JSON만 출력하세요.`;
         }
 
         // 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
-        const headline = parsed.title;
+        const headline = parsed.headline || parsed.title || '';
         const headlineKeywords = headline.split(' ').filter((w: string) => w.length > 1);
 
         const finalSources = (selectedSources.length > 0 ? selectedSources : cluster.map(c => c.url))
@@ -189,9 +178,12 @@ JSON만 출력하세요.`;
             });
 
         return {
-            headline: parsed.title,
+            headline: parsed.headline || parsed.title,
+            category: parsed.category,
+            oneLineSummary: parsed.oneLineSummary,
+            hashtags: parsed.hashtags,
             keyFacts: parsed.keyFacts,
-            insight: parsed.strategicInsight,
+            insight: parsed.insight || parsed.strategicInsight,
             framework: getFrameworkNames(frameworks),
             sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
         };

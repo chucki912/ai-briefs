@@ -121,12 +121,15 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 ## 출력 형식 (JSON)
 {
   "headline": "한국어 헤드라인 (30자 이내, 단일 핵심 주제 중심)",
+  "category": "적절한 카테고리 (영어)",
+  "oneLineSummary": "이슈 전체를 요약하는 한 문장 (100자 이내)",
+  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
   "keyFacts": [
     "핵심 사실 1 (구체적 수치/기업명 포함)",
     "핵심 사실 2",
     "핵심 사실 3"
   ],
-  "insight": "위 3가지 핵심 사실을 종합하여, K-Battery(한국 배터리 산업)에 미치는 파급 효과와 전략적 시사점을 도출한 심층 인사이트 (공백 포함 300자 내외)",
+  "insight": "위 3가지 핵심 사실을 종합하여, K-Battery(한국 배터리 산업) 생태계에 미치는 파급 효과와 전략적 시사점을 적용 분석 프레임워크에 구애받지 않고 자율적으로 넓게 확장하여 도출한 심층 인사이트 (공백 포함 300자 내외)",
   "relevantSourceIndices": [1, 2]
 }
 
@@ -137,7 +140,7 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 - **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요.
 - **심층 인사이트**:
   - 단순 요약이 아닌, 추출된 3가지 사실이 **한국 배터리 기업(LGES, SK On, SDI, 소재사 등)**에 어떤 기회나 위협이 되는지 분석하세요.
-  - 시장의 판도 변화, 기술 주도권, 공급망 이슈 등을 전문가 관점에서 연결하여 서술하세요.
+  - 제공된 분석 프레임워크의 틀에만 얽매이지 말고, **자율적이고 폭넓은 시야(Autonomous)**로 시장의 판도 변화, 기술 주도권, 공급망 이슈 등을 자유롭게 연결하여 'So What?'을 도출하세요.
 - 객관적 수치, 공식 발언 기반 서술 (수치 데이터가 있다면 반드시 포함)
 - 감정적 표현 배제 (드라이하고 전문적인 톤 유지)
 
@@ -170,9 +173,12 @@ JSON만 출력하세요.`;
         }
 
         return {
-            headline: parsed.headline,
+            headline: parsed.headline || parsed.title,
+            category: parsed.category,
+            oneLineSummary: parsed.oneLineSummary,
+            hashtags: parsed.hashtags,
             keyFacts: parsed.keyFacts,
-            insight: parsed.insight,
+            insight: parsed.insight || parsed.strategicInsight,
             framework: matchedFrameworks.map(f => f.name).join(', '),
             sources: selectedSources,
         };
@@ -286,7 +292,7 @@ export async function generateBatteryTrendReport(
 지금 즉시 K-Battery 초격차 전략 분석을 시작하십시오. 검색이 우선입니다.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro-preview',
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });

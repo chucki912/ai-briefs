@@ -156,6 +156,7 @@ ${expert.reasoning}
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. [Top Strategic Signal]을 [Signal]로 축약하는 것을 금지합니다. 정확히 그대로 출력하십시오.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
 6) **Minimum Depth**: [Strategic Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
+7) **Professional Tone**: **모든 출력 텍스트는 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 '개조식 축약 문체'로 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
 반드시 아래 포맷을 엄격히 준수하십시오.

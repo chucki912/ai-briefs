@@ -135,6 +135,7 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 
 ## 작성 규칙
 - 100% 한국어 (기업명/전문용어는 영문 병기)
+- **모든 출력 내용(headline, category, oneLineSummary, keyFacts, insight 등)은 반드시 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 '개조식 축약 문체'로 작성할 것. (예: "~합니다." -> "~함.", "~입니다." -> "~임.", "~기록했다" -> "~기록함") 서술어 철저히 배제.**
 - **단일 주제 집중 (Strictly Single Topic)**: 하나의 브리프 카드는 반드시 하나의 구체적이고 명확한 주제(예: 특정 리튬 가격 변동, 특정 기업의 합작사 설립 등)만 다루어야 합니다. 서로 다른 여러 소식을 병렬로 나열하지 마세요.
 - **중요**: \`relevantSourceIndices\` 필드에는 이 브리핑과 직접 관련된 핵심 기사 번호만 정수 배열로 포함하세요.
 - **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요.
@@ -233,6 +234,7 @@ export async function generateBatteryTrendReport(
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. 정확히 그대로 출력할 것.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
 6) **Minimum Depth**: [Deep Analysis] 태그 뒤에는 반드시 최소 3문장 이상의 분석 본문을 작성하고, (Basis: 근거)를 명시할 것.
+7) **Professional Tone**: **모든 문장을 철저하게 명사형 종결어미(~함, ~임, ~전망 등)로 끝나는 '개조식 축약 문체'로 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
 반드시 아래 포맷을 엄격히 준수하십시오.

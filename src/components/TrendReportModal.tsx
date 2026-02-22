@@ -375,32 +375,59 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const headline = lines[0].replace(/\[|\]/g, '').trim();
                         const facts: any[] = [];
                         const analysis: any[] = [];
-
                         const why_it_matters: any[] = [];
+
+                        let currentState: 'none' | 'fact' | 'analysis' | 'linkage' = 'none';
+                        let currentText = '';
+
+                        const saveCurrentState = () => {
+                            if (!currentText.trim()) return;
+
+                            if (currentState === 'fact') {
+                                facts.push({ text: currentText.trim() });
+                            } else if (currentState === 'analysis') {
+                                // Extract basis if it exists at the very end of the accumulated analysis text
+                                const parts = currentText.split(/Basis:/i);
+                                const text = parts[0].replace(/\(\s*$/, '').trim();
+                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
+                                analysis.push({ text, basis });
+                            } else if (currentState === 'linkage') {
+                                why_it_matters.push({ text: currentText.trim() });
+                            }
+                            currentText = '';
+                        };
 
                         lines.slice(1).forEach(line => {
                             const cleanLine = line.replace(/\*\*/g, '').trim();
 
-                            // Flexible regex for tags: [Fact], (Fact), Fact:, [Analysis], [Structural Linkage], etc.
-                            const factMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?Fact[\)\]:]?\s*(.*)/i);
-                            const analysisMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Strategic\s+)?Analysis[\)\]:]?\s*(.*)/i);
-                            const linkageMatch = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Structural\s+)?Linkage[\)\]:]?|[\(\[]?Why[\)\]:]?\s*(.*)/i);
+                            // Check for transition to a new section
+                            const isFactHeader = cleanLine.match(/^(?:-\s*)?[\(\[]?Fact[\)\]:]?(.*)/i);
+                            const isAnalysisHeader = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Strategic\s+)?Analysis[\)\]:]?(.*)/i);
+                            const isLinkageHeader = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:Structural\s+)?Linkage[\)\]:]?|[\(\[]?Why[\)\]:]?(.*)/i);
 
-                            if (factMatch) {
-                                facts.push({ text: factMatch[1].trim() });
-                            } else if (analysisMatch) {
-                                const analysisText = analysisMatch[1].trim();
-                                const parts = analysisText.split(/Basis:/i);
-                                const text = parts[0].replace(/\(\s*$/, '').trim();
-                                // 기본값을 고정된 '구조적 분석 기반' 대신 의미 있는 문맥 연결을 유도하거나 아예 비워서 UI에서 가리기
-                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
-                                analysis.push({ text, basis });
-                            } else if (linkageMatch) {
-                                // For linkage, prioritize text after the tag, fallback to cleanLine if match is empty
-                                const linkageText = linkageMatch[1] ? linkageMatch[1].trim() : cleanLine.replace(/.*Linkage\]|.*Why\]\s*/i, '').replace(/^-\s*/, '').trim();
-                                if (linkageText) why_it_matters.push({ text: linkageText });
+                            if (isFactHeader) {
+                                saveCurrentState();
+                                currentState = 'fact';
+                                currentText = isFactHeader[1] ? isFactHeader[1].trim() : '';
+                            } else if (isAnalysisHeader) {
+                                saveCurrentState();
+                                currentState = 'analysis';
+                                currentText = isAnalysisHeader[1] ? isAnalysisHeader[1].trim() : '';
+                            } else if (isLinkageHeader) {
+                                saveCurrentState();
+                                currentState = 'linkage';
+                                const linkageMatchText = isLinkageHeader[1] ? isLinkageHeader[1].trim() : cleanLine.replace(/.*Linkage\]|.*Why\]\s*/i, '').replace(/^-\s*/, '').trim();
+                                currentText = linkageMatchText;
+                            } else if (cleanLine) {
+                                // If not a header and we are in a state, append the line (for multi-line bullets)
+                                if (currentState !== 'none') {
+                                    currentText += (currentText ? '\n' + cleanLine : cleanLine);
+                                }
                             }
                         });
+
+                        // Save the last block
+                        saveCurrentState();
 
                         if (headline) {
                             data.key_developments.push({

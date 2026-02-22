@@ -393,7 +393,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 let basis = parts[1] ? parts[1].replace(/\)\s*$/, '').trim() : '';
                                 analysis.push({ text, basis });
                             } else if (currentState === 'linkage') {
-                                why_it_matters.push({ text: currentText.trim() });
+                                why_it_matters.push({ text: currentText.replace(/#+\s*$/, '').trim() });
                             }
                             currentText = '';
                         };

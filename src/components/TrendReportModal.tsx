@@ -472,15 +472,21 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const cleanLine = line.replace(/\*\*/g, '').trim();
 
                         // Flexible regex for implications tags
-                        const marketMatch = cleanLine.match(/[\(\[]?(?:Market|Market\s*&\s*CapEx|Market\s*&\s*Business)[\)\]:]?\s*(.*)/i);
-                        const techMatch = cleanLine.match(/[\(\[]?(?:Tech|Technology\s*Frontier|Tech\s*&\s*Product)[\)\]:]?\s*(.*)/i);
-                        const compMatch = cleanLine.match(/[\(\[]?(?:Comp|Competitive\s*Edge|Competitive\s*Landscape|Competitive\s*Position)[\)\]:]?\s*(.*)/i);
-                        const policyMatch = cleanLine.match(/[\(\[]?(?:Policy|Regulation|Policy\s*&\s*Regulation)[\)\]:]?\s*(.*)/i);
+                        // By replacing the matched prefix completely, we avoid capturing partial tags.
+                        const marketRegex = /^-\s*\[(?:Market|Market\s*&\s*CapEx|Market\s*&\s*Business)\]\s*(.*)/i;
+                        const techRegex = /^-\s*\[(?:Tech|Technology\s*Frontier|Tech\s*&\s*Product)\]\s*(.*)/i;
+                        const compRegex = /^-\s*\[(?:Comp|Competitive\s*Edge|Competitive\s*Landscape|Competitive\s*Position)\]\s*(.*)/i;
+                        const policyRegex = /^-\s*\[(?:Policy|Regulation|Policy\s*&\s*Regulation)\]\s*(.*)/i;
 
-                        if (marketMatch && marketMatch[1]) data.implications.market_business.push({ text: marketMatch[1].replace(/^-/, '').trim() });
-                        else if (techMatch && techMatch[1]) data.implications.tech_product.push({ text: techMatch[1].replace(/^-/, '').trim() });
-                        else if (compMatch && compMatch[1]) data.implications.competitive_landscape.push({ text: compMatch[1].replace(/^-/, '').trim() });
-                        else if (policyMatch && policyMatch[1]) data.implications.policy_regulation.push({ text: policyMatch[1].replace(/^-/, '').trim() });
+                        const marketMatch = cleanLine.match(marketRegex);
+                        const techMatch = cleanLine.match(techRegex);
+                        const compMatch = cleanLine.match(compRegex);
+                        const policyMatch = cleanLine.match(policyRegex);
+
+                        if (marketMatch && marketMatch[1]) data.implications.market_business.push({ text: marketMatch[1].trim() });
+                        else if (techMatch && techMatch[1]) data.implications.tech_product.push({ text: techMatch[1].trim() });
+                        else if (compMatch && compMatch[1]) data.implications.competitive_landscape.push({ text: compMatch[1].trim() });
+                        else if (policyMatch && policyMatch[1]) data.implications.policy_regulation.push({ text: policyMatch[1].trim() });
                     });
                 }
 

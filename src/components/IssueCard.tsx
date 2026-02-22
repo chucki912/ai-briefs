@@ -236,6 +236,8 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     margin-bottom: 0.5rem;
                     line-height: 1.35;
                     letter-spacing: -0.02em;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
 
                 .issue-summary {
@@ -245,6 +247,8 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     margin-bottom: 1.5rem;
                     line-height: 1.5;
                     font-weight: 500;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
 
                 .btn-icon-only {
@@ -279,6 +283,8 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     list-style: none;
                     margin-bottom: 2rem;
                     padding: 0;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
 
                 .issue-facts li {
@@ -288,6 +294,8 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     color: var(--text-secondary);
                     font-size: 1rem;
                     line-height: 1.6;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
 
                 .issue-facts li::before {
@@ -329,6 +337,8 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     font-size: 1.05rem;
                     line-height: 1.6;
                     font-weight: 500;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
 
                 .issue-hashtags {

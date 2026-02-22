@@ -1069,6 +1069,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     color: var(--text-primary);
                     line-height: 1.7;
                     font-size: 1rem;
+                    user-select: text;
+                    -webkit-user-select: text;
                 }
                 .markdown-content h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); color: var(--text-primary); }
                 .markdown-content h2 { font-size: 1.2rem; font-weight: 800; margin-top: 2.5rem; margin-bottom: 1.25rem; color: var(--accent-color); border-left: 5px solid var(--accent-color); padding-left: 0.75rem; background: linear-gradient(90deg, var(--bg-body) 0%, transparent 100%); padding-top: 0.5rem; padding-bottom: 0.5rem; border-radius: 0 4px 4px 0; }

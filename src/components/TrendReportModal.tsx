@@ -388,7 +388,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                             } else if (currentState === 'analysis') {
                                 // Extract basis if it exists at the very end of the accumulated analysis text
                                 const parts = currentText.split(/Basis:/i);
-                                const text = parts[0].replace(/\(\s*$/, '').trim();
+                                let text = parts[0].replace(/\(\s*$/, '').trim();
+                                text = text.replace(/-\s*$/, '').trim(); // Remove trailing dash
                                 let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
                                 analysis.push({ text, basis });
                             } else if (currentState === 'linkage') {
@@ -642,8 +643,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         textToCopy += `\n[${d.headline}]\n`;
                         d.facts?.forEach(f => textToCopy += `- (Fact) ${f.text}\n`);
                         d.analysis?.forEach(a => {
-                            const basisSuffix = a.basis ? ` (Basis: ${a.basis})` : '';
-                            textToCopy += `- (Analysis) ${a.text}${basisSuffix}\n`;
+                            const basisSuffix = a.basis ? `(Basis: ${a.basis})` : '';
+                            const analysisLines = a.text.split('\n').map(l => l.trim()).filter(Boolean);
+                            textToCopy += `- (Analysis)\n`;
+                            analysisLines.forEach(line => {
+                                textToCopy += `  ${line}\n`;
+                            });
+                            if (basisSuffix) {
+                                textToCopy += `  - ${basisSuffix}\n`;
+                            }
                         });
                         d.why_it_matters?.forEach(w => textToCopy += `- (Structural Linkage) ${w.text}\n`);
                     });
@@ -815,9 +823,15 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                                 <ul className="report-list">
                                                     {d.facts?.map((f, fi) => <li key={fi}>- (Fact) {f.text}</li>)}
                                                     {d.analysis?.map((a, ai) => (
-                                                        <li key={ai}>
-                                                            - (Analysis) {a.text}
-                                                            {a.basis && <div className="analysis-basis">Basis: {a.basis}</div>}
+                                                        <li key={ai} style={{ marginBottom: '8px' }}>
+                                                            <div style={{ fontWeight: 600, marginBottom: '4px' }}>- (Analysis)</div>
+                                                            <div style={{ paddingLeft: '1rem' }}>
+                                                                {a.text.split('\n').map((line, idx) => {
+                                                                    const trimmed = line.trim();
+                                                                    return trimmed ? <div key={idx} style={{ marginBottom: '2px' }}>{trimmed}</div> : null;
+                                                                })}
+                                                            </div>
+                                                            {a.basis && <div className="analysis-basis" style={{ marginTop: '4px' }}>Basis: {a.basis}</div>}
                                                         </li>
                                                     ))}
                                                     {d.why_it_matters?.map((w, wi) => <li key={wi}>- (Why) {w.text}</li>)}

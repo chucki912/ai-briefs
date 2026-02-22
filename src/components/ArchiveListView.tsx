@@ -9,6 +9,7 @@ interface ArchiveListViewProps {
     onToggleSelection: (issue: IssueItem) => void;
     accentColor?: string;
     isSelectionMode: boolean;
+    onIssueClick?: (issue: IssueItem & { date: string; dayOfWeek: string }) => void;
 }
 
 export default function ArchiveListView({
@@ -16,7 +17,8 @@ export default function ArchiveListView({
     selectedIssues,
     onToggleSelection,
     accentColor = 'var(--accent-color)',
-    isSelectionMode
+    isSelectionMode,
+    onIssueClick
 }: ArchiveListViewProps) {
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -71,7 +73,13 @@ export default function ArchiveListView({
                         <div
                             key={`${issue.date}-${idx}`}
                             className={`headline-item ${isIssueSelected(issue.headline) ? 'selected' : ''}`}
-                            onClick={() => isSelectionMode && onToggleSelection(issue)}
+                            onClick={() => {
+                                if (isSelectionMode) {
+                                    onToggleSelection(issue);
+                                } else if (onIssueClick) {
+                                    onIssueClick(issue);
+                                }
+                            }}
                         >
                             {isSelectionMode && (
                                 <div className="checkbox-section">

@@ -466,6 +466,7 @@ export default function ArchivePage() {
                                     selectedIssues={selectedIssues}
                                     onToggleSelection={toggleIssueSelection}
                                     isSelectionMode={isSelectionMode}
+                                    onIssueClick={(issue) => loadBriefDetail(issue.date)}
                                 />
                             )
                         ) : (

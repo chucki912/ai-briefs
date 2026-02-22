@@ -470,6 +470,7 @@ export default function BatteryArchivePage() {
                                     onToggleSelection={toggleIssueSelection}
                                     accentColor="#22c55e"
                                     isSelectionMode={isSelectionMode}
+                                    onIssueClick={(issue) => loadBriefDetail(issue.date)}
                                 />
                             )
                         ) : (

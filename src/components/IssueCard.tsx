@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { logger } from '@/lib/logger';
 import { IssueItem } from '@/types';
 import { useBriefCart } from '@/contexts/BriefCartContext';
@@ -30,6 +31,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
     const { isAdmin } = useAuth();
     const { addToCart, removeFromCart, isInCart } = useBriefCart();
     const inCart = isInCart(issue.headline);
+    const [isCopied, setIsCopied] = useState(false);
 
     const handleCartToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -48,6 +50,34 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
         }
     };
 
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        const factsText = issue.keyFacts.map(fact => `- ${fact}`).join('\n');
+        const tagsText = issue.hashtags ? issue.hashtags.map(tag => `#${tag}`).join(' ') : '';
+        const sourcesText = issue.sources.map(source => `- ${source}`).join('\n');
+
+        const contentToCopy = `[${issue.category || issue.framework || 'Issue'}] ${issue.headline}
+${issue.oneLineSummary ? `\n> ${issue.oneLineSummary}\n` : ''}
+■ Key Facts
+${factsText}
+
+■ Strategic Insight
+${issue.insight}
+${tagsText ? `\n${tagsText}` : ''}
+
+■ Sources
+${sourcesText}`;
+
+        navigator.clipboard.writeText(contentToCopy).then(() => {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+            alert('클립보드 복사에 실패했습니다.');
+        });
+    };
+
     return (
         <article
             className={`issue-card animate-in ${isSelectionMode ? 'selection-mode' : ''} ${isSelected ? 'selected' : ''}`}
@@ -63,6 +93,13 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
                     <span className="issue-number">ISSUE {index + 1}</span>
                 </div>
                 <div className="actions-group" style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        className={`btn-icon-only ${isCopied ? 'copied' : ''}`}
+                        onClick={handleCopy}
+                        title="이 브리프 내용 복사하기"
+                    >
+                        {isCopied ? "✓" : "📋"}
+                    </button>
                     <button
                         className={`btn-icon-only ${inCart ? 'active' : ''}`}
                         onClick={handleCartToggle}

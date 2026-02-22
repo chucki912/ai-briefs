@@ -155,7 +155,7 @@ ${expert.reasoning}
 3) **Source Extension**: 기존 브리프 소스 외에 최소 3~5개의 새로운 고품질 글로벌 소스를 추가하여 분석의 객관성을 확보하십시오.
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. [Top Strategic Signal]을 [Signal]로 축약하는 것을 금지합니다. 정확히 그대로 출력하십시오.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
-6) **Minimum Depth**: [Strategic Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 (Basis: 근거)를 명시할 것.
+6) **Expert Analytical Basis**: [Strategic Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 \`(Basis: 파괴적 혁신, 전환비용, 네트워크 효과, 규모의 경제 등 실제 검증된 경영 / 경제 프레임워크 적용 내용)\`을 명시할 것. 단순 텍스트("구조적 분석 기반") 등 플레이스홀더 사용 절대 금지.
 7) **Professional Tone**: **모든 출력 텍스트는 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
@@ -183,7 +183,7 @@ ${expert.reasoning}
 
     #### Key Developments & Context
     - **[Fact]** <검색된 팩트 — 수치, 날짜, 기업명 필수>
-    - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <분석 근거 프레임워크 또는 유사 사례>)
+    - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <ex.파괴적 혁신 모델에 따른 후발주자 진입 장벽 약화 분석>)
     - **[Structural Linkage]** <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
 
 ## ■ Second-Order Economic Insights

@@ -233,7 +233,7 @@ export async function generateBatteryTrendReport(
 3) **Source Expansion**: 'ISSUE_URLS' 외에 최소 3개 이상의 고품질 해외 신규 소스(IR 자료, 전문 리포트, 글로벌 테크 미디어)를 확보하십시오.
 4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. 정확히 그대로 출력할 것.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
-6) **Minimum Depth**: [Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 (Basis: 근거)를 명시할 것.
+6) **Expert Analytical Basis**: [Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 '(Basis: 파괴적 혁신, 전환비용, 네트워크 효과, 규모의 경제 등 실제 검증된 경영/경제 프레임워크 적용 내용)'을 명시할 것. 단순 텍스트("구조적 분석 기반") 등 플레이스홀더 사용 절대 금지.
 7) **Professional Tone**: **모든 문장을 철저하게 명사형 종결어미(~함, ~임, ~전망 등)로 끝나는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
@@ -256,11 +256,11 @@ export async function generateBatteryTrendReport(
 ## ■ Key Developments (Strategic Analysis)
 ### <핵심 사건 1>
 - [Fact] <검색된 구체적 사실 (GWh, 제조원가, 스펙 필수)>
-- [Analysis] <이 사건이 숨기고 있는 전략적 의도와 시장 영향력을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <사용한 분석 프레임워크>)
+- [Analysis] <이 사건이 숨기고 있는 전략적 의도와 시장 영향력을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <ex.파괴적 혁신 모델에 따른 후발주자 진입 장벽 약화 분석>)
 
 ### <핵심 사건 2>
 - [Fact] <검색된 팩트>
-- [Analysis] <이 사실이 촉발할 2차 파급 효과를 2~3개의 하위 블릿으로 개조식 분석> (Basis: <근거>)
+- [Analysis] <이 사실이 촉발할 2차 파급 효과를 2~3개의 하위 블릿으로 개조식 분석> (Basis: <ex.네트워크 효과에 의한 경쟁사 진입 차단 현상 분석>)
 
 ## ■ Cost & Technology Dynamics
 ### <테마명>

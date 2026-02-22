@@ -392,7 +392,8 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 const analysisText = analysisMatch[1].trim();
                                 const parts = analysisText.split(/Basis:/i);
                                 const text = parts[0].replace(/\(\s*$/, '').trim();
-                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '구조적 분석 기반';
+                                // 기본값을 고정된 '구조적 분석 기반' 대신 의미 있는 문맥 연결을 유도하거나 아예 비워서 UI에서 가리기
+                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
                                 analysis.push({ text, basis });
                             } else if (linkageMatch) {
                                 // For linkage, prioritize text after the tag, fallback to cleanLine if match is empty
@@ -613,7 +614,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     parsedReport.key_developments.forEach(d => {
                         textToCopy += `\n[${d.headline}]\n`;
                         d.facts?.forEach(f => textToCopy += `- (Fact) ${f.text}\n`);
-                        d.analysis?.forEach(a => textToCopy += `- (Analysis) ${a.text} (Basis: ${a.basis})\n`);
+                        d.analysis?.forEach(a => {
+                            const basisSuffix = a.basis ? ` (Basis: ${a.basis})` : '';
+                            textToCopy += `- (Analysis) ${a.text}${basisSuffix}\n`;
+                        });
                         d.why_it_matters?.forEach(w => textToCopy += `- (Structural Linkage) ${w.text}\n`);
                     });
                 }
@@ -786,7 +790,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                                     {d.analysis?.map((a, ai) => (
                                                         <li key={ai}>
                                                             - (Analysis) {a.text}
-                                                            <div className="analysis-basis">Basis: {a.basis}</div>
+                                                            {a.basis && <div className="analysis-basis">Basis: {a.basis}</div>}
                                                         </li>
                                                     ))}
                                                     {d.why_it_matters?.map((w, wi) => <li key={wi}>- (Why) {w.text}</li>)}

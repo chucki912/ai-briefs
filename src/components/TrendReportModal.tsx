@@ -390,7 +390,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 const parts = currentText.split(/Basis:/i);
                                 let text = parts[0].replace(/\(\s*$/, '').trim();
                                 text = text.replace(/-\s*$/, '').trim(); // Remove trailing dash
-                                let basis = parts[1] ? parts[1].replace(/\).*$/, '').trim() : '';
+                                let basis = parts[1] ? parts[1].replace(/\)\s*$/, '').trim() : '';
                                 analysis.push({ text, basis });
                             } else if (currentState === 'linkage') {
                                 why_it_matters.push({ text: currentText.trim() });

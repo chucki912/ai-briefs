@@ -260,6 +260,8 @@ export default function ArchiveListView({
                     margin: 0;
                     line-height: 1.4;
                     color: var(--text-primary);
+                    word-wrap: break-word;
+                    word-break: keep-all;
                 }
                 .headline-footer {
                     display: flex;
@@ -269,6 +271,7 @@ export default function ArchiveListView({
                     font-size: 0.7rem;
                     color: var(--text-muted);
                     font-weight: 600;
+                    word-break: break-all;
                 }
 
                 .no-results {

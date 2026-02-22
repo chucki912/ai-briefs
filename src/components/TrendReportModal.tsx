@@ -451,15 +451,35 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                         const themeName = lines[0].replace(/\[|\]/g, '').trim();
                         const drivers: any[] = [];
 
+                        let currentDriverState = 'none';
+                        let currentDriverText = '';
+
+                        const saveDriverState = () => {
+                            if (!currentDriverText.trim()) return;
+                            drivers.push({ text: currentDriverText.trim() });
+                            currentDriverText = '';
+                        };
+
                         lines.slice(1).forEach(line => {
                             const cleanLine = line.replace(/\*\*/g, '').trim();
-                            const driverMatch = cleanLine.match(/[\(\[]?(?:Primary\s+)?Driver[\)\]:]?|[\(\[]?Ripple\s+Effects[\)\]:]?|[\(\[]?Context[\)\]:]?|[\(\[]?Cost\/Efficiency\s+Logic[\)\]:]?|[\(\[]?Competitive\s+Position[\)\]:]?/i);
-                            if (driverMatch) {
-                                drivers.push({ text: cleanLine.replace(/[\(\[]?(?:Primary\s+)?Driver[\)\]:]?|[\(\[]?Ripple\s+Effects[\)\]:]?|[\(\[]?Context[\)\]:]?|[\(\[]?Cost\/Efficiency\s+Logic[\)\]:]?|[\(\[]?Competitive\s+Position[\)\]:]?/gi, '').replace(/^[-\s]*/, '').trim() });
+
+                            // Check for transition to a new driver/context bullet
+                            const isDriverHeader = cleanLine.match(/^(?:-\s*)?[\(\[]?(?:(?:Primary\s+)?Driver|Ripple\s+Effects|Context|Cost\/Efficiency\s+Logic|Competitive\s+Position)[\)\]:]?(.*)/i);
+
+                            if (isDriverHeader) {
+                                saveDriverState();
+                                currentDriverState = 'driver';
+                                currentDriverText = isDriverHeader[1] ? isDriverHeader[1].trim() : '';
+                            } else if (cleanLine) {
+                                if (currentDriverState !== 'none') {
+                                    currentDriverText += (currentDriverText ? '\n' + cleanLine : cleanLine);
+                                }
                             }
                         });
 
-                        if (themeName) {
+                        saveDriverState();
+
+                        if (themeName && drivers.length > 0) {
                             data.themes.push({ theme: themeName, drivers });
                         }
                     });
@@ -663,11 +683,16 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     });
                 }
 
-                if (parsedReport.themes?.length) {
-                    textToCopy += `\n■ Core Themes\n`;
+                if (parsedReport.themes?.length > 0) {
+                    textToCopy += `\n■ ${weeklyMode ? 'Second-Order Economic Insights' : 'Core Themes'}\n`;
                     parsedReport.themes.forEach(t => {
                         textToCopy += `\n[${t.theme}]\n`;
-                        t.drivers?.forEach(d => textToCopy += `- (Driver) ${d.text}\n`);
+                        t.drivers?.forEach(d => {
+                            const driverLines = d.text.split('\n').map(l => l.trim()).filter(Boolean);
+                            driverLines.forEach((line, idx) => {
+                                textToCopy += idx === 0 ? `- ${line}\n` : `  ${line}\n`;
+                            });
+                        });
                     });
                 }
 
@@ -850,9 +875,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                         <h2 className="section-title">{weeklyMode ? '■ Second-Order Economic Insights' : '■ Core Themes'}</h2>
                                         {parsedReport.themes?.map((t, i) => (
                                             <div key={i} className="theme-item">
-                                                <h4>#{t.theme}</h4>
+                                                <h3 className="theme-headline">[{t.theme}]</h3>
                                                 <ul className="report-list">
-                                                    {t.drivers?.map((d, di) => <li key={di}>{d.text}</li>)}
+                                                    {t.drivers?.map((d, di) => (
+                                                        <li key={di} style={{ marginBottom: '8px' }}>
+                                                            <div style={{ paddingLeft: '0.5rem' }}>
+                                                                {d.text.split('\n').map((line, idx) => {
+                                                                    const trimmed = line.trim();
+                                                                    return trimmed ? <div key={idx} style={{ marginBottom: '2px' }}>{idx === 0 ? `- ${trimmed}` : trimmed}</div> : null;
+                                                                })}
+                                                            </div>
+                                                        </li>
+                                                    ))}
                                                 </ul>
                                             </div>
                                         ))}

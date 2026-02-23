@@ -249,11 +249,11 @@ export default function BatteryArchivePage() {
         <div className="container">
             {/* Header - Battery Theme */}
             <header className="header">
-                <Link href="/battery" className="logo" style={{ color: '#22c55e' }}>
+                <Link href={isAdmin ? "/battery?admin=true" : "/battery"} className="logo" style={{ color: '#22c55e' }}>
                     🔋 Battery Daily Brief
                 </Link>
                 <nav className="nav">
-                    <Link href="/battery" className="nav-link">
+                    <Link href={isAdmin ? "/battery?admin=true" : "/battery"} className="nav-link">
                         오늘의 브리핑
                     </Link>
                     <ThemeToggle />

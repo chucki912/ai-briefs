@@ -114,7 +114,7 @@ export default function BatteryBriefPage() {
                     🔋 Battery Daily Brief
                 </div>
                 <nav className="nav">
-                    <Link href="/battery/archive" className="nav-link">
+                    <Link href={isAdmin ? "/battery/archive?admin=true" : "/battery/archive"} className="nav-link">
                         아카이브
                     </Link>
                     <ThemeToggle />

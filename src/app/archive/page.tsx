@@ -8,6 +8,7 @@ import TrendReportModal from '@/components/TrendReportModal';
 import ManualSourceInput from '@/components/ManualSourceInput';
 import ArchiveListView from '@/components/ArchiveListView';
 import { BriefReport, IssueItem } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BriefSummary {
     id: string;
@@ -19,6 +20,7 @@ interface BriefSummary {
 }
 
 export default function ArchivePage() {
+    const { isAdmin } = useAuth();
     const [briefs, setBriefs] = useState<BriefSummary[]>([]);
     const [selectedBrief, setSelectedBrief] = useState<BriefReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -253,7 +255,7 @@ export default function ArchivePage() {
                     🤖 AI Daily Brief
                 </Link>
                 <nav className="nav">
-                    <Link href="/" className="nav-link">
+                    <Link href={isAdmin ? "/?admin=true" : "/"} className="nav-link">
                         오늘의 브리핑
                     </Link>
                     <ThemeToggle />
@@ -378,19 +380,6 @@ export default function ArchivePage() {
                                     >
                                         <span className="icon">←</span> 전체 목록
                                     </button>
-
-                                    {selectedBrief.date === new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) && (
-                                        <button
-                                            className="delete-button"
-                                            onClick={() => {
-                                                if (confirm('정말로 이 브리핑을 삭제하시겠습니까?')) {
-                                                    handleDelete(selectedBrief.date);
-                                                }
-                                            }}
-                                        >
-                                            🗑️ 삭제
-                                        </button>
-                                    )}
                                 </div>
 
                                 {/* Brief Detail */}

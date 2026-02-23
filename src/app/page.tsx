@@ -113,7 +113,7 @@ export default function HomePage() {
             🤖 AI Daily Brief
           </Link>
           <nav className="nav">
-            <Link href="/archive" className="nav-link">
+            <Link href={isAdmin ? "/archive?admin=true" : "/archive"} className="nav-link">
               아카이브
             </Link>
             <ThemeToggle />

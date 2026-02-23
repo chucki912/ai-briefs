@@ -137,16 +137,19 @@ export default function HomePage() {
                       <span className="calendar-icon">📅</span>
                       {brief.date.split('-')[0]}년 {brief.date.split('-')[1]}월 {brief.date.split('-')[2]}일
                     </div>
+                    {/* 주간 트렌드 리포트 버튼 숨김 처리
                     {isAdmin && (
                       <button
                         className="weekly-report-btn-top"
                         onClick={handleWeeklyReport}
-                        disabled={reportLoading}
+                        disabled={true}
+                        title="현재 비활성화 상태입니다"
                       >
                         <span>📊</span>
-                        주간 트렌드 리포트
+                        주간 트렌드 리포트 (준비중)
                       </button>
                     )}
+                    */}
                   </div>
                   <h1 className="hero-title">
                     AI Daily <span className="highlight">Intelligence</span>

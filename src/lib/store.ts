@@ -260,7 +260,7 @@ class VercelKvStorage implements StorageAdapter {
 
         try {
             // Fetch all briefs in parallel
-            const keys = dates.map(date => `brief:${date}`);
+            const keys = dates.map(date => `aib:brief:${date}`);
             const briefs = await kv.mget<BriefReport[]>(...keys);
 
             return briefs
@@ -283,7 +283,7 @@ class VercelKvStorage implements StorageAdapter {
         }
 
         try {
-            const keys = dates.map(date => `brief:${date}`);
+            const keys = dates.map(date => `aib:brief:${date}`);
             // Vercel KV mget limits might apply, but for typical ranges (30 days) it should be fine.
             const briefs = await kv.mget<BriefReport[]>(...keys);
 
@@ -298,20 +298,20 @@ class VercelKvStorage implements StorageAdapter {
 
     async saveBrief(report: BriefReport): Promise<void> {
         // 개별 브리핑 저장 (90일 유지: 60s * 60m * 24h * 90d = 7776000)
-        await kv.set(`brief:${report.date}`, report, { ex: 7776000 });
+        await kv.set(`aib:brief:${report.date}`, report, { ex: 7776000 });
 
         // 날짜 인덱싱을 위한 Sorted Set 업데이트 (정렬 및 목록 조회용)
         const timestamp = new Date(report.date).getTime();
-        await kv.zadd('briefs_index', { score: timestamp, member: report.date });
+        await kv.zadd('aib:briefs_index', { score: timestamp, member: report.date });
         console.log(`[KV Store] 브리핑 저장 완료(90일 보관): ${report.date}`);
     }
 
     async getBriefByDate(date: string): Promise<BriefReport | null> {
-        return await kv.get<BriefReport>(`brief:${date}`);
+        return await kv.get<BriefReport>(`aib:brief:${date}`);
     }
 
     async getLatestBrief(): Promise<BriefReport | null> {
-        const dates = await kv.zrange('briefs_index', 0, 0, { rev: true });
+        const dates = await kv.zrange('aib:briefs_index', 0, 0, { rev: true });
         if (dates.length === 0) return null;
 
         const latestDate = dates[0] as string;
@@ -319,10 +319,10 @@ class VercelKvStorage implements StorageAdapter {
     }
 
     async getAllBriefs(limit = 30): Promise<BriefReport[]> {
-        const dates = await kv.zrange('briefs_index', 0, limit - 1, { rev: true });
+        const dates = await kv.zrange('aib:briefs_index', 0, limit - 1, { rev: true });
         if (dates.length === 0) return [];
 
-        const keys = dates.map(date => `brief:${date}`);
+        const keys = dates.map(date => `aib:brief:${date}`);
         if (keys.length === 0) return [];
 
         const briefs = await kv.mget<BriefReport[]>(...keys);
@@ -331,8 +331,8 @@ class VercelKvStorage implements StorageAdapter {
 
     async deleteBrief(date: string): Promise<boolean> {
         try {
-            await kv.del(`brief:${date}`);
-            await kv.zrem('briefs_index', date);
+            await kv.del(`aib:brief:${date}`);
+            await kv.zrem('aib:briefs_index', date);
             console.log(`[KV Store] 브리핑 삭제 완료: ${date}`);
             return true;
         } catch (error) {
@@ -343,25 +343,25 @@ class VercelKvStorage implements StorageAdapter {
 
     async kvSet(key: string, value: any, ttlSeconds?: number): Promise<void> {
         const opts = ttlSeconds ? { ex: ttlSeconds } : {};
-        await kv.set(key, value, opts);
+        await kv.set(`aib:kv:${key}`, value, opts);
     }
 
     async kvGet<T>(key: string): Promise<T | null> {
-        return await kv.get<T>(key);
+        return await kv.get<T>(`aib:kv:${key}`);
     }
 
     async saveLog(log: ActivityLog): Promise<void> {
         // 1. 로그 상세 저장 (30일 보관)
-        const key = `log:${log.timestamp}:${log.id}`;
+        const key = `aib:log:${log.timestamp}:${log.id}`;
         await kv.set(key, log, { ex: 2592000 }); // 30 days
 
         // 2. 인덱싱 (Timestamp Score)
-        await kv.zadd('logs_index', { score: log.timestamp, member: key });
+        await kv.zadd('aib:logs_index', { score: log.timestamp, member: key });
     }
 
     async getLogs(limit = 100): Promise<ActivityLog[]> {
         // 최신순 조회
-        const keys = await kv.zrange('logs_index', 0, limit - 1, { rev: true });
+        const keys = await kv.zrange('aib:logs_index', 0, limit - 1, { rev: true });
         if (keys.length === 0) return [];
 
         // MGET으로 로그 상세 조회 (string[]으로 반환됨을 고려)
@@ -510,7 +510,7 @@ class RedisStorage implements StorageAdapter {
         }
 
         try {
-            const keys = dates.map(date => `brief:${date}`);
+            const keys = dates.map(date => `aib:brief:${date}`);
             const results = await client.mGet(keys);
 
             return results
@@ -536,7 +536,7 @@ class RedisStorage implements StorageAdapter {
         }
 
         try {
-            const keys = dates.map(date => `brief:${date}`);
+            const keys = dates.map(date => `aib:brief:${date}`);
             const results = await client.mGet(keys);
 
             return results
@@ -551,31 +551,31 @@ class RedisStorage implements StorageAdapter {
 
     async saveBrief(report: BriefReport): Promise<void> {
         const client = await this.clientPromise;
-        await client.set(`brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
+        await client.set(`aib:brief:${report.date}`, JSON.stringify(report), { EX: 7776000 });
         const timestamp = new Date(report.date).getTime();
-        await client.zAdd('briefs_index', { score: timestamp, value: report.date });
+        await client.zAdd('aib:briefs_index', { score: timestamp, value: report.date });
         console.log(`[Redis] 브리핑 저장 완료: ${report.date}`);
     }
 
     async getBriefByDate(date: string): Promise<BriefReport | null> {
         const client = await this.clientPromise;
-        const data = await client.get(`brief:${date}`);
+        const data = await client.get(`aib:brief:${date}`);
         return data ? JSON.parse(data) : null;
     }
 
     async getLatestBrief(): Promise<BriefReport | null> {
         const client = await this.clientPromise;
-        const list = await client.zRange('briefs_index', 0, 0, { REV: true });
+        const list = await client.zRange('aib:briefs_index', 0, 0, { REV: true });
         if (list.length === 0) return null;
         return this.getBriefByDate(list[0]);
     }
 
     async getAllBriefs(limit = 30): Promise<BriefReport[]> {
         const client = await this.clientPromise;
-        const dates = await client.zRange('briefs_index', 0, limit - 1, { REV: true });
+        const dates = await client.zRange('aib:briefs_index', 0, limit - 1, { REV: true });
         if (dates.length === 0) return [];
 
-        const keys = dates.map(date => `brief:${date}`);
+        const keys = dates.map(date => `aib:brief:${date}`);
         if (keys.length === 0) return [];
 
         const results = await client.mGet(keys);
@@ -587,8 +587,8 @@ class RedisStorage implements StorageAdapter {
     async deleteBrief(date: string): Promise<boolean> {
         const client = await this.clientPromise;
         try {
-            await client.del(`brief:${date}`);
-            await client.zRem('briefs_index', date);
+            await client.del(`aib:brief:${date}`);
+            await client.zRem('aib:briefs_index', date);
             console.log(`[Redis] 브리핑 삭제 완료: ${date}`);
             return true;
         } catch (error) {
@@ -602,29 +602,29 @@ class RedisStorage implements StorageAdapter {
         const opts = ttlSeconds ? { EX: ttlSeconds } : {};
         // Redis는 객체를 문자열로 직렬화해야 함
         const stringVal = JSON.stringify(value);
-        await client.set(key, stringVal, opts);
+        await client.set(`aib:kv:${key}`, stringVal, opts);
     }
 
     async kvGet<T>(key: string): Promise<T | null> {
         const client = await this.clientPromise;
-        const data = await client.get(key);
+        const data = await client.get(`aib:kv:${key}`);
         return data ? JSON.parse(data) as T : null;
     }
 
     async saveLog(log: ActivityLog): Promise<void> {
         const client = await this.clientPromise;
-        const key = `log:${log.timestamp}:${log.id}`;
+        const key = `aib:log:${log.timestamp}:${log.id}`;
 
         // Transaction to ensure atomicity
         await client.multi()
             .set(key, JSON.stringify(log), { EX: 2592000 }) // 30 days
-            .zAdd('logs_index', { score: log.timestamp, value: key })
+            .zAdd('aib:logs_index', { score: log.timestamp, value: key })
             .exec();
     }
 
     async getLogs(limit = 100): Promise<ActivityLog[]> {
         const client = await this.clientPromise;
-        const keys = await client.zRange('logs_index', 0, limit - 1, { REV: true });
+        const keys = await client.zRange('aib:logs_index', 0, limit - 1, { REV: true });
         if (keys.length === 0) return [];
 
         const logs = await client.mGet(keys);

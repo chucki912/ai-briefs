@@ -100,6 +100,7 @@ ${sourcesText}`;
                     >
                         {isCopied ? "✓" : "📋"}
                     </button>
+                    {/* 장바구니 버튼 숨김 처리
                     <button
                         className={`btn-icon-only ${inCart ? 'active' : ''}`}
                         onClick={handleCartToggle}
@@ -107,6 +108,7 @@ ${sourcesText}`;
                     >
                         {inCart ? "🛒✓" : "🛒+"}
                     </button>
+                    */}
                     {onDeepDive && isAdmin && (
                         <button
                             className="btn-text-icon"

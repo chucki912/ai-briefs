@@ -11,7 +11,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <AuthProvider>
                 <BriefCartProvider>
                     {children}
-                    <BriefCart />
+                    {/* 장바구니 컴포넌트 숨김 처리 */}
+                    {/* <BriefCart /> */}
                 </BriefCartProvider>
             </AuthProvider>
         </Suspense>

@@ -287,10 +287,11 @@ export default function BatteryArchivePage() {
                                 </button>
                             </div>
 
-                            <div className="weekly-trigger-container">
+                            {/* 주간 배터리 트렌드 분석 버튼 숨김 처리 */}
+                            <div className="weekly-trigger-container" style={{ display: 'none' }}>
                                 {!showWeeklySection ? (
-                                    <button className="weekly-start-btn" onClick={() => setShowWeeklySection(true)}>
-                                        ✨ 주간 배터리 트렌드 분석
+                                    <button className="weekly-start-btn" disabled={true} title="현재 비활성화 상태입니다" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                                        ✨ 주간 배터리 트렌드 분석 (준비중)
                                     </button>
                                 ) : (
                                     <div className="weekly-control-panel card-glow animate-in">
@@ -337,7 +338,7 @@ export default function BatteryArchivePage() {
                     <>
                         {/* Action Toolbar - Persistent in Detail or List View Selection Mode */}
                         {(selectedBrief || (viewMode === 'list' && briefs.length > 0)) && (
-                            <div className="selection-toolbar animate-in">
+                            <div className="selection-toolbar animate-in" style={{ display: 'none' }}>
                                 <button
                                     className={`selection-toggle-btn ${isSelectionMode ? 'active' : ''}`}
                                     onClick={toggleSelectionMode}
@@ -356,7 +357,7 @@ export default function BatteryArchivePage() {
                             </div>
                         )}
 
-                        {/* Manual Source Input Section */}
+                        {/* Manual Source Input Section - Hidden
                         {isSelectionMode && (selectedBrief || viewMode === 'list') && (
                             <ManualSourceInput
                                 manualUrls={manualUrls}
@@ -365,6 +366,7 @@ export default function BatteryArchivePage() {
                                 setManualTexts={setManualTexts}
                             />
                         )}
+                        */}
 
                         {selectedBrief ? (
                             <>

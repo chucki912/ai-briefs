@@ -289,11 +289,11 @@ export default function ArchivePage() {
                                 </button>
                             </div>
 
-                            {/* 주간 트렌드 분석 버튼 숨김 처리 */}
-                            <div className="weekly-trigger-container" style={{ display: 'none' }}>
+                            {/* 주간 트렌드 분석 버튼 */}
+                            <div className="weekly-trigger-container" style={{ display: isAdmin ? 'flex' : 'none' }}>
                                 {!showWeeklySection ? (
-                                    <button className="weekly-start-btn" disabled={true} title="현재 비활성화 상태입니다" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                        ✨ 주간 트렌드 분석 (준비중)
+                                    <button className="weekly-start-btn" onClick={() => setShowWeeklySection(true)}>
+                                        ✨ 주간 트렌드 분석
                                     </button>
                                 ) : (
                                     <div className="weekly-control-panel card-glow animate-in">

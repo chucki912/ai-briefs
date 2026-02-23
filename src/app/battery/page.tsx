@@ -162,18 +162,14 @@ export default function BatteryBriefPage() {
                                     <div className="meta-action-group">
                                         {isAdmin ? (
                                             <div style={{ display: 'flex', gap: '12px' }}>
-                                                {/* 주간 트렌드 리포트 버튼 숨김 처리
                                                 <button
                                                     className="weekly-report-button"
                                                     onClick={handleWeeklyReport}
-                                                    disabled={true}
-                                                    title="현재 비활성화 상태입니다"
                                                     style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}
                                                 >
                                                     <span>📊</span>
-                                                    주간 트렌드 리포트 (준비중)
+                                                    주간 배터리 트렌드 리포트
                                                 </button>
-                                                */}
                                                 <button
                                                     className="regenerate-button"
                                                     onClick={() => generateBrief(true)}

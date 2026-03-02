@@ -122,30 +122,34 @@ ${frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 
 ---
 
-## 브리프 시리즈 컨텍스트 (다수 브리프 생성 시 필수 참조)
+## 브리프 시리즈 컨텍스트
 ${recentContextStr}
 
 ---
 
 ## 출력 형식 (JSON)
+
 {
   "headline": "한국어 헤드라인 (30자 이내)",
   "category": "아래 허용 목록 중 1개 선택",
-  "singleTopicStatement": "이 브리프가 다루는 단일 주제를 1문장으로 명시 (내부 검증용, 50자 이내)",
-  "oneLineSummary": "이슈 전체를 요약하는 한 문장 (100자 이내)",
-  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
+  "singleTopicStatement": "단일 주제 (50자 이내): [기업/이벤트]이 [메커니즘]을 통해 [K-AI에 미치는 영향]",
+  "excludedFacts": ["주제와 무관하여 제외한 사실 1", "제외한 사실 2"],
   "keyFacts": [
-    "핵심 사실 1 (singleTopicStatement에 직접 기여하는 사실만, 구체적 수치/기업명 포함)",
-    "핵심 사실 2 (singleTopicStatement에 직접 기여하는 사실만)",
-    "핵심 사실 3 (singleTopicStatement에 직접 기여하는 사실만)"
+    "Fact1 | 메커니즘: [singleTopicStatement의 메커니즘과 동일한지 명시]",
+    "Fact2 | 메커니즘: [동일 확인]",
+    "Fact3 | 메커니즘: [동일 확인]"
   ],
-  "insight": "위 3가지 핵심 사실을 종합하여, 한국 AI 산업(K-AI) 생태계에 미치는 파급 효과와 전략적 시사점을 적용 분석 프레임워크에 맞춰 도출한 심층 인사이트 (공백 포함 300자 내외)",
+  "prescriptionLevel": "전략 / 전술 / 실행 중 1개",
+  "insight": "위 3가지 핵심 사실을 종합하여 도출한 심층 인사이트...",
+  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
+  "oneLineSummary": "이슈 전체를 요약하는 한 문장 (100자 이내)",
   "relevantSourceIndices": [1, 2]
 }
 
 ---
 
 ## 허용 category 목록 (반드시 아래 중 1개만 선택)
+
 - Platform & Ecosystem
 - Geopolitics & AI Regulation
 - Computing Infrastructure
@@ -157,53 +161,93 @@ ${recentContextStr}
 
 ---
 
+## 작성 절차 (반드시 아래 순서로 실행)
+
+### STEP 1. singleTopicStatement 확정
+다음 템플릿을 채워 단일 주제를 확정하라:
+"[기업/이벤트]이 [구체적 메커니즘]을 통해 [K-AI 생태계에 미치는 구체적 영향]"
+
+예시 ✅: "구글 딥마인드가 수학 추론 능력 고도화를 통해 K-AI의 범용 모델 상한선을 압박함"
+예시 ❌: "구글 딥마인드의 AI 발전과 여러 기술 동향" (메커니즘 없음, 영향 불명확)
+
+### STEP 2. 후보 사실 필터링 (keyFacts 작성 전 필수 실행)
+뉴스 클러스터에서 사실을 추출하되, 각 사실에 대해 아래 질문에 답하라:
+Q. "이 사실은 STEP 1의 [메커니즘]과 동일한 메커니즘으로 작동하는가?"
+- YES → keyFacts 후보에 포함
+- NO  → excludedFacts에 기록하고 keyFacts에서 완전 배제
+
+**메커니즘 동일성 판단 기준:**
+- ✅ 동일 메커니즘: 같은 인과 경로로 singleTopicStatement를 뒷받침함
+- ❌ 다른 메커니즘: 인상적인 수치이거나 같은 기업 뉴스라도 인과 경로가 다르면 배제
+
+### STEP 3. keyFacts 3개 확정
+- STEP 2 후보군에서만 선택 (후보군 외 사실 진입 금지)
+- 정확히 3개. 후보군이 3개 미만이면 브리프 분리 또는 주제 재설정
+- 출력 시 각 Fact 뒤에 "| 메커니즘: [확인 내용]" 형식으로 동일성 명시
+
+### STEP 4. 처방 레지스트리 조회 (시리즈 컨텍스트가 있을 때 필수)
+브리프 시리즈 컨텍스트의 이전 처방 목록을 확인하고:
+1. 이전 처방과 동일하거나 유사한 처방은 사용 금지
+2. prescriptionLevel을 이전 브리프와 다른 레벨로 설정
+   - 전략(방향 설정) → 전술(구체적 방법) → 실행(즉시 가능한 액션) 순으로 분화
+3. 처방 방향이 같더라도 레벨이 다르면 허용 (단, insight에서 레벨 차이를 명시)
+
+### STEP 5. insight 작성
+아래 3요소를 반드시 포함하되, 단순 나열이 아닌 하나의 논리 흐름으로 서술:
+
+1. **인과 추론**: keyFacts 3개가 만들어내는 메커니즘이 K-AI에 어떤 구조적 압력을 가하는가
+2. **위협/기회 판정**: Naver, Kakao, SKT, LG 등 기업을 명시하여 구체적 영향 서술
+3. **처방**: prescriptionLevel에 맞는 실행 가능한 방향 1개
+   - 전략 레벨: "어떤 시장에서 싸울 것인가"
+   - 전술 레벨: "어떤 방식으로 싸울 것인가"
+   - 실행 레벨: "지금 당장 무엇을 해야 하는가"
+
+추가 조건:
+- 적용 분석 프레임워크의 핵심 개념어를 최소 1회 명시 사용
+- 시리즈 처방 충돌 시 말미에 "(※ trade-off: [이전 브리프 헤드라인])" 명시
+- 분량: 공백 포함 300자 내외
+- 감정적 표현 배제, 개조식 축약 문체 유지
+
+---
+
 ## 작성 규칙
 
 ### [규칙 1] 문체
-- 100% 한국어 (기업명·전문용어는 영문 병기)
-- 모든 출력 항목은 **개조식 축약 문체**로 작성 (명사형 종결어미: ~함, ~임, ~전망)
-- 서술형 종결어미 완전 배제 (~합니다, ~입니다, ~했다)
+- 100% 한국어 (기업명·전문용어 영문 병기)
+- 전 항목 개조식 축약 문체 (명사형 종결: ~함, ~임, ~전망)
+- 서술형 종결어미 완전 배제
 
-### [규칙 2] 단일 주제 통제 (P1 수정)
-- **브리프 1개 = 주제 1개**. 주제의 범위 기준은 다음을 따름:
-  - ✅ 허용: 하나의 기업·이벤트·정책이 하나의 메커니즘(경쟁/규제/투자 등)에 미치는 영향
-  - ❌ 금지: 서로 다른 기업의 동향을 병렬 나열 / 서로 다른 메커니즘을 하나의 브리프에 혼합
-- **\`singleTopicStatement\`를 먼저 확정한 후**, keyFacts와 insight를 작성할 것
-- keyFacts 3개는 반드시 \`singleTopicStatement\`를 입증하거나 구성하는 사실만 선별. 주제와 직접 연결되지 않는 사실은 수치가 인상적이더라도 배제할 것
+### [규칙 2] category 선택
+- 허용 목록 중 1개만 선택
+- singleTopicStatement의 메커니즘과 가장 일치하는 카테고리 선택
 
-### [규칙 3] Key Facts 품질 기준 (P1 수정)
-- 정확히 **3개**만 도출 (4개 이상 나열 금지)
-- 각 사실은 독립적이되, 3개가 합산되면 \`singleTopicStatement\`를 완전히 뒷받침하는 구조일 것
-- 수치·기업명·날짜 등 검증 가능한 구체 정보를 반드시 포함
+### [규칙 3] excludedFacts 의무 기재
+- 후보에서 제외한 사실을 반드시 1개 이상 기재
+- 기재 내용이 없으면 필터링 미실행으로 간주하고 STEP 2 재실행
 
-### [규칙 4] Insight 품질 기준 (P2 수정)
-- 분량: 공백 포함 300자 내외
-- **필수 포함 요소 3가지** (순서 자유):
-  1. **인과 추론**: keyFacts 3개가 K-AI 생태계에 미치는 메커니즘 설명 (단순 요약 금지)
-  2. **기회 또는 위협 판정**: Naver, Kakao, SKT, LG 등 구체적 기업을 명시하여 영향 서술
-  3. **전략 처방 1개**: 위협 대응 또는 기회 활용을 위한 실행 가능한 방향 제시 (추상적 권고 금지)
-- **적용 분석 프레임워크의 핵심 개념어를 insight 내 최소 1회 명시적으로 사용**할 것
-- 감정적 표현 배제, 드라이하고 전문적인 톤 유지
-
-### [규칙 5] 분석 프레임워크 적용 검증 (P2 수정)
-- insight 작성 후 다음을 자체 점검할 것:
-  - "적용 분석 프레임워크의 핵심 개념어가 insight에 포함되어 있는가?"
-  - "프레임워크 없이도 동일하게 쓸 수 있는 일반론적 내용이면 재작성"
-
-### [규칙 6] 브리프 시리즈 정합성 (P1 수정)
-- \`브리프 시리즈 컨텍스트\`가 제공된 경우, 이전 브리프들의 insight와 처방이 충돌하지 않는지 확인할 것
-- 이전 브리프와 **전략 처방이 상충할 경우**, insight 말미에 "(※ [이전 브리프 헤드라인]의 처방과 trade-off 관계임)" 형식으로 명시
-- 이전 브리프와 동일한 처방을 반복하지 말 것. 처방의 중복이 불가피한 경우 구체성 수준을 한 단계 낮춰 차별화
-
-### [규칙 7] Sources 연결 기준 (P2 수정)
-- \`relevantSourceIndices\`에는 **keyFacts에 직접 인용된 사실의 출처 기사 번호만** 포함
-- insight 작성에만 참고한 기사는 포함 금지
+### [규칙 4] relevantSourceIndices
+- keyFacts에 직접 인용된 사실의 출처 기사 번호만 포함
+- insight 참고 기사는 포함 금지
 - 정수 배열로만 표기
 
 ---
 
-## 자체 검증 체크리스트 (출력 전 순서대로 확인)
-JSON만 출력하세요.`;
+## 자체 검증 체크리스트 (JSON 출력 전 순서대로 확인)
+[ ] 1. singleTopicStatement가 템플릿 형식을 충족하는가?
+(기업/이벤트 + 구체적 메커니즘 + K-AI 영향 3요소 포함)
+[ ] 2. excludedFacts에 1개 이상 기재되어 있는가?
+(없으면 STEP 2 미실행 — 재실행 필요)
+[ ] 3. keyFacts 각각의 "| 메커니즘:" 표기가 singleTopicStatement의 메커니즘과 동일한가?
+하나라도 다르면 해당 Fact를 excludedFacts로 이동
+[ ] 4. keyFacts가 정확히 3개인가?
+[ ] 5. insight에 인과추론 / 기업 명시 / 처방 3요소가 있는가?
+[ ] 6. insight의 처방이 prescriptionLevel과 일치하는가?
+[ ] 7. 시리즈 컨텍스트가 있을 때, 이전 처방과 레벨이 다른가? (같으면 재작성)
+[ ] 8. 분석 프레임워크 핵심 개념어가 insight에 있는가?
+[ ] 9. category가 허용 목록 내 1개인가?
+[ ] 10. relevantSourceIndices가 keyFacts 출처만 포함하는가?
+
+체크리스트 결과는 출력하지 마세요. JSON만 출력하세요.`;
 
     try {
         const result = await generateWithRetry(model, prompt);
@@ -247,6 +291,8 @@ JSON만 출력하세요.`;
             headline: parsed.headline || parsed.title,
             category: parsed.category,
             singleTopicStatement: parsed.singleTopicStatement,
+            excludedFacts: parsed.excludedFacts || [],
+            prescriptionLevel: parsed.prescriptionLevel,
             oneLineSummary: parsed.oneLineSummary,
             hashtags: parsed.hashtags,
             keyFacts: parsed.keyFacts,

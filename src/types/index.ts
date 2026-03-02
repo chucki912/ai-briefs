@@ -19,6 +19,8 @@ export interface AnalysisFramework {
 export interface IssueItem {
   category?: string;
   singleTopicStatement?: string;
+  excludedFacts?: string[];
+  prescriptionLevel?: string;
   oneLineSummary?: string;
   hashtags?: string[];
   headline: string;

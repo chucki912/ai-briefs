@@ -135,9 +135,9 @@ ${recentContextStr}
   "singleTopicStatement": "단일 주제 (50자 이내): [기업/이벤트]이 [메커니즘]을 통해 [K-AI에 미치는 영향]",
   "excludedFacts": ["주제와 무관하여 제외한 사실 1", "제외한 사실 2"],
   "keyFacts": [
-    "Fact1 | 메커니즘: [singleTopicStatement의 메커니즘과 동일한지 명시]",
-    "Fact2 | 메커니즘: [동일 확인]",
-    "Fact3 | 메커니즘: [동일 확인]"
+    "[추출된 핵심 사실 내용] | 메커니즘: [singleTopicStatement의 메커니즘과 동일한지 명시]",
+    "[추출된 핵심 사실 내용] | 메커니즘: [동일 확인]",
+    "[추출된 핵심 사실 내용] | 메커니즘: [동일 확인]"
   ],
   "prescriptionLevel": "전략 / 전술 / 실행 중 1개",
   "insight": "위 3가지 핵심 사실을 종합하여 도출한 심층 인사이트...",

@@ -6,21 +6,21 @@ export const ANALYSIS_FRAMEWORKS: Record<string, AnalysisFramework> = {
         name: "지정학 및 패권",
         triggers: ["수출통제", "칩 전쟁", "데이터 주권", "탈중국", "디지털 철의 장막",
             "export control", "chip war", "data sovereignty", "decoupling", "China", "US"],
-        insightTemplate: "K-AI 관점에서의 위기/기회/전략적 함의"
+        insightTemplate: "글로벌 지정학적 역학 관계 및 전략적 함의 분석"
     },
 
     structural_shift: {
         name: "산업 구조 및 BM 변화",
         triggers: ["AI 에이전트 경제", "API 경제", "오픈소스 vs 클로즈드", "플랫폼 지배력",
             "agent economy", "API economy", "open source", "closed source", "platform"],
-        insightTemplate: "한국 AI 기업의 포지셔닝 전략 시사점"
+        insightTemplate: "글로벌 핵심 사업자의 포지셔닝 및 비즈니스 모델 시사점"
     },
 
     economic_moat: {
         name: "경제적 해자",
         triggers: ["데이터 락인", "스케일 게임", "생태계 장악", "진입장벽",
             "data moat", "scale", "ecosystem", "barrier", "lock-in"],
-        insightTemplate: "국내 기업의 경쟁력 확보 방안"
+        insightTemplate: "글로벌 경쟁 환경 내 핵심 경쟁 우위 확보 방안"
     },
 
     value_chain: {

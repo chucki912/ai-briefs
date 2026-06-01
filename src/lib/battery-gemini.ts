@@ -380,16 +380,3 @@ async function generateWithRetry(model: any, prompt: string, retries = 3, delay 
     // 모든 재시도 실패 시 마지막 에러 throw
     throw lastError || new Error('Failed to generate content after all retries');
 }
-            const isOverloaded = error.status === 503 || error.message?.includes('overloaded');
-            const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
-
-            if ((isOverloaded || isRateLimit) && i < retries - 1) {
-                console.warn(`[Battery Gemini Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                delay *= 2;
-                continue;
-            }
-            throw error;
-        }
-    }
-}

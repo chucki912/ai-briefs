@@ -174,7 +174,7 @@ export async function generateAggregatedReport(
     `;
 
 
-    try {Pro (Preview) first
+    try {
         // Note: Using Gemini 3 models as per gemini.ts configuration
         console.log(`[Report] Starting generation with model: ${PRO_MODEL}`);
         const model = genAI.getGenerativeModel({ model: PRO_MODEL });
@@ -186,8 +186,7 @@ export async function generateAggregatedReport(
         console.error('[Report] Generation failed with Pro model, trying Fallback:', error);
         // Fallback to Flash if Pro fails
         try {
-            const model = genAI.getGenerativeModel({ model: FLASH_MODEL
-            const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+            const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
             const result = await model.generateContent(prompt);
             return result.response.text();
         } catch (fallbackError) {

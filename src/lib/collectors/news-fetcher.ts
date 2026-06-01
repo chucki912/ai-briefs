@@ -320,8 +320,8 @@ function sortByRelevance(news: NewsItem[]): NewsItem[] {
         return b.publishedAt.getTime() - a.publishedAt.getTime();
     });
 }
- (SHA1 해시의 앞 12자리)
+
+// SHA1 해시의 앞 12자리
 function generateId(url: string): string {
-    return createHash('sha1').update(url).digest('hex').substring(0, 12
-    return Math.abs(hash).toString(36);
+    return createHash('sha1').update(url).digest('hex').substring(0, 12);
 }

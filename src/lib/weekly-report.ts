@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { IssueItem } from '@/types';
+import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -13,7 +14,7 @@ export interface IssueCluster {
 // ─── 1. AI-Driven Issue Clustering ──────────────────────────────────────────
 export async function clusterIssuesByAI(issues: IssueItem[], domain: 'ai' | 'battery' = 'ai'): Promise<IssueCluster[]> {
     if (issues.length === 0) return [];
-
+FLASH_MODEL
     const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
     const issueList = issues.map((issue, idx) =>
@@ -220,7 +221,7 @@ ${expert.reasoning}
 지금 즉시 초격차 주간 전략 분석을 시작하십시오. 검색과 연결이 핵심입니다.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-pro-preview',
+        model: PRO_MODEL,
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });
@@ -255,7 +256,7 @@ ${clusterContext}
         } catch (primaryError: any) {
             console.warn('[Weekly Report] Primary Pro Model failed, trying Fallback Flash Model...', primaryError.message);
             // 2. Fallback Attempt: Flash Model (Faster, more available)
-            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+            const fallbackModel = genAI.getGenerativeModel({ model: FLASH_MODEL });
             result = await generateWithRetry(fallbackModel, userPrompt, 2, 2000);
             isFallback = true;
         }

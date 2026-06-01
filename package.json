@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "generate": "curl -X POST http://localhost:3000/api/generate",
-    "scheduler": "npx tsx scripts/scheduler.ts"
+    "scheduler": "npx tsx scripts/scheduler.ts",
+    "check:gemini": "npx tsx scripts/check-gemini-models.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

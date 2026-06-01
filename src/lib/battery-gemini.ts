@@ -6,13 +6,14 @@ import { NewsItem, IssueItem } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
 import { getRecentIssues } from './store';
 import { checkDuplicateIssues, calculateSimilarity } from './gemini';
+import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // 배터리 뉴스 분석 및 인사이트 생성
 export async function analyzeBatteryNewsAndGenerateInsights(
     newsItems: NewsItem[]
-): Promise<IssueItem[]> {
+): Promise<IssueItem[]> {FLASH_MODEL
     const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
     // 뉴스를 관련 주제별로 클러스터링
@@ -294,7 +295,7 @@ export async function generateBatteryTrendReport(
 지금 즉시 K-Battery 초격차 전략 분석을 시작하십시오. 검색이 우선입니다.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-pro-preview',
+        model: PRO_MODEL,
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });
@@ -358,10 +359,27 @@ ${issue.sources ? issue.sources.join('\n') : 'URL 없음'}
 
 // Retry 로직
 async function generateWithRetry(model: any, prompt: string, retries = 3, delay = 2000) {
+    let lastError: any;
     for (let i = 0; i < retries; i++) {
         try {
             return await model.generateContent(prompt);
         } catch (error: any) {
+            lastError = error;
+            const isOverloaded = error.status === 503 || error.message?.includes('overloaded');
+            const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
+
+            if ((isOverloaded || isRateLimit) && i < retries - 1) {
+                console.warn(`[Battery Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+                continue;
+            }
+            throw error;
+        }
+    }
+    // 모든 재시도 실패 시 마지막 에러 throw
+    throw lastError || new Error('Failed to generate content after all retries');
+}
             const isOverloaded = error.status === 503 || error.message?.includes('overloaded');
             const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
 

@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NewsItem, IssueItem } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
 import { getRecentIssues } from './store';
+import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 // Gemini API 클라이언트 초기화
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -10,7 +11,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 export async function analyzeNewsAndGenerateInsights(
     newsItems: NewsItem[]
 ): Promise<IssueItem[]> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+    const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
 
     // 뉴스를 관련 주제별로 클러스터링
     const clusters = clusterNewsByTopic(newsItems);
@@ -348,7 +349,7 @@ export async function checkDuplicateIssues(newIssue: IssueItem, history: IssueIt
 // 3. AI 기반 의미론적 유사도 체크 (키워드 매칭이 애매한 경우)
 async function checkSemanticDuplicate(newIssue: IssueItem, oldIssue: IssueItem): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
         const prompt = `
         Compare these two news issues and determine if they describe the exact same core event or announcement. 
         Ignore minor differences in details or perspective.
@@ -392,7 +393,7 @@ export function calculateSimilarity(str1: string, str2: string): number {
 // API 연결 테스트 function
 export async function checkGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
         const result = await model.generateContent('Hello');
         const response = await result.response;
         console.log('[Gemini Connection Test Success]:', response.text().slice(0, 20) + '...');
@@ -406,7 +407,7 @@ export async function checkGeminiConnection(): Promise<boolean> {
 // API 연결 테스트
 export async function testGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
         const result = await model.generateContent('Hello');
         const response = await result.response;
         return !!response.text();
@@ -501,7 +502,7 @@ export async function generateTrendReport(
 지금 즉시 검색을 시작하고, 팩트를 기반으로 리포트를 작성하십시오. 상상하지 말고 검색하십시오.`;
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-pro-preview',
+        model: PRO_MODEL,
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} } as any],
     });
@@ -578,10 +579,12 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
 
 // Helper: Retry logic for API calls
 async function generateWithRetry(model: any, prompt: string | any, retries = 3, delay = 2000) {
+    let lastError: any;
     for (let i = 0; i < retries; i++) {
         try {
             return await model.generateContent(prompt);
         } catch (error: any) {
+            lastError = error;
             const isOverloaded = error.status === 503 || error.message?.includes('overloaded');
             const isRateLimit = error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED');
 
@@ -594,4 +597,6 @@ async function generateWithRetry(model: any, prompt: string | any, retries = 3, 
             throw error;
         }
     }
+    // 모든 재시도 실패 시 마지막 에러 throw
+    throw lastError || new Error('Failed to generate content after all retries');
 }

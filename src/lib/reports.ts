@@ -3,6 +3,7 @@ import { IssueItem } from '@/types';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { getIssuesByDateRange } from './store';
+import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -173,13 +174,10 @@ export async function generateAggregatedReport(
     `;
 
 
-    try {
-        // Try Gemini 3.1 Pro (Preview) first
+    try {Pro (Preview) first
         // Note: Using Gemini 3 models as per gemini.ts configuration
-        let modelName = 'gemini-3.1-pro-preview';
-
-        console.log(`[Report] Starting generation with model: ${modelName}`);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        console.log(`[Report] Starting generation with model: ${PRO_MODEL}`);
+        const model = genAI.getGenerativeModel({ model: PRO_MODEL });
         const result = await model.generateContent(prompt);
         const response = result.response;
         return response.text();
@@ -188,6 +186,7 @@ export async function generateAggregatedReport(
         console.error('[Report] Generation failed with Pro model, trying Fallback:', error);
         // Fallback to Flash if Pro fails
         try {
+            const model = genAI.getGenerativeModel({ model: FLASH_MODEL
             const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
             const result = await model.generateContent(prompt);
             return result.response.text();

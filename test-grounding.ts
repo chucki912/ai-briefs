@@ -1,11 +1,12 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { PRO_MODEL } from './src/lib/gemini-models';
 
 async function testGrounding() {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-    // User explicitly requested gemini-3-pro-preview
-    const modelName = 'gemini-3-pro-preview';
+    // User explicitly requested Pro model
+    const modelName = PRO_MODEL;
 
     console.log(`Testing Google Search Grounding with ${modelName}...`);
 

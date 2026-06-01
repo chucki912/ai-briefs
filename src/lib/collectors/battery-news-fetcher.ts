@@ -3,6 +3,7 @@
 
 import Parser from 'rss-parser';
 import { NewsItem } from '@/types';
+import { createHash } from 'crypto';
 import { BATTERY_CONFIG, getBatterySourceScore, isLGExcluded } from '@/configs/battery';
 
 const parser = new Parser({
@@ -301,10 +302,7 @@ function sortByBatteryRelevance(news: NewsItem[]): NewsItem[] {
     });
 }
 
-// URL에서 고유 ID 생성
+// URL에서 고유 ID 생성 (SHA1 해시의 앞 12자리)
 function generateId(url: string): string {
-    const hash = url.split('').reduce((acc, char) => {
-        return ((acc << 5) - acc) + char.charCodeAt(0);
-    }, 0);
-    return Math.abs(hash).toString(36);
+    return createHash('sha1').update(url).digest('hex').substring(0, 12);
 }

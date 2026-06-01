@@ -1,5 +1,6 @@
 import Parser from 'rss-parser';
 import { NewsItem } from '@/types';
+import { createHash } from 'crypto';
 import {
     RSS_FEEDS,
     PRIMARY_KEYWORDS,
@@ -158,9 +159,13 @@ async function fetchFromBraveSearch(): Promise<NewsItem[]> {
                 let sourceName = 'Brave Search';
                 if (typeof item.source === 'string') {
                     sourceName = item.source;
-                } else if (item.source && typeof item.source === 'object' && 'name' in item.source) {
-                    // @ts-ignore - source might be any
-                    sourceName = item.source.name;
+                } else if (
+                    item.source &&
+                    typeof item.source === 'object' &&
+                    'name' in item.source &&
+                    typeof (item.source as Record<string, unknown>).name === 'string'
+                ) {
+                    sourceName = (item.source as Record<string, unknown>).name as string;
                 } else if (item.meta_url && item.meta_url.hostname) {
                     sourceName = item.meta_url.hostname;
                 }
@@ -315,11 +320,8 @@ function sortByRelevance(news: NewsItem[]): NewsItem[] {
         return b.publishedAt.getTime() - a.publishedAt.getTime();
     });
 }
-
-// URL에서 고유 ID 생성
+ (SHA1 해시의 앞 12자리)
 function generateId(url: string): string {
-    const hash = url.split('').reduce((acc, char) => {
-        return ((acc << 5) - acc) + char.charCodeAt(0);
-    }, 0);
+    return createHash('sha1').update(url).digest('hex').substring(0, 12
     return Math.abs(hash).toString(36);
 }

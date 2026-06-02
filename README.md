@@ -155,6 +155,55 @@ data/
 └── logs/                               # 활동 로그 (로컬)
 ```
 
+## 📰 주간 AI 단신 생성기 (`/weekly-flash`)
+
+LG경영연구원 리서처가 버튼 한 번으로 **최근 1주일 AI 산업 주요 이슈**를 CEO 보고용 단신 메모로 생성·검토·내보내기 하는 내부 도구입니다. 기존 데일리 브리핑(RSS 수집 기반)과 독립된 모듈이며, **실시간 웹 검색(Gemini + Google Search grounding)** 으로 그 자리에서 뉴스를 확보합니다.
+
+### 사용 방법
+
+1. 개발 서버 실행 후 http://localhost:3000/weekly-flash 접속
+2. (선택) 기준일 입력 — 비우면 서버의 오늘 날짜(KST) 사용
+3. 검색 확장 토글 선택 — **D-7**(기본) / **D-14**(보완 확장)
+4. **단신 생성** 클릭 → 단신 3꼭지 + 종합 시사점 카드로 표시
+5. **복사 / Markdown / PDF(인쇄)** 로 내보내기
+
+생성 이력은 브라우저 세션 동안만 React state 로 보관됩니다(서버 DB 미사용).
+
+### 동작 사양 (가드레일)
+
+- **사실성**: 모델이 반환한 출처 링크를 **그대로** 표시하며, 앱이 링크를 생성·보정하지 않습니다. 링크가 없거나 "미확인"인 항목은 **배지**로 표시해 검증을 유도합니다.
+- **정직한 건수**: 선정 기준을 충족하는 뉴스가 3건 미만이면 억지로 채우지 않고 `기준 충족 뉴스 N건` + `[기준 외 확장]` 표기로 정직하게 출력합니다.
+- **API 키 보호**: `GEMINI_API_KEY` 는 서버 라우트(`/api/weekly-flash`)에서만 사용되며 클라이언트 번들에 포함되지 않습니다.
+- 결과 하단 고정 안내: *"본 메모는 자동 생성 초안임. 수치·출처는 발행 전 반드시 원문 확인 필요."*
+
+### 모델 / 검색 도구 설정
+
+| 환경변수 | 설명 | 기본값 |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | (필수) 서버 전용 Gemini API 키 | — |
+| `WEEKLY_FLASH_MODEL` | 단신 생성 모델. grounding(웹 검색) 지원 모델 지정 | `gemini-3.1-pro-preview` |
+
+웹 검색은 Gemini grounding(`tools: [{ googleSearch: {} }]`)으로 수행됩니다.
+
+> 참고: 원본 사양은 Anthropic Messages API의 `web_search` 도구를 전제했으나, 본 프로젝트의 기존 스택과 일관성을 위해 Gemini grounding 으로 구현했습니다(시스템 프롬프트는 사양 전문 그대로 유지).
+
+### 관련 파일
+
+```
+src/app/weekly-flash/page.tsx          # 메인 UI
+src/app/api/weekly-flash/route.ts      # 서버 전용 LLM 호출 (재시도/타임아웃)
+src/lib/weekly-flash/prompt.ts         # 시스템 프롬프트 상수 (사양 전문)
+src/lib/weekly-flash/gemini.ts         # Gemini grounding 호출
+src/lib/weekly-flash/parse.ts          # 메모 텍스트 → 구조화 파서
+src/lib/weekly-flash/export.ts         # 복사 / MD / PDF 내보내기
+src/lib/weekly-flash/types.ts          # 타입 정의
+src/components/weekly-flash/           # FlashCard, SummaryBox, Toolbar, ExportBar, Skeleton
+```
+
+### Vercel 배포
+
+기존 배포와 동일합니다(`vercel --prod` 또는 GitHub 연동). 배포 환경의 **Environment Variables** 에 `GEMINI_API_KEY` (필수)와 `WEEKLY_FLASH_MODEL` (선택)을 등록하면 됩니다. grounding 검색에 시간이 필요하므로 라우트는 `maxDuration = 120` 으로 설정되어 있습니다.
+
 ## 📊 Gemini 모델 설정
 
 프로젝트는 다음 두 가지 Gemini 모델을 사용합니다:

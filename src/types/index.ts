@@ -28,6 +28,12 @@ export interface IssueItem {
   insight: string;
   framework: string;
   sources: string[];
+  soWhat?: {
+    ifTrue: string;
+    uncertain: string;
+    bet: string;
+    downside: string;
+  };
 }
 
 // 브리핑 리포트 타입

@@ -57,6 +57,16 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
         const tagsText = issue.hashtags ? issue.hashtags.map(tag => `#${tag}`).join(' ') : '';
         const sourcesText = issue.sources.map(source => `- ${source}`).join('\n');
 
+        let soWhatText = '';
+        if (issue.soWhat) {
+            soWhatText = `\n■ So What (의사결정 판단)
+- 이 신호가 사실이라면: ${issue.soWhat.ifTrue}
+- 아직 불확실한 것: ${issue.soWhat.uncertain}
+- 합리적 베팅: ${issue.soWhat.bet}
+- 틀렸을 때의 비용: ${issue.soWhat.downside}
+`;
+        }
+
         const contentToCopy = `[${issue.category || issue.framework || 'Issue'}] ${issue.headline}
 ${issue.oneLineSummary ? `\n> ${issue.oneLineSummary}\n` : ''}
 ■ Key Facts
@@ -64,7 +74,7 @@ ${factsText}
 
 ■ Strategic Insight
 ${issue.insight}
-${tagsText ? `\n${tagsText}` : ''}
+${soWhatText}${tagsText ? `\n${tagsText}` : ''}
 
 ■ Sources
 ${sourcesText}`;
@@ -140,6 +150,33 @@ ${sourcesText}`;
                     {issue.insight}
                 </div>
             </div>
+
+            {issue.soWhat && (
+                <div className="so-what-container">
+                    <div className="so-what-header">
+                        <span className="so-what-sparkle">🎯</span>
+                        SO WHAT (의사결정 판단 프레임)
+                    </div>
+                    <div className="so-what-grid">
+                        <div className="so-what-item">
+                            <span className="so-what-label">이 신호가 사실이라면</span>
+                            <p className="so-what-text">{issue.soWhat.ifTrue}</p>
+                        </div>
+                        <div className="so-what-item">
+                            <span className="so-what-label">아직 불확실한 것</span>
+                            <p className="so-what-text">{issue.soWhat.uncertain}</p>
+                        </div>
+                        <div className="so-what-item">
+                            <span className="so-what-label">합리적 베팅</span>
+                            <p className="so-what-text">{issue.soWhat.bet}</p>
+                        </div>
+                        <div className="so-what-item">
+                            <span className="so-what-label">틀렸을 때의 비용</span>
+                            <p className="so-what-text">{issue.soWhat.downside}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {issue.hashtags && issue.hashtags.length > 0 && (
                 <div className="issue-hashtags">
@@ -355,6 +392,65 @@ ${sourcesText}`;
                     color: white;
                     margin-bottom: 2rem;
                     box-shadow: 0 8px 16px -4px rgba(79, 70, 229, 0.3);
+                }
+
+                .so-what-container {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-color);
+                    padding: 1.5rem;
+                    border-radius: 20px;
+                    margin-bottom: 2rem;
+                    box-shadow: var(--shadow-sm);
+                }
+
+                .so-what-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    margin-bottom: 1rem;
+                    letter-spacing: 0.1em;
+                    color: var(--text-primary);
+                }
+
+                .so-what-sparkle {
+                    font-size: 1rem;
+                }
+
+                .so-what-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 1.25rem;
+                }
+
+                .so-what-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+
+                .so-what-label {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    color: var(--accent-color);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .so-what-text {
+                    font-size: 0.95rem;
+                    line-height: 1.5;
+                    color: var(--text-primary);
+                    margin: 0;
+                    font-weight: 500;
+                }
+
+                @media (max-width: 640px) {
+                    .so-what-grid {
+                        grid-template-columns: 1fr;
+                        gap: 1rem;
+                    }
                 }
 
                 .issue-insight-label {

@@ -101,6 +101,10 @@ export async function generateAggregatedReport(
     **"${periodLabel} 종합 심층 리포트"**를 작성해주세요.
 
     ---
+    ### 하우스 스타일 지침 (House Style Guidelines)
+    - **레지스터 구분**: 일일 브리프 카드는 구체적 대응을 담은 처방형(soWhat)이지만, 본 통합 리포트는 산업 흐름을 분석하는 **진단형 리포트**입니다. 직접적인 행동 지시문(Action Item)을 적는 것을 완전히 배제하고, 결정 프레임과 리스크 요인, 폐기 조건을 제시하여 의사결정자를 보조하십시오.
+
+    ---
     ### 분석 대상 데이터
     1. **기존 브리프 이슈 (${issues.length}건)**:
     ${issuesContext}
@@ -114,10 +118,11 @@ export async function generateAggregatedReport(
     ---
     ### Critical Rules
     1) 출력 포맷: 반드시 아래 "OUTPUT TEMPLATE" 그대로 작성.
-    2) Action Item 금지: 행동 지시 문구 작성 금지.
+    2) Action Item 금지: 행동 지시 문구 작성 금지 (예: "~하라", "~를 해야 함" 등 지양).
     3) 사실 검증: 존재하지 않는 사실 창작 금지.
     4) 각 섹션 마커 ■ 기호를 반드시 포함.
     5) 톤앤매너: **모든 문장을 철저하게 명사형 종결어미(~함, ~임, ~전망 등)로 끝나는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
+    6) Mechanism Over Labels: 경영/경제 프레임워크 라벨(예: Basis)을 부착하지 말고 메커니즘을 자연스럽게 문장으로 증명하십시오.
 
     ========================================================
     ## OUTPUT TEMPLATE (이 형식 그대로 출력)
@@ -132,16 +137,16 @@ export async function generateAggregatedReport(
     ## ■ Executive Summary
     - **[Signal]** {핵심 신호 — 이슈들을 관통하는 가장 중요한 변화 신호}
     - **[Change]** {산업 구조 변화 — 이전과 달라진 점}
-    - **[So What]** {전략적 함의 — 왜 주목해야 하는지}
+    - **[So What]** {전략적 함의 — 왜 주목해야 하는지 (결정 관점 제시)}
 
     ## ■ Key Developments
     ### [{핵심 전개 1 제목}]
     - (Fact) {확정 사실}
-    - (Analysis) {2~3개의 하위 블릿으로 개조식 분석} (Basis: {이론/근거} - {설명})
+    - (Analysis) {2~3개의 하위 블릿으로 개조식 분석하며 작동 메커니즘을 설명 (Basis 라벨 기재 금지)}
 
     ### [{핵심 전개 2 제목}]
     - (Fact) {확정 사실}
-    - (Analysis) {2~3개의 하위 블릿으로 개조식 분석} (Basis: {이론/근거} - {설명})
+    - (Analysis) {2~3개의 하위 블릿으로 개조식 분석하며 작동 메커니즘을 설명 (Basis 라벨 기재 금지)}
 
     ## ■ Core Themes
     ### [{테마 1}]
@@ -151,20 +156,21 @@ export async function generateAggregatedReport(
     - (Driver) {메커니즘}
 
     ## ■ Implications
-    - **[Market]** {시장 관점}
-    - **[Tech]** {기술 관점}
-    - **[Comp]** {경쟁 관점}
-    - **[Policy]** {규제 관점}
+    - **[Market]** {사실일 때의 시장 규모, CapEx, 비즈니스 모델 영향과 하방 비용}
+    - **[Tech]** {돌파 가능한 기술적 경로와 잔존하는 불확실성}
+    - **[Comp]** {경쟁사들의 실질적 대응 동향 및 베팅 방향}
+    - **[Policy]** {관련 정책 및 규제 리스크의 트리거 조건}
 
     ## ■ Risks & Uncertainties
-    - **[tech]** {기술 리스크}
-    - **[market]** {시장 리스크}
-    - **[reg]** {규제 리스크}
+    - **[Tech]** {기술적 리스크와 그것이 틀렸을 때의 하방 비용}
+    - **[Market]** {시장 리스크와 판단 유보 요인}
+    - **[Reg]** {규제 리스크와 규제 트리거}
 
     ## ■ Watchlist
     - **{관측 지표 1}**
     (Why) {중요성}
     (How) {모니터링 방법}
+    (폐기 트리거) {이 가정과 논지가 완전히 무너지는 조건 1줄}
 
     ## ■ Sources
     (분석에 사용된 이슈 출처를 기반으로 작성)

@@ -154,9 +154,9 @@ ${expert.reasoning}
 1) **No Mock Data**: 정량적 데이터(%, $, 수주액, CapEx)를 반드시 포함하십시오. 모호한 표현 절대 금지.
 2) **Strategic Coherence**: 리포트 전체가 하나의 일관된 메시지를 향하게 하십시오. "최근 이런 일이 많았다"는 서술은 금지하며, "이러한 흐름이 단일 방향으로 수렴하고 있다"는 통찰을 제시하십시오.
 3) **Source Extension**: 기존 브리프 소스 외에 최소 3~5개의 새로운 고품질 글로벌 소스를 추가하여 분석의 객관성을 확보하십시오.
-4) **Label Precision**: 아래 Output Format의 대괄호 [] 안 레이블은 절대 변경·축약 금지. [Top Strategic Signal]을 [Signal]로 축약하는 것을 금지합니다. 정확히 그대로 출력하십시오.
+4) **Label Precision**: 아래 Output Format of 대괄호 [] 안 레이블은 절대 변경·축약 금지. [Top Strategic Signal]을 [Signal]로 축약하는 것을 금지합니다. 정확히 그대로 출력하십시오.
 5) **No Empty Sections**: 모든 ## ■ 섹션에 반드시 실질적 내용을 포함할 것. 빈 섹션은 절대 금지.
-6) **Expert Analytical Basis**: [Strategic Analysis] 태그 뒤에는 반드시 2~3개의 개조식 하위 블릿(-)을 사용하여 깊이 있게 분석하고, 마지막 부분에 \`(Basis: 파괴적 혁신, 전환비용, 네트워크 효과, 규모의 경제 등 실제 검증된 경영 / 경제 프레임워크 적용 내용)\`을 명시할 것. 단순 텍스트("구조적 분석 기반") 등 플레이스홀더 사용 절대 금지.
+6) **Mechanism Over Labels**: 경영/경제 프레임워크(예: 파괴적 혁신, 전환비용, 네트워크 효과, 규모의 경제 등) 개념 라벨을 기계적으로 부착하는 행위(예: \`(Basis: 네트워크 효과)\`)를 금지합니다. 대신, 해당 효과가 왜 그리고 어떻게 작동하는지 분석 본문의 긴밀한 인과관계 문장을 통해 논리적으로 서술하십시오.
 7) **Professional Tone**: **모든 출력 텍스트는 명사형 종결어미(~함, ~임, ~전망 등)를 사용하는 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 형태의 서술을 절대 금지하며, 하위 블릿(-)을 적극 활용하여 간결하게 작성할 것. 서술어(~습니다, ~한다) 절대 금지.**
 
 ## Output Format
@@ -174,7 +174,7 @@ ${expert.reasoning}
 ## ■ Executive Summary
 - **[Top Strategic Signal]** <이번 주 관측된 가장 파괴적인 단 하나의 신호 — 구체적 수치 포함>
 - **[Converged Mega Trend]** <클러스터들이 공통으로 가리키는 거대한 산업의 물줄기>
-- **[Strategic Recommendation]** <의사결정자를 위한 즉각적 행동 제언>
+- **[Strategic Recommendation]** <의사결정자를 위한 결정 프레임 기반의 전략적 방향성 제언 (행동지시가 아닌 판단 프레임 형태)>
 
 ## ■ Structural Cluster Analysis
 <각 클러스터별로 아래 형식을 반복하십시오>
@@ -184,7 +184,7 @@ ${expert.reasoning}
 
     #### Key Developments & Context
     - **[Fact]** <검색된 팩트 — 수치, 날짜, 기업명 필수>
-    - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석> (Basis: <ex.파괴적 혁신 모델에 따른 후발주자 진입 장벽 약화 분석>)
+    - **[Strategic Analysis]** <이 진전이 산업 구조에 미치는 영향을 2~3개의 하위 블릿으로 개조식 분석하며 메커니즘을 증명 (Basis 꼬리표 부착 금지)>
     - **[Structural Linkage]** <타 클러스터 이슈와의 유기적 관계 및 시너지/충돌 분석>
 
 ## ■ Second-Order Economic Insights
@@ -193,26 +193,25 @@ ${expert.reasoning}
 - **[Ripple Effects]** <전/후방 산업에 미칠 연쇄 파급 효과 상세 기술>
 
 ## ■ Professional Implications
-- **[Market & CapEx]** <시장 규모 및 기업들의 자본 투자 방향 변화 — 수치 포함>
-- **[Technology Frontier]** <기술적 병목 구간과 이를 돌파하려는 혁신 주체들의 동향>
-- **[Competitive Edge]** <이 흐름에서 승자와 패자를 가를 핵심 경쟁 요소>
-- **[Policy & Regulation]** <주요국 정책 및 규제 환경 변화가 산업에 미치는 실질적 영향>
+- **[Market & CapEx]** <사실일 때의 시장 규모, CapEx, 비즈니스 모델 영향과 하방 비용 — 수치 포함>
+- **[Technology Frontier]** <돌파 가능한 기술적 경로와 잔존하는 불확실성>
+- **[Competitive Edge]** <경쟁사들의 실질적 대응 동향 및 베팅 방향>
+- **[Policy & Regulation]** <관련 정책 및 규제 리스크의 트리거 조건>
 
 ## ■ Risks & Uncertainties
-- **[TECH]** <기술적 리스크>
-  - Impact: <예상 부정적 영향>
-- **[MARKET]** <시장/거시경제 리스크>
-  - Impact: <예상 부정적 영향>
-- **[REGULATION]** <규제/정책 리스크>
-  - Impact: <예상 부정적 영향>
+- **[Tech]** <기술적 리스크와 그것이 틀렸을 때의 하방 비용>
+- **[Market]** <시장 리스크와 판단 유보 요인>
+- **[Reg]** <규제/정책 리스크와 트리거 조건>
 
 ## ■ Strategic Watchlist: Indicators to Monitor
 - **<핵심 선행 지표 1>**
   (Why) <이것이 왜 Inflection Point 트리거인지>
   (Threshold) <어떤 수치/변화 국면에서 전략적 피보팅이 필요한지>
+  (폐기 트리거) <이 가정과 논지가 완전히 무너지는 조건 1줄>
 - **<핵심 선행 지표 2>**
   (Why) <설명>
   (Threshold) <피보팅 기준>
+  (폐기 트리거) <이 가정과 논지가 완전히 무너지는 조건 1줄>
 
 ## ■ Sources
 (시스템이 자동 주입합니다)

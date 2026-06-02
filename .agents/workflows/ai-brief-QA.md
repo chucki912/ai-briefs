@@ -40,7 +40,15 @@ getBriefByDate('2026-03-02').then(res => {
 1. `singleTopicStatement`가 존재하는가?
 2. `excludedFacts` 배열에 팩트가 존재하는가?
 3. `keyFacts` 배열의 각 문자열 끝에 `| 메커니즘:` 텍스트가 묻어나오지 않고 깔끔하게 제거(Trim)되었는가?
-4. `insight` 문단에 "※ trade-off" 같은 이상하고 기계적인 괄호 텍스트가 억지로 추가되지 않았는가?
+4. `keyFacts` 내 수치 정보에 괄호 출처 및 시점/신뢰도가 명시되어 있는가?
+5. `insight` 문단에 "※ trade-off" 같은 기계적인 괄호 텍스트나 직접적인 행동 지시(~하라)가 배제되어 있는가?
+6. `soWhat` 필드가 4분 구조(`ifTrue`, `uncertain`, `bet`, `downside`)를 갖추어 각각 완성형 1문장으로 출력되는가?
+
+### 🔍 리포트(Deep Dive/주간/통합) 검증 체크리스트
+생성된 마크다운 리포트를 열고 다음 항목을 확인하세요:
+1. Key Developments 내 `[Strategic Analysis]` 하단에 `(Basis: ...)` 형태의 기계적 꼬리표 라벨이 붙지 않고 본문으로 자연스럽게 녹아들었는가?
+2. `## ■ Watchlist` 항목마다 `(폐기 트리거)` 조건이 1줄씩 의무적으로 명시되었는가?
+3. Risks & Uncertainties 섹션의 위험 라벨이 Title Case(`[Tech]/[Market]/[Reg]`)로 통일되었는가?
 
 ## Step 4. UI 렌더링 확인
 위의 JSON이 완벽하다면 비로소 웹 브라우저 (http://localhost:3000)를 띄우고 UI 렌더링 시 디자인 오류나 텍스트 짤림이 없는지 육안으로 최종 확정합니다.

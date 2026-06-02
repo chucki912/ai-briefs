@@ -317,12 +317,15 @@ ${sourcesText}`;
                 }
 
                 .issue-summary {
-                    font-size: 1.05rem;
-                    color: var(--text-secondary);
+                    font-size: 1.1rem;
+                    color: var(--text-primary);
                     margin-top: 0;
                     margin-bottom: 1.5rem;
                     line-height: 1.5;
-                    font-weight: 500;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                    border-left: 3px solid var(--accent-color);
+                    padding-left: 10px;
                     user-select: text;
                     -webkit-user-select: text;
                 }

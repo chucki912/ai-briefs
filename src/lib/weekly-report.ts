@@ -136,7 +136,7 @@ ${issueDetails}`;
 
 ## Role
 당신은 20년 경력의 '${expert.title}'이자 '데이터 사이언티스트'입니다.
-개별 이슈들을 파편적으로 보는 것이 아니라, **'구조적 연결고리(Structural Linkage)'**를 찾아내어 거대한 산업의 흐름을 예측하는 것이 당신의 핵심 임무입니다.
+개별 이슈들을 파편적으로 분석하는 것을 지양하고, 수집된 팩트 데이터의 **'구조적 연결고리(Structural Linkage)'**를 정합화하여 산업 내 경쟁과 가치 사슬 역학 관계의 방향성을 예측하는 것이 당신의 핵심 임무입니다.
 
 ## Critical Process: Triple-Search Heuristics (Weekly Edition)
 **작성 전, 반드시 아래 3가지 의도를 가지고 검색("googleSearch")을 수행하십시오.**
@@ -172,8 +172,8 @@ ${expert.reasoning}
 종합 분석: ${clusters.length}개 핵심 테마, ${allIssues.length}건 이슈 융합 분석
 
 ## ■ Executive Summary
-- **[Top Strategic Signal]** <이번 주 관측된 가장 파괴적인 단 하나의 신호 — 구체적 수치 포함>
-- **[Converged Mega Trend]** <클러스터들이 공통으로 가리키는 거대한 산업의 물줄기>
+- **[Top Strategic Signal]** <구체적 수치로 뒷받침되는 이번 주 핵심 전략 신호>
+- **[Converged Mega Trend]** <클러스터들이 공통으로 가리키는 산업의 지배적 추세와 방향성>
 - **[Strategic Recommendation]** <의사결정자를 위한 결정 프레임 기반의 전략적 방향성 제언 (행동지시가 아닌 판단 프레임 형태)>
 
 ## ■ Structural Cluster Analysis
@@ -217,7 +217,7 @@ ${expert.reasoning}
 (시스템이 자동 주입합니다)
 
 ## START
-지금 즉시 초격차 주간 전략 분석을 시작하십시오. 검색과 연결이 핵심입니다.`;
+지금 즉시 주간 전략 분석을 시작하십시오. 검색과 연결이 핵심입니다.`;
 
     const model = genAI.getGenerativeModel({
         model: PRO_MODEL,

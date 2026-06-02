@@ -53,14 +53,31 @@ ${year}년 ${month}월 ${day}일 (${dayOfWeek})
         issues.forEach((issue, index) => {
             md += `이슈 ${index + 1}. ${issue.headline}
 `;
+            if (issue.oneLineSummary) {
+                md += `논지: ${issue.oneLineSummary}
+
+`;
+            }
 
             for (const fact of issue.keyFacts) {
                 md += `- ${fact}
 `;
             }
+            md += `\n`;
 
             md += `Insight: ${issue.insight}
-원문:
+`;
+
+            if (issue.soWhat) {
+                md += `So What:
+사실이라면: ${issue.soWhat.ifTrue}
+불확실: ${issue.soWhat.uncertain}
+베팅: ${issue.soWhat.bet}
+틀렸을 때: ${issue.soWhat.downside}
+`;
+            }
+
+            md += `원문:
 `;
 
             for (const source of issue.sources) {

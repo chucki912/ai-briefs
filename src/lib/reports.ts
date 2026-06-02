@@ -96,7 +96,7 @@ export async function generateAggregatedReport(
     `).join('\n\n');
 
     const prompt = `
-    당신은 세계 최고의 AI 산업 전략 분석가입니다.
+    당신은 전문 AI 산업 전략 분석가입니다.
     제공된 '브리프 이슈들'과 '추가 수집 자료(Manual Sources)', 그리고 '원문 텍스트(Pasted Texts)'를 바탕으로,
     **"${periodLabel} 종합 심층 리포트"**를 작성해주세요.
 
@@ -135,7 +135,7 @@ export async function generateAggregatedReport(
     관점: {분석 프레임워크 기반 관점}
 
     ## ■ Executive Summary
-    - **[Signal]** {핵심 신호 — 이슈들을 관통하는 가장 중요한 변화 신호}
+    - **[Signal]** {핵심 신호 — 이슈들을 관통하는 구체적 수치/증거 기반 지배적 변화 신호}
     - **[Change]** {산업 구조 변화 — 이전과 달라진 점}
     - **[So What]** {전략적 함의 — 왜 주목해야 하는지 (결정 관점 제시)}
 

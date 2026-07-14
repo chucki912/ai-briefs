@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { IssueItem } from '@/types';
 import { useBriefCart } from '@/contexts/BriefCartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { stripVerificationTag } from '@/lib/text';
 
 interface IssueCardProps {
     issue: IssueItem;
@@ -53,7 +54,7 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const factsText = issue.keyFacts.map(fact => `- ${fact}`).join('\n');
+        const factsText = issue.keyFacts.map(fact => `- ${stripVerificationTag(fact)}`).join('\n');
         const tagsText = issue.hashtags ? issue.hashtags.map(tag => `#${tag}`).join(' ') : '';
         const sourcesText = issue.sources.map(source => `- ${source}`).join('\n');
 
@@ -137,7 +138,7 @@ ${sourcesText}`;
 
             <ul className="issue-facts">
                 {issue.keyFacts.map((fact, i) => (
-                    <li key={i}>{fact}</li>
+                    <li key={i}>{stripVerificationTag(fact)}</li>
                 ))}
             </ul>
 

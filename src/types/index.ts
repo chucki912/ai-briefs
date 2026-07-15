@@ -26,6 +26,7 @@ export interface IssueItem {
   headline: string;
   keyFacts: string[];
   insight: string;
+  confidence?: 'high' | 'medium' | 'low' | string; // insight 근거 확실성 자기평가(baseline 계측용)
   framework: string;
   sources: string[];
   soWhat?: {

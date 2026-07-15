@@ -1,12 +1,20 @@
 import { AnalysisFramework } from '@/types';
 
-// 7대 분석 프레임워크
+/**
+ * 프레임워크 신뢰 하한(J). 최고 점수가 이 값 미만이면 framework='none'.
+ * 잠정값 — Phase 1.5의 30건에서 none 비율을 계측해 확정한다.
+ */
+export const MIN_MATCH_SCORE = 2;
+
+// 7대 분석 프레임워크 (insightTemplate은 '적재된 수사' 제거, 작동 메커니즘 중심으로 중립화 — R5)
 export const ANALYSIS_FRAMEWORKS: Record<string, AnalysisFramework> = {
     geopolitics: {
-        name: "지정학 및 패권",
+        // 구: "지정학 및 패권" / "글로벌 지정학적 역학 관계 및 전략적 함의 분석" → 중립화
+        name: "규제·수출통제·공급망 정책",
+        // 맨몸 "China"/"US" 트리거 제거(단일 국가명이 '패권' 렌즈로 라우팅되던 문제)
         triggers: ["수출통제", "칩 전쟁", "데이터 주권", "탈중국", "디지털 철의 장막",
-            "export control", "chip war", "data sovereignty", "decoupling", "China", "US"],
-        insightTemplate: "글로벌 지정학적 역학 관계 및 전략적 함의 분석"
+            "export control", "chip war", "data sovereignty", "decoupling", "tariff", "sanction"],
+        insightTemplate: "규제·수출통제·공급망 정책이 비용·시장 접근성에 미치는 구조적 영향"
     },
 
     structural_shift: {
@@ -71,18 +79,20 @@ export function matchFrameworks(title: string, description: string): AnalysisFra
         }
     }
 
-    // 점수 높은 순으로 정렬 후 상위 2개 반환
+    // 점수 높은 순으로 정렬
     matches.sort((a, b) => b.score - a.score);
 
-    // 매칭되는 게 없으면 기본 프레임워크 반환
-    if (matches.length === 0) {
-        return [ANALYSIS_FRAMEWORKS.structural_shift];
+    // R5/J: 신뢰 하한 미달(또는 무매칭)이면 강제 기본값 대신 none([]) 반환.
+    // "슬롯이 있으면 모델은 채운다" — 렌즈를 억지로 주지 않는다.
+    if (matches.length === 0 || matches[0].score < MIN_MATCH_SCORE) {
+        return [];
     }
 
-    return matches.slice(0, 2).map(m => m.framework);
+    // 하한 이상인 것만 상위 2개
+    return matches.filter(m => m.score >= MIN_MATCH_SCORE).slice(0, 2).map(m => m.framework);
 }
 
-// 프레임워크 이름 목록 반환
+// 프레임워크 이름 목록 반환 (none이면 'none')
 export function getFrameworkNames(frameworks: AnalysisFramework[]): string {
-    return frameworks.map(f => f.name).join(', ');
+    return frameworks.length ? frameworks.map(f => f.name).join(', ') : 'none';
 }

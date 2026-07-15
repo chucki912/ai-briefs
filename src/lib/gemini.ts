@@ -123,7 +123,9 @@ ${indexedNews}
 ---
 
 ## 적용 분석 프레임워크
-${frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
+${frameworks.length
+            ? `아래는 참고용 분석 렌즈임. 렌즈의 명칭·수사를 본문에 그대로 복제하지 말고, 제공된 사실에 근거한 분석에만 사용할 것.\n${frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}`
+            : `지정된 분석 렌즈 없음(none). 특정 프레임워크를 언급하거나 억지로 끼워넣지 말고, 오직 제공된 사실에 근거하여 분석할 것.`}
 
 ---
 
@@ -145,6 +147,7 @@ ${recentContextStr}
     "[보도된 사실만]"
   ],
   "insight": "${KEY_INSIGHT_FIELD_SPEC}",
+  "confidence": "high | medium | low 중 1개 — 이 insight의 근거 확실성 자기평가",
   "soWhat": {
     "ifTrue": "이 신호가 사실이라면 산업 구조/경쟁 구도에서 무엇이 바뀌는가 (완성형 1문장)",
     "uncertain": "아직 검증되지 않았거나 주시해야 할 핵심 변수 (완성형 1문장)",
@@ -195,7 +198,7 @@ ${recentContextStr}
 
 ### STEP 5. insight(Key Insight) 및 soWhat 작성 (★판단형 의사결정 체계 적용★)
 ${KEY_INSIGHT_GUIDE}
-  - 적용 분석 프레임워크의 핵심 작동 메커니즘을 최소 1회 자연스러운 문장으로 녹여 서술하십시오.
+  - 프레임워크가 지정된 경우에만 분석 렌즈로 참고하되, 프레임워크 명칭·수사를 본문에 복제하지 마십시오. 지정되지 않았으면(none) 프레임워크를 언급하지 말고 사실 기반으로만 분석하십시오.
   - soWhat은 위 Key Insight를 실행 관점에서 분해하는 상세 의사결정 매트릭스입니다. insight의 마지막(경영진 대응) 문장은 방향성 수준으로 제시하고, 구체적 베팅은 soWhat.bet에서 전개하여 문장을 그대로 복제하지 마십시오.
 - **soWhat (4분 구조)**:
   - \`ifTrue\`: 이 신호가 노이즈가 아닌 실질적 사실이자 영구적 추세일 때 변하는 업계의 역학 구도를 기술하십시오.
@@ -304,6 +307,7 @@ ${KEY_INSIGHT_GUIDE}
             hashtags: parsed.hashtags,
             keyFacts: cleanedFacts,
             insight: finalInsight,
+            confidence: parsed.confidence,
             framework: getFrameworkNames(frameworks),
             sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
             soWhat: parsed.soWhat,

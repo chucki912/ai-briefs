@@ -73,7 +73,7 @@ ${issue.oneLineSummary ? `\n> ${issue.oneLineSummary}\n` : ''}
 ■ Key Facts
 ${factsText}
 
-■ Strategic Insight
+■ Key Insight
 ${issue.insight}
 ${soWhatText}${tagsText ? `\n${tagsText}` : ''}
 
@@ -145,7 +145,7 @@ ${sourcesText}`;
             <div className="issue-insight-container">
                 <div className="issue-insight-label">
                     <span className="insight-sparkle">✨</span>
-                    STRATEGIC INSIGHT
+                    KEY INSIGHT
                 </div>
                 <div className="issue-insight-content">
                     {issue.insight}

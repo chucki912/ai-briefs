@@ -1,0 +1,332 @@
+[
+  {
+    "id": "ai-model-01",
+    "category": "ai-model",
+    "title": "차세대 추론 모델 공개와 컨텍스트 확장 경쟁",
+    "facts": [
+      "OpenAI가 장문 추론에 특화된 신규 모델을 공개함",
+      "컨텍스트 윈도우가 100만 토큰 수준으로 확장됨",
+      "동일 벤치마크에서 경쟁 모델 대비 추론 정확도 개선 보고"
+    ],
+    "expectedAudience": "AI 애플리케이션 기업"
+  },
+  {
+    "id": "ai-model-02",
+    "category": "ai-model",
+    "title": "오픈웨이트 모델의 성능 격차 축소",
+    "facts": [
+      "Meta가 신규 오픈웨이트 모델을 라이선스와 함께 배포함",
+      "주요 코딩 벤치마크에서 상용 모델과의 격차가 좁혀짐",
+      "다수 스타트업이 자체 파인튜닝 버전을 공개"
+    ],
+    "expectedAudience": "국내 파운데이션 모델·SaaS 기업"
+  },
+  {
+    "id": "ai-platform-01",
+    "category": "ai-platform",
+    "title": "AI 에이전트 플랫폼과 앱 마켓 생태계 형성",
+    "facts": [
+      "주요 빅테크가 에이전트 실행 런타임과 앱 스토어를 발표함",
+      "서드파티 개발자용 수익 배분 정책 공개",
+      "기업용 워크플로 자동화 파트너십 다수 체결"
+    ],
+    "expectedAudience": "B2B SaaS 및 개발 도구 기업"
+  },
+  {
+    "id": "ai-platform-02",
+    "category": "ai-platform",
+    "title": "모델 API 가격 인하와 토큰 단가 경쟁",
+    "facts": [
+      "주요 사업자가 추론 API 단가를 큰 폭으로 인하함",
+      "배치 처리·캐싱 등 비용 절감 옵션 확대",
+      "경쟁사도 유사 가격 정책으로 대응"
+    ],
+    "expectedAudience": "AI 기능을 내장한 애플리케이션 기업"
+  },
+  {
+    "id": "ai-regulation-01",
+    "category": "ai-regulation",
+    "title": "고위험 AI 안전성 검증 의무화 초안",
+    "facts": [
+      "규제 당국이 고위험 AI에 대한 사전 안전성 평가 의무 초안을 공개함",
+      "제3자 감사와 사고 보고 체계 요구",
+      "위반 시 매출 기반 과징금 조항 포함"
+    ],
+    "expectedAudience": "글로벌 AI 서비스 운영 기업"
+  },
+  {
+    "id": "ai-regulation-02",
+    "category": "ai-regulation",
+    "title": "AI 학습 데이터 저작권·투명성 규정 강화",
+    "facts": [
+      "학습 데이터 출처 공개 요건이 강화됨",
+      "저작권 침해 소송 다수 진행 중",
+      "일부 사업자는 데이터 라이선스 계약으로 선회"
+    ],
+    "expectedAudience": "생성형 AI 제품 기업"
+  },
+  {
+    "id": "ai-regulation-03",
+    "category": "ai-regulation",
+    "title": "국제 AI 표준기구 설립 제안",
+    "facts": [
+      "복수 국가가 국제 AI 안전 표준기구 설립을 제안함",
+      "모델 평가 방법론 표준화 논의 착수",
+      "산업계 참여 채널은 아직 확정되지 않음"
+    ],
+    "expectedAudience": "국내 AI 사업자·정책 담당"
+  },
+  {
+    "id": "datacenter-01",
+    "category": "datacenter-power",
+    "title": "데이터센터 전력 수요 급증과 계통 제약",
+    "facts": [
+      "AI 데이터센터 전력 수요 전망치가 상향됨",
+      "일부 지역에서 전력 계통 접속 지연 발생",
+      "전력구매계약(PPA) 체결 사례 증가"
+    ],
+    "expectedAudience": "클라우드·데이터센터 운영 기업"
+  },
+  {
+    "id": "datacenter-02",
+    "category": "datacenter-power",
+    "title": "원전·SMR 기반 데이터센터 전력 조달 논의",
+    "facts": [
+      "빅테크가 SMR 기반 전력 조달 의향을 밝힘",
+      "장기 전력 공급 계약 협상 진행",
+      "인허가·건설 일정의 불확실성 존재"
+    ],
+    "expectedAudience": "전력·인프라 투자자"
+  },
+  {
+    "id": "datacenter-03",
+    "category": "datacenter-power",
+    "title": "냉각 기술 전환과 액침냉각 채택 확대",
+    "facts": [
+      "고밀도 랙 대응을 위한 액침냉각 도입 사례 증가",
+      "냉각 관련 부품·소재 공급망 재편",
+      "표준화 미비로 벤더 종속 우려"
+    ],
+    "expectedAudience": "데이터센터 설비·소재 기업"
+  },
+  {
+    "id": "semiconductor-01",
+    "category": "semiconductor-gpu",
+    "title": "차세대 GPU 공급 지연과 배정 경쟁",
+    "facts": [
+      "차세대 가속기 공급이 수요를 크게 하회함",
+      "대형 고객 중심으로 물량이 우선 배정됨",
+      "리드타임이 수개월로 확대"
+    ],
+    "expectedAudience": "AI 인프라 도입 기업"
+  },
+  {
+    "id": "semiconductor-02",
+    "category": "semiconductor-gpu",
+    "title": "HBM 공급 확대와 메모리 업체 실적",
+    "facts": [
+      "HBM 수요 증가로 메모리 3사 증설 발표",
+      "선단 공정 수율 개선 보고",
+      "고객사 장기 공급 계약 확대"
+    ],
+    "expectedAudience": "메모리·후공정 기업"
+  },
+  {
+    "id": "semiconductor-03",
+    "category": "semiconductor-gpu",
+    "title": "AI 가속기 자체 설계(ASIC) 확산",
+    "facts": [
+      "빅테크가 자체 추론용 ASIC 물량을 늘림",
+      "특정 GPU 벤더 의존도 완화 시도",
+      "설계·패키징 파트너십 다변화"
+    ],
+    "expectedAudience": "팹리스·파운드리·후공정 기업"
+  },
+  {
+    "id": "battery-01",
+    "category": "battery-energy",
+    "title": "LFP 배터리 원가 하락과 시장 점유율 이동",
+    "facts": [
+      "LFP 셀 원가가 추가 하락함",
+      "중국 업체의 글로벌 점유율 확대",
+      "K-Battery는 고성능·고부가 제품으로 대응"
+    ],
+    "expectedAudience": "국내 배터리 셀·소재 기업"
+  },
+  {
+    "id": "battery-02",
+    "category": "battery-energy",
+    "title": "ESS 수요 확대와 전력망 저장 시장 성장",
+    "facts": [
+      "재생에너지 확대로 ESS 수요 증가",
+      "북미·유럽 그리드 저장 프로젝트 발주 증가",
+      "안전 규격·화재 리스크 이슈 상존"
+    ],
+    "expectedAudience": "ESS·셀 제조 기업"
+  },
+  {
+    "id": "battery-03",
+    "category": "battery-energy",
+    "title": "핵심광물 공급망 다변화와 자원 정책",
+    "facts": [
+      "리튬·니켈 가격 변동성 확대",
+      "일부 자원국의 수출 규제 강화",
+      "정련·재활용 내재화 투자 발표"
+    ],
+    "expectedAudience": "배터리 소재·리사이클 기업"
+  },
+  {
+    "id": "battery-04",
+    "category": "battery-energy",
+    "title": "전고체 배터리 파일럿 라인 가동 소식",
+    "facts": [
+      "복수 업체가 전고체 파일럿 라인 가동을 발표함",
+      "양산 시점과 수율은 미확정",
+      "완성차 업체와 공동개발 계약 체결"
+    ],
+    "expectedAudience": "배터리·완성차 협력 기업"
+  },
+  {
+    "id": "cloud-01",
+    "category": "cloud-sovereign",
+    "title": "소버린 클라우드·자국 데이터 규제 확산",
+    "facts": [
+      "여러 국가가 자국 내 데이터 처리 요건을 강화함",
+      "현지 리전·파트너 요구 증가",
+      "글로벌 사업자는 현지 합작 모델로 대응"
+    ],
+    "expectedAudience": "글로벌 SaaS·클라우드 기업"
+  },
+  {
+    "id": "cloud-02",
+    "category": "cloud-sovereign",
+    "title": "국가 주도 AI 인프라 투자 확대",
+    "facts": [
+      "일부 정부가 국가 AI 컴퓨팅 인프라 투자 계획을 발표함",
+      "자국 언어 모델 개발 지원 확대",
+      "공공 조달 우대 정책 검토"
+    ],
+    "expectedAudience": "국내 AI·클라우드 사업자"
+  },
+  {
+    "id": "deal-01",
+    "category": "deal-investment",
+    "title": "클라우드-모델 기업 간 대형 컴퓨팅 계약",
+    "facts": [
+      "모델 기업이 특정 클라우드와 장기 컴퓨팅 공급 계약을 체결함",
+      "선구매 규모가 수십억 달러 수준으로 보고됨",
+      "독점 여부·조건은 공개되지 않음"
+    ],
+    "expectedAudience": "AI 인프라 의존 기업"
+  },
+  {
+    "id": "deal-02",
+    "category": "deal-investment",
+    "title": "AI 스타트업 대형 투자 라운드",
+    "facts": [
+      "AI 인프라 스타트업이 대규모 투자를 유치함",
+      "기업가치가 전 라운드 대비 상승",
+      "일부 투자자는 전략적 파트너십을 병행"
+    ],
+    "expectedAudience": "AI 벤처·투자 심사역"
+  },
+  {
+    "id": "deal-03",
+    "category": "deal-investment",
+    "title": "반도체 장비사-파운드리 장기 공급 협약",
+    "facts": [
+      "장비사와 파운드리가 선단 공정 장비 장기 공급에 합의함",
+      "우선 공급 조건 포함",
+      "총 계약 규모는 비공개"
+    ],
+    "expectedAudience": "반도체 장비·소재 기업"
+  },
+  {
+    "id": "cluster-01",
+    "category": "cluster",
+    "title": "규제·인프라·계약 신호가 함께 나타난 AI 주간",
+    "facts": [
+      "고위험 AI 안전성 검증 의무화 초안 공개",
+      "국제 AI 표준기구 설립 제안",
+      "모델 기업의 대형 GPU 클라우드 장기 계약 체결"
+    ],
+    "expectedAudience": "글로벌 AI 서비스 운영 기업"
+  },
+  {
+    "id": "cluster-02",
+    "category": "cluster",
+    "title": "전력·냉각·부지 제약이 동시에 부상",
+    "facts": [
+      "데이터센터 전력 계통 접속 지연 발생",
+      "고밀도 랙 대응 액침냉각 채택 확대",
+      "수도권 인근 부지 확보 경쟁 심화"
+    ],
+    "expectedAudience": "데이터센터 운영·투자 기업"
+  },
+  {
+    "id": "cluster-03",
+    "category": "cluster",
+    "title": "공급망 다변화 신호의 동시 다발",
+    "facts": [
+      "빅테크의 자체 ASIC 물량 확대",
+      "HBM 3사 증설 발표",
+      "자원국 수출 규제 강화"
+    ],
+    "expectedAudience": "반도체·소재 공급망 기업"
+  },
+  {
+    "id": "parallel-01",
+    "category": "parallel-signal",
+    "title": "직접 인과 근거 없는 병렬 신호 모음",
+    "facts": [
+      "A국이 AI 데이터센터 인허가 절차를 간소화함",
+      "무관한 B사가 신규 GPU 클라우드 리전을 개설함",
+      "C 표준기구가 평가 방법론 초안을 회람함"
+    ],
+    "expectedAudience": "국내 AI 인프라 기업"
+  },
+  {
+    "id": "parallel-02",
+    "category": "parallel-signal",
+    "title": "상호 연결 근거가 약한 정책·투자 신호",
+    "facts": [
+      "한 정부가 자국 AI 펀드 조성을 발표함",
+      "별도 기업이 해외 데이터센터 투자를 공개함",
+      "동일 시점에 표준화 워킹그룹이 발족"
+    ],
+    "expectedAudience": "정책·투자 담당"
+  },
+  {
+    "id": "weak-01",
+    "category": "weak-evidence",
+    "title": "근거가 약한 단일 루머성 신호",
+    "facts": [
+      "특정 기업이 대형 인수를 검토 중이라는 미확인 보도",
+      "회사 측은 확인도 부인도 하지 않음",
+      "구체적 금액·시점은 알려지지 않음"
+    ],
+    "expectedAudience": "M&A 관찰 투자자"
+  },
+  {
+    "id": "weak-02",
+    "category": "weak-evidence",
+    "title": "제한된 표본의 초기 성능 주장",
+    "facts": [
+      "신규 아키텍처가 소규모 벤치마크에서 우위를 주장함",
+      "독립 재현 결과는 아직 없음",
+      "상용화 계획은 미정"
+    ],
+    "expectedAudience": "AI 연구·제품 의사결정자"
+  },
+  {
+    "id": "policy-01",
+    "category": "ai-regulation",
+    "title": "수출통제 대상 AI 칩 범위 조정",
+    "facts": [
+      "특정 성능 이상 AI 칩의 수출 요건이 조정됨",
+      "일부 국가·용도에 대한 예외 조항 신설",
+      "적용 시점과 세부 기준은 추가 고시 예정"
+    ],
+    "expectedAudience": "반도체 수출·구매 기업"
+  }
+]

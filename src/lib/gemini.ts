@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NewsItem, IssueItem } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
+import { KEY_INSIGHT_FIELD_SPEC, KEY_INSIGHT_GUIDE, KEY_INSIGHT_CHECKLIST, ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
+import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
@@ -94,10 +96,12 @@ function clusterNewsByTopic(newsItems: NewsItem[]): NewsItem[][] {
 }
 
 // 클러스터에서 이슈 생성
-async function generateIssueFromCluster(
+// onKeyInsight: Key Insight 검증/재생성 결과를 관찰하기 위한 선택적 훅(평가/집계용). 프로덕션 호출부는 미전달.
+export async function generateIssueFromCluster(
     model: ReturnType<typeof genAI.getGenerativeModel>,
     cluster: NewsItem[],
-    recentIssues: IssueItem[] = []
+    recentIssues: IssueItem[] = [],
+    onKeyInsight?: (r: ValidatedKeyInsightResult) => void
 ): Promise<IssueItem | null> {
     const primaryNews = cluster[0];
     const frameworks = matchFrameworks(primaryNews.title, primaryNews.description);
@@ -140,7 +144,7 @@ ${recentContextStr}
     "[추출된 핵심 사실 내용] | 메커니즘: [동일 확인]",
     "[추출된 핵심 사실 내용] | 메커니즘: [동일 확인]"
   ],
-  "insight": "인과관계가 흐르는 2~3문장 분량의 완성형 문단 형태 심층 인사이트. 이미 keyFacts에 나열된 팩트를 되풀이하거나 요약하지 말고, 해당 사건이 시장/산업 구조에 주는 본질적 의미와 '그래서 무엇을 의미하는지'에만 온전히 집중할 것.",
+  "insight": "${KEY_INSIGHT_FIELD_SPEC}",
   "soWhat": {
     "ifTrue": "이 신호가 사실이라면 산업 구조/경쟁 구도에서 무엇이 바뀌는가 (완성형 1문장)",
     "uncertain": "아직 검증되지 않았거나 주시해야 할 핵심 변수 (완성형 1문장)",
@@ -189,15 +193,10 @@ ${recentContextStr}
 - 이전 브리프들의 요약(이전 논지 및 인사이트)을 읽고 **유기적으로 연결되는 서사(Storyline)**를 구성하십시오.
 - 이전 브리프가 다룬 위협/기회와 어떻게 맞물려 흐름을 형성하는지 융합하십시오.
 
-### STEP 5. insight 및 soWhat 작성 (★판단형 의사결정 체계 적용★)
-- **insight**: 
-  - 팩트의 단순 요약을 지양하고, 해당 흐름이 초래할 **인과관계 기반의 구조적 변화**를 2~3문장의 완성형 문단으로 작성하십시오.
-  - **중요 (독립성)**: insight 작성 시 headline, oneLineSummary(논지), keyFacts에 이미 기술된 사실관계를 다시 나열하거나 요약하여 복제하지 마십시오. 오직 분석과 향후 미칠 파급 영향(시사점)에 집중하십시오.
-  - ❌ 금지 조건:
-    * "~의 일환임", "~을 상징함", "~로의 전환이 시급함" 같은 모호한 선언형 마무리 금지.
-    * 문장 끝에 기계적으로 "(※ trade-off: ...)"를 붙이는 행위 금지.
-    * 직접적인 행동지시 문구("~하라", "~해야 한다")는 insight 섹션에서 금지. (행동 및 베팅은 \`soWhat\` 필드에서 서술)
+### STEP 5. insight(Key Insight) 및 soWhat 작성 (★판단형 의사결정 체계 적용★)
+${KEY_INSIGHT_GUIDE}
   - 적용 분석 프레임워크의 핵심 작동 메커니즘을 최소 1회 자연스러운 문장으로 녹여 서술하십시오.
+  - soWhat은 위 Key Insight를 실행 관점에서 분해하는 상세 의사결정 매트릭스입니다. insight의 마지막(경영진 대응) 문장은 방향성 수준으로 제시하고, 구체적 베팅은 soWhat.bet에서 전개하여 문장을 그대로 복제하지 마십시오.
 - **soWhat (4분 구조)**:
   - \`ifTrue\`: 이 신호가 노이즈가 아닌 실질적 사실이자 영구적 추세일 때 변하는 업계의 역학 구도를 기술하십시오.
   - \`uncertain\`: 현재 시점에서 아직 확인되지 않은 핵심 변수나 위험 요소를 명시하십시오.
@@ -228,8 +227,8 @@ ${recentContextStr}
 ## 자체 검증 체크리스트 (JSON 출력 전 순서대로 확인)
 [ ] 1. 핵심 사건을 중심으로 단일 논지를 관통하는 singleTopicStatement를 확정했는가?
 [ ] 2. keyFacts 각 문장 끝에 출처명·시점·신뢰도(검증됨/미검증 등) 꼬리표가 붙지 않고 순수 사실만 서술되었는가?
-[ ] 3. insight가 단순 요약이 아닌, 인과관계가 흐르는 2~3문장의 완성형 문단으로 작성되었는가?
-[ ] 4. insight 내부에 "~하라" 같은 직접적인 행동 처방이 배제되었는가?
+[ ] 3. (Key Insight) ${KEY_INSIGHT_CHECKLIST.map((c, i) => `3-${i + 1}. ${c}`).join('\n[ ] ')}
+[ ] 4. insight의 경영진 대응 문장이 soWhat.bet과 문장 단위로 중복되지 않고 방향성/실행의 층위가 구분되는가?
 [ ] 5. soWhat의 4가지 필드(ifTrue, uncertain, bet, downside)가 각각 명확하게 1문장씩의 완성형 문장으로 작성되었는가?
 [ ] 6. soWhat.bet에 구체적인 주어가 명시되어 있는가?
 [ ] 7. category가 허용 목록 내 1개인가?
@@ -279,6 +278,22 @@ ${recentContextStr}
                 return index === 0 || score > 0;
             });
 
+        const cleanedFacts: string[] = (parsed.keyFacts || []).map((fact: string) => fact.split('|')[0].trim());
+
+        // Key Insight 검증 + 치명적 위반 시 최대 1회 재생성
+        const kiResult = await ensureValidKeyInsight(
+            parsed.insight || parsed.strategicInsight || '',
+            { facts: cleanedFacts, title: parsed.headline || parsed.title, audience: parsed.category },
+            async (regenPrompt: string) => {
+                const r = await generateWithRetry(model, regenPrompt);
+                return (await r.response).text();
+            },
+        );
+        logKeyInsightResult(`Key Insight (${parsed.headline || parsed.title})`, kiResult);
+        await recordKeyInsightMetrics(kiResult, 'ai'); // 내부에서 예외를 삼키므로 생성 실패로 이어지지 않음
+        if (onKeyInsight) onKeyInsight(kiResult);
+        const finalInsight = kiResult.insight;
+
         return {
             headline: parsed.headline || parsed.title,
             category: parsed.category,
@@ -287,8 +302,8 @@ ${recentContextStr}
             prescriptionLevel: parsed.prescriptionLevel,
             oneLineSummary: parsed.oneLineSummary,
             hashtags: parsed.hashtags,
-            keyFacts: parsed.keyFacts.map((fact: string) => fact.split('|')[0].trim()),
-            insight: parsed.insight || parsed.strategicInsight,
+            keyFacts: cleanedFacts,
+            insight: finalInsight,
             framework: getFrameworkNames(frameworks),
             sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
             soWhat: parsed.soWhat,

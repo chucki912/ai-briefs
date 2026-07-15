@@ -6,6 +6,8 @@ import { NewsItem, IssueItem } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
 import { getRecentIssues } from './store';
 import { checkDuplicateIssues, calculateSimilarity } from './gemini';
+import { KEY_INSIGHT_FIELD_SPEC, KEY_INSIGHT_GUIDE, KEY_INSIGHT_CHECKLIST, ensureValidKeyInsight, logKeyInsightResult } from './analyzers/key-insight';
+import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -130,7 +132,7 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
     "핵심 사실 2",
     "핵심 사실 3"
   ],
-  "insight": "인과관계가 흐르는 2~3문장 분량의 완성형 문단 형태 심층 인사이트. K-Battery(한국 배터리 산업) 생태계에 미치는 파급 효과와 전략적 시사점을 적용 분석 프레임워크의 개념을 녹여 완성형 문장으로 작성할 것. 이미 keyFacts에 나열된 팩트를 되풀이하거나 단순 요약하지 말고, 해당 사건이 시장/산업 구조 및 K-Battery 생태계에 주는 본질적 의미와 '그래서 무엇을 의미하는지'에만 온전히 집중하여 분석할 것.",
+  "insight": "${KEY_INSIGHT_FIELD_SPEC} (기업 영향·경영진 대응은 K-Battery 생태계(LGES, SK On, SDI, 소재사 등) 관점에서 구체화할 것.)",
   "soWhat": {
     "ifTrue": "이 신호가 사실이라면 K-Battery 생태계 관점에서 무엇이 바뀌는가 (완성형 1문장)",
     "uncertain": "아직 검증되지 않았거나 주시해야 할 핵심 변수 (완성형 1문장)",
@@ -147,14 +149,16 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 - **중요**: \`relevantSourceIndices\` 필드에는 이 브리핑과 직접 관련된 핵심 기사 번호만 정수 배열로 포함하세요.
 - **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요. 중복 방지를 위해 keyFacts 작성 시 헤드라인, oneLineSummary(논지) 및 insight(시사점)의 내용을 반복하여 재진술하지 마십시오. 오직 객관적 팩트와 수치 데이터 전달에 집중해야 합니다.
 - **출처·검증 태그 금지**: keyFacts 각 문장 끝에 \`(Yahoo Finance, 2026년 7월 / 검증됨)\`, \`(... / 미검증)\`, \`(... 기준 / 신뢰도 보통)\` 같은 출처명·시점·신뢰도 꼬리표를 절대 붙이지 마십시오. 출처는 하단 Sources 링크로만 제공합니다. 팩트 문장은 순수하게 사실만 서술하고 괄호 태그로 마무리하지 마십시오.
-- **심층 인사이트 및 soWhat (★판단형 의사결정 체계 적용★)**:
-  - 단순 요약이 아닌, 추출된 3가지 사실이 **한국 배터리 기업(LGES, SK On, SDI, 소재사 등)**에 어떤 기회나 위협이 되는지 분석하세요.
-  - 제공된 분석 프레임워크의 틀에만 얽매이지 말고, **자율적이고 폭넓은 시야(Autonomous)**로 시장의 판도 변화, 기술 주도권, 공급망 이슈 등을 자유롭게 연결하여 'So What?'을 도출하세요.
-  - 직접적인 행동지시 문구("~하라", "~해야 한다")는 insight 섹션에서 금지합니다. (행동 및 베팅은 \`soWhat\` 필드에서 서술)
-  - **중요 (독립성)**: 각 필드 간(headline, oneLineSummary, keyFacts, insight) 내용의 복제 및 중복 서술을 철저하게 배제하십시오. 헤드라인은 사건, 요약은 논지명제, 팩트는 사실 정보, 인사이트는 시사점에만 충실해야 합니다.
-  - soWhat의 4가지 필드(ifTrue, uncertain, bet, downside)가 각각 명확하게 1문장씩의 완성형 문장으로 작성되었는지 검증하고, bet에 구체적인 주어가 명시되어야 합니다.
+- **심층 인사이트(Key Insight) 및 soWhat (★판단형 의사결정 체계 적용★)**:
+${KEY_INSIGHT_GUIDE}
+  - 여기서 '기업'은 우선적으로 한국 배터리 생태계(LGES, SK On, SDI, 소재사 등)를 뜻합니다. 다만 근거 없이 특정국·특정사의 의도를 단정하지 말고 구조적 결과로 서술하십시오.
+  - soWhat은 위 Key Insight를 실행 관점에서 분해하는 상세 매트릭스입니다. 4가지 필드(ifTrue, uncertain, bet, downside)를 각각 완성형 1문장으로 작성하고, bet에 구체적 주어를 명시하되 insight의 경영진 대응 문장을 그대로 복제하지 마십시오.
 - 객관적 수치, 공식 발언 기반 서술 (수치 데이터가 있다면 반드시 포함)
 - 감정적 표현 배제 (드라이하고 전문적인 톤 유지)
+
+## 자체 검증 체크리스트 (JSON 출력 전 확인, 실패 시 해당 섹션 재생성)
+[ ] ${KEY_INSIGHT_CHECKLIST.join('\n[ ] ')}
+[ ] soWhat 4필드가 완성형 1문장씩이고 bet에 구체적 주어가 있으며 insight 대응 문장과 중복되지 않는가?
 
 JSON만 출력하세요.`;
 
@@ -184,13 +188,26 @@ JSON만 출력하세요.`;
             selectedSources = [cluster[0].url];
         }
 
+        // Key Insight 검증 + 치명적 위반 시 최대 1회 재생성
+        const kiResult = await ensureValidKeyInsight(
+            parsed.insight || parsed.strategicInsight || '',
+            { facts: parsed.keyFacts || [], title: parsed.headline || parsed.title, audience: parsed.category },
+            async (regenPrompt: string) => {
+                const r = await generateWithRetry(model, regenPrompt);
+                return (await r.response).text();
+            },
+        );
+        logKeyInsightResult(`Battery Key Insight (${parsed.headline || parsed.title})`, kiResult);
+        await recordKeyInsightMetrics(kiResult, 'battery'); // 내부에서 예외를 삼킴(생성 비중단)
+        const finalInsight = kiResult.insight;
+
         return {
             headline: parsed.headline || parsed.title,
             category: parsed.category,
             oneLineSummary: parsed.oneLineSummary,
             hashtags: parsed.hashtags,
             keyFacts: parsed.keyFacts,
-            insight: parsed.insight || parsed.strategicInsight,
+            insight: finalInsight,
             framework: matchedFrameworks.map(f => f.name).join(', '),
             sources: selectedSources,
             soWhat: parsed.soWhat,

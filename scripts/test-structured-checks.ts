@@ -1,6 +1,6 @@
 /** 구조화 체크 단위 테스트 (외부 API 불필요). npx tsx scripts/test-structured-checks.ts */
 import {
-    c1_allFactsSourced, c2_allSourcesResolved, c4_restsOnValid, c5_killTriggerConcrete,
+    c1_allFactsSourced, c2_allSourcesResolved, c4_restsOnValid, c5prime_killTriggerFuture,
     c9prime_actRequiresHigh, c10_actComplete, c11_observeHasMetric, c12_noneIsEmpty,
     c6_batchDupPairs, checkCard,
 } from '../src/lib/analyzers/structured-checks';
@@ -18,7 +18,7 @@ const sources: SourceRef[] = [
     { id: 's2', url: 'https://theverge.com/b', outlet: 'Verge', resolved: true },
 ];
 const insight: KeyInsightStructured = { text: 'x', claimType: 'inferred', restsOnFactIds: ['f1', 'f2'], confidence: 'high', mundaneAlternative: 'boring' };
-const swAct: SoWhatV2 = { ifInferenceHolds: 'a', unknown: 'b', actionType: 'act', action: { what: 'do', reversible: true, costIfWrong: 'c', costIfMissed: 'd' }, killTrigger: '2026년 Q3 50% 미달' };
+const swAct: SoWhatV2 = { ifInferenceHolds: 'a', unknown: 'b', actionType: 'act', action: { what: 'do', reversible: true, costIfWrong: 'c', costIfMissed: 'd' }, killTrigger: '2027년 12월 31일까지 50% 미달' };
 
 // C1
 chk('C1 무출처 fact 탐지', c1_allFactsSourced([{ id: 'f1', text: 'x', sourceIds: [] }]).length > 0);
@@ -31,9 +31,13 @@ chk('C2 정상', c2_allSourcesResolved(sources).length === 0);
 chk('C4 dangling 탐지', c4_restsOnValid({ ...insight, restsOnFactIds: ['f9'] }, facts).length > 0);
 chk('C4 빈 restsOn 탐지', c4_restsOnValid({ ...insight, restsOnFactIds: [] }, facts).length > 0);
 chk('C4 정상', c4_restsOnValid(insight, facts).length === 0);
-// C5
-chk('C5 날짜/수치 없음 탐지', c5_killTriggerConcrete({ ...swAct, killTrigger: '상황이 나빠지면' }).length > 0);
-chk('C5 정상(날짜)', c5_killTriggerConcrete(swAct).length === 0);
+// C5' (날짜 기반, now 고정 주입)
+const NOW = new Date('2026-07-16');
+chk("C5' 만료 날짜 탐지", c5prime_killTriggerFuture({ ...swAct, killTrigger: '2025년 4분기 실적에서 15% 이하' }, NOW).length > 0);
+chk("C5' 과거 연도 탐지", c5prime_killTriggerFuture({ ...swAct, killTrigger: '2025-12-31까지' }, NOW).length > 0);
+chk("C5' 미래 날짜 정상", c5prime_killTriggerFuture({ ...swAct, killTrigger: '2026년 12월 31일까지' }, NOW).length === 0);
+chk("C5' 날짜없는 수치임계 정상", c5prime_killTriggerFuture({ ...swAct, killTrigger: '월간 변동성이 5% 미만으로' }, NOW).length === 0);
+chk("C5' 날짜·수치 모두 없음 탐지", c5prime_killTriggerFuture({ ...swAct, killTrigger: '상황이 나빠지면' }, NOW).length > 0);
 // C9'
 chk("C9' act+low 탐지", c9prime_actRequiresHigh(swAct, { ...insight, confidence: 'low' }).length > 0);
 chk("C9' act+high 정상", c9prime_actRequiresHigh(swAct, insight).length === 0);
@@ -55,8 +59,8 @@ const goodCard: IssueItem = {
     headline: 'h', keyFacts: ['A', 'B'], insight: 'x', framework: 'none', sources: ['https://reuters.com/a', 'https://theverge.com/b'],
     structuredFacts: facts, sourceRefs: sources, keyInsight: insight, soWhatV2: swAct,
 };
-chk('checkCard 정상 카드 PASS', checkCard(goodCard).ok);
-chk('checkCard 구조 누락 탐지', checkCard(card(['u1'])).hasError);
+chk('checkCard 정상 카드 PASS', checkCard(goodCard, NOW).ok);
+chk('checkCard 구조 누락 탐지', checkCard(card(['u1']), NOW).hasError);
 
 console.log(`\n=== 결과: ${pass} PASS / ${fail} FAIL ===`);
 if (fail > 0) process.exit(1);

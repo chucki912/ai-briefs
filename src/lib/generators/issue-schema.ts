@@ -43,7 +43,7 @@ export const ISSUE_RESPONSE_SCHEMA = {
         keyInsight: {
             type: 'object',
             properties: {
-                text: { type: 'string', description: 'HBR/McKinsey 급 Key Insight 2~3문장: 구조적 변화→기업 영향→경영진 대응.' },
+                text: { type: 'string', description: '판단만 담는 Key Insight 2문장 내외: [구조적 변화 → 기업 경쟁력·비용·시장 접근성에 주는 영향]. 행동 제언·처방("~해야 한다", "경영진은…")을 절대 쓰지 말 것(행동은 soWhat 소관). "~하고 있습니다 / ~일 수 있습니다"로 끝낼 것.' },
                 restsOnFactIndices: { type: 'array', items: { type: 'integer' }, description: '이 인사이트가 근거하는 keyFacts의 위치(1-based). 최소 1개.' },
                 confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: '이 인사이트 근거의 확실성. 근거 fact 수·출처 다양성이 낮으면 high 금지.' },
                 mundaneAlternative: { type: 'string', description: '이 현상의 지루하고 평범한 설명 1문장(과잉 해석의 반례). 필수.' },
@@ -85,9 +85,12 @@ export const ISSUE_RESPONSE_SCHEMA = {
     required: ['headline', 'thesis', 'category', 'keyFacts', 'keyInsight', 'soWhat'],
 };
 
-export function buildIssuePrompt(indexedNews: string, frameworkLines: string, recentContextStr: string): string {
+export function buildIssuePrompt(indexedNews: string, frameworkLines: string, recentContextStr: string, today: string): string {
     return `당신은 **글로벌 AI 산업 전략 애널리스트**입니다. 아래 뉴스 클러스터를 근거로 구조화된 브리프 카드 1장을 작성하십시오.
 출력은 제공된 JSON 스키마를 반드시 따릅니다(스키마 외 필드 금지).
+
+## 오늘 날짜: ${today}
+- 모든 미래 시점(특히 killTrigger)은 **반드시 오늘(${today}) 이후**여야 합니다. 과거 연도(예: 2025)를 쓰지 마십시오. 학습 데이터 기준이 아니라 오늘 날짜 기준으로 판단하십시오.
 
 ## 뉴스 클러스터 (번호 부여됨 — sourceIndices는 이 번호를 참조)
 ${indexedNews}
@@ -114,6 +117,6 @@ ${KEY_INSIGHT_GUIDE}
    - 'observe'이면 observe(metric/cadence). metric은 셀 수 있는 지표여야 함.
    - 'none'이면 action·observe를 비울 것.
    - confidence가 'low'이면 actionType은 'observe' 또는 'none'만.
-   - \`killTrigger\`: 논지가 무너지는 조건에 **날짜 또는 수치를 반드시 포함**.
+   - \`killTrigger\`: 논지가 무너지는 조건. **오늘(${today}) 이후의 미래 날짜** 또는 관측 가능한 수치 임계를 포함할 것. 과거 날짜 금지.
 6. 문체: 한국어, 과장된 지정학 수사(패권/영토/서막/포위망 등) 금지. keyFacts는 개조식, keyInsight·soWhat은 완성형 문장.`;
 }

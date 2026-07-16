@@ -4,7 +4,7 @@ import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matche
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
-import { checkCard } from './analyzers/structured-checks';
+import { checkCard, SOURCE_POLICY } from './analyzers/structured-checks';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
@@ -127,7 +127,8 @@ export async function generateIssueFromCluster(
         ? recentIssues.map(issue => `- [${issue.headline}]\n  인사이트 요약: ${issue.insight.substring(0, 100)}...`).join('\n')
         : '이전 브리프 내용 없음';
 
-    const prompt = buildIssuePrompt(indexedNews, frameworkLines, recentContextStr);
+    const today = new Date().toISOString().slice(0, 10);
+    const prompt = buildIssuePrompt(indexedNews, frameworkLines, recentContextStr, today);
 
     try {
         // responseSchema로 구조화 출력 강제 (정규식 파싱 폐기). 전달받은 model의 클라이언트를 그대로 사용.
@@ -138,17 +139,28 @@ export async function generateIssueFromCluster(
         const parsed = JSON.parse((await result.response).text());
 
         // keyFacts: sourceIndices([n], 1-based) → sourceRef.id 결박 (R2)
-        const structuredFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: any, i: number) => {
+        const rawFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: any, i: number) => {
             const idxs: number[] = Array.isArray(f?.sourceIndices) ? f.sourceIndices : [];
             const sourceIds = idxs.map(n => sourceRefs[n - 1]?.id).filter((x): x is string => !!x);
             return { id: `f${i + 1}`, text: String(f?.text || '').trim(), sourceIds, publishedAt: f?.publishedAt || undefined };
         });
+
+        // AN: C2 하드 실패 — 미해석(Google 등) 소스에만 결박된 fact는 폐기(거짓 귀속 방지, 312 날조보다 정직한 사망)
+        const resolvedRefIds = new Set(sourceRefs.filter(s => s.resolved !== false).map(s => s.id));
+        const structuredFacts: KeyFactStructured[] = rawFacts
+            .map(f => ({ ...f, sourceIds: f.sourceIds.filter(id => resolvedRefIds.has(id)) }))
+            .filter(f => f.sourceIds.length >= 1);
+        if (structuredFacts.length < SOURCE_POLICY.MIN_SOURCED_FACTS) {
+            console.warn(`[C2 hard-fail] "${parsed.headline}": 해석된 소스에 결박된 fact ${structuredFacts.length} < ${SOURCE_POLICY.MIN_SOURCED_FACTS} → 카드 폐기(미해석 소스 과다)`);
+            return null;
+        }
+        const survivingIds = new Set(structuredFacts.map(f => f.id));
         const cleanedFacts = structuredFacts.map(f => f.text);
 
-        // keyInsight: restsOnFactIndices(1-based) → fact.id
+        // keyInsight: restsOnFactIndices(1-based) → fact.id (폐기된 fact 참조는 제거)
         const kiRaw = parsed.keyInsight || {};
         const restsOnFactIds = (Array.isArray(kiRaw.restsOnFactIndices) ? kiRaw.restsOnFactIndices : [])
-            .map((n: number) => structuredFacts[n - 1]?.id).filter((x: any): x is string => !!x);
+            .map((n: number) => rawFacts[n - 1]?.id).filter((x: any): x is string => !!x && survivingIds.has(x));
 
         // Key Insight 가드레일 검증 + 치명 위반 시 최대 1회 재생성 (insight 텍스트에 적용)
         const kiResult = await ensureValidKeyInsight(

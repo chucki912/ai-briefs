@@ -28,6 +28,9 @@ export interface CardCheckResult {
 /** 소스 무결성 실패로 간주할 도메인(R4 나이브 해석 0%). config에서 주입 가능. */
 export const BLOCKED_SOURCE_DOMAINS = ['news.google.com'];
 
+/** 소스 정책(튜너블). MIN_SOURCED_FACTS 미만이면 카드 폐기(AN). */
+export const SOURCE_POLICY = { MIN_SOURCED_FACTS: 2 };
+
 function host(url: string): string {
     try {
         return new URL(url).hostname.replace(/^www\./, '');
@@ -36,9 +39,26 @@ function host(url: string): string {
     }
 }
 
-/** C5: killTrigger가 날짜/수치 패턴을 포함 (어휘 아님, 형식). */
-const KILL_TRIGGER_CONCRETE =
-    /\d{4}|\bQ[1-4]\b|\bH[12]\b|\d+\s?%|\$\s?\d|\d+\s?(월|억|조|GW|kWh|bp|배)/;
+/** killTrigger 채점 설정(튜너블). */
+export const KILL = { MIN_HORIZON_DAYS: 30 };
+
+/** 날짜 없는 순수 임계(수치) 트리거 허용 패턴. */
+const KILL_NUMERIC_THRESHOLD = /\d+\s?%|\$\s?\d|\d+\s?(억|조|배|GW|kWh|bp|건|개|명)|지수|점 이하|점 이상/;
+
+/** killTrigger 텍스트에서 마감 시점(Date)을 파싱. 없으면 null. */
+export function parseKillDeadline(text: string): Date | null {
+    if (!text) return null;
+    const years = [...text.matchAll(/\b(20\d{2})\b/g)].map(m => parseInt(m[1], 10));
+    if (!years.length) return null;
+    const y = Math.max(...years);
+    const q = text.match(/([1-4])\s*분기|Q\s*([1-4])/);
+    const mo = text.match(/(1[0-2]|0?[1-9])\s*월/);
+    const day = text.match(/(3[01]|[12]\d|0?[1-9])\s*일/);
+    if (mo && day) return new Date(y, parseInt(mo[1], 10) - 1, parseInt(day[1], 10));
+    if (mo) return new Date(y, parseInt(mo[1], 10), 0); // 해당 월 말일
+    if (q) { const qq = parseInt(q[1] || q[2], 10); return new Date(y, qq * 3, 0); } // 분기 말일
+    return new Date(y, 11, 31); // 연말
+}
 
 // ── 카드 단위 체크 ───────────────────────────────────────────────────────────
 
@@ -71,12 +91,20 @@ export function c4_restsOnValid(insight: KeyInsightStructured, facts: KeyFactStr
     return [];
 }
 
-/** C5: soWhat.killTrigger가 날짜/수치 포함. */
-export function c5_killTriggerConcrete(sw: SoWhatV2): CheckIssue[] {
-    if (!sw.killTrigger || !KILL_TRIGGER_CONCRETE.test(sw.killTrigger)) {
-        return [{ code: 'c5_vague_killtrigger', severity: 'error', message: 'killTrigger에 날짜/수치 없음' }];
+/** C5': killTrigger가 미래에 채점 가능해야 함. 만료된 날짜/파싱불가 = 하드 실패. */
+export function c5prime_killTriggerFuture(sw: SoWhatV2, now: Date = new Date()): CheckIssue[] {
+    const text = sw.killTrigger || '';
+    const deadline = parseKillDeadline(text);
+    const cutoff = new Date(now.getTime() + KILL.MIN_HORIZON_DAYS * 86400000);
+    if (deadline) {
+        if (deadline.getTime() < cutoff.getTime()) {
+            return [{ code: 'c5_expired_killtrigger', severity: 'error', message: `killTrigger 만료/임박: ${deadline.toISOString().slice(0, 10)} < 오늘+${KILL.MIN_HORIZON_DAYS}일` }];
+        }
+        return [];
     }
-    return [];
+    // 날짜 없음 → 순수 수치 임계면 허용(미래 채점 가능), 아니면 실패
+    if (KILL_NUMERIC_THRESHOLD.test(text)) return [];
+    return [{ code: 'c5_undatable_killtrigger', severity: 'error', message: 'killTrigger에 미래 날짜도 수치 임계도 없음(채점 불가)' }];
 }
 
 /** C9': actionType='act' → confidence='high'. (자기신고 confidence를 act의 열쇠로 두되 C13이 별도 결박) */
@@ -115,8 +143,8 @@ export function c12_noneIsEmpty(sw: SoWhatV2): CheckIssue[] {
     return [];
 }
 
-/** 카드 전체 구조 체크 실행. */
-export function checkCard(issue: IssueItem): CardCheckResult {
+/** 카드 전체 구조 체크 실행. now: killTrigger 만료 판정 기준(주입 가능, 테스트/결정성). */
+export function checkCard(issue: IssueItem, now: Date = new Date()): CardCheckResult {
     const issues: CheckIssue[] = [];
     const facts = issue.structuredFacts;
     const sources = issue.sourceRefs;
@@ -130,7 +158,7 @@ export function checkCard(issue: IssueItem): CardCheckResult {
     issues.push(...c1_allFactsSourced(facts));
     issues.push(...c2_allSourcesResolved(sources));
     issues.push(...c4_restsOnValid(insight, facts));
-    issues.push(...c5_killTriggerConcrete(sw));
+    issues.push(...c5prime_killTriggerFuture(sw, now));
     issues.push(...c9prime_actRequiresHigh(sw, insight));
     issues.push(...c10_actComplete(sw));
     issues.push(...c11_observeHasMetric(sw));

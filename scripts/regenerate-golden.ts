@@ -1,70 +1,57 @@
 /**
- * 구현본으로 클러스터를 재생성하여 사람이 판정할 수 있는 카드를 출력.
- * 골든 3장 원본 클러스터가 오면 scripts/fixtures/golden-clusters.json에 넣고 실행.
- * 없으면 대표 클러스터(라틴 헤드라인 / 순수 한국어(R7) / 무관혼재(mixedness))로 스모크.
+ * 라이브 프로덕션 경로로 오늘 뉴스 top-5 카드를 생성해 사람이 판정할 수 있게 렌더.
+ * fetchAllNews → clusterNewsByTopic(복제, 프로덕션 동일) → slice(0,5) → generateIssueFromCluster.
+ * 정제·선별 없음. SHA·시각 기록.
  *
- *   npx tsx scripts/regenerate-golden.ts
- *   npx tsx scripts/regenerate-golden.ts --file=scripts/fixtures/golden-clusters.json
+ *   npx tsx scripts/regenerate-golden.ts            # 라이브 5장
+ *   npx tsx scripts/regenerate-golden.ts --n=5
  */
-import * as dotenv from 'dotenv'; import * as fs from 'fs'; import * as path from 'path';
+import * as dotenv from 'dotenv'; import * as fs from 'fs'; import * as path from 'path'; import { execSync } from 'child_process';
 for (const f of ['.env.local', '.env.development.local', '.env']) { const p = path.join(process.cwd(), f); if (fs.existsSync(p)) dotenv.config({ path: p }); }
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
+import { fetchAllNews } from '../src/lib/collectors/news-fetcher';
 import { generateIssueFromCluster } from '../src/lib/gemini';
 import { renderCard } from '../src/lib/generators/render-card';
 import { NewsItem } from '../src/types';
 
-function mk(id: string, title: string, desc: string, source: string): NewsItem {
-    return { id, title, description: desc, url: `https://${source.toLowerCase().replace(/\s/g, '')}.com/${id}`, source, publishedAt: new Date('2026-07-14') };
+// 프로덕션 clusterNewsByTopic 복제 (gemini.ts와 동일)
+const keyTerms = ['OpenAI', 'Anthropic', 'Google', 'Meta', 'Microsoft', 'NVIDIA', 'Apple AI', 'xAI', 'Mistral', 'GPT', 'Claude', 'Gemini', 'Llama', 'Sora', 'Reasoning', 'o1', 'o3', 'Agent', 'Robot', 'Physical Intelligence', 'Quantum', 'Semiconductor', 'HBM', 'Regulation', 'Safety', 'Copyright', 'Policy', 'Lawsuit'];
+function clusterNewsByTopic(items: NewsItem[]): NewsItem[][] {
+    const m = new Map<string, NewsItem[]>();
+    for (const it of items) {
+        let c = 'Global Trends';
+        const t = (it.title + ' ' + it.description).toLowerCase();
+        for (const k of keyTerms) { if (t.includes(k.toLowerCase())) { c = k; break; } }
+        if (!m.has(c)) m.set(c, []);
+        m.get(c)!.push(it);
+    }
+    return Array.from(m.values()).sort((a, b) => b.length - a.length);
 }
 
-// 대표 스모크 클러스터 3종
-const SMOKE: { name: string; cluster: NewsItem[] }[] = [
-    {
-        name: 'AI규제(라틴 헤드라인) — 다중 실소스',
-        cluster: [
-            mk('r1', 'EU finalizes high-risk AI safety audit mandate with revenue-based fines', 'Third-party audits required for frontier models; penalties scale with global revenue.', 'Reuters'),
-            mk('r2', 'AI Act enforcement: pre-market conformity assessment detailed', 'Regulators publish conformity assessment procedure for high-risk systems.', 'TechCrunch'),
-            mk('r3', 'Compliance auditing firms report surge in AI audit demand', 'Third-party AI audit market grows sharply as rules tighten.', 'The Verge'),
-            mk('r4', 'Startups warn AI compliance costs create barriers to entry', 'Small AI firms say audit and monitoring costs are prohibitive.', 'VentureBeat'),
-        ],
-    },
-    {
-        name: '배터리 광물(순수 한국어 헤드라인 유발) — R7 테스트',
-        cluster: [
-            mk('b1', 'Resource nations tighten critical mineral export controls', 'Several producer nations impose new export restrictions on lithium and nickel.', 'Bloomberg'),
-            mk('b2', 'Lithium and nickel price volatility widens', 'Battery raw material prices swing amid supply uncertainty.', 'Reuters'),
-            mk('b3', 'Korean battery makers announce refining and recycling in-house investment', 'LGES and peers invest to internalize refining and recycling capacity.', 'Electrive'),
-        ],
-    },
-    {
-        name: '무관혼재 — mixedness 테스트',
-        cluster: [
-            mk('m1', 'A country streamlines AI data center permitting process', 'Government consolidates administrative steps for data center approval.', 'Reuters'),
-            mk('m2', 'Unrelated startup opens new GPU cloud region', 'A firm launches a new cloud region for GPU workloads.', 'TechCrunch'),
-            mk('m3', 'Standards body circulates model evaluation methodology draft', 'A standards group shares a draft evaluation methodology for review.', 'The Verge'),
-        ],
-    },
-];
-
 async function main() {
-    const fileArg = process.argv.find(a => a.startsWith('--file='));
+    const nArg = process.argv.find(a => a.startsWith('--n='));
+    const N = nArg ? parseInt(nArg.split('=')[1], 10) : 5;
     const key = process.env.GEMINI_API_KEY;
     if (!key) { console.log('GEMINI_API_KEY 없음 — 종료'); return; }
+
+    let sha = 'unknown';
+    try { sha = execSync('git rev-parse HEAD').toString().trim(); } catch { /* */ }
+    console.log(`# 라이브 브리프 (프로덕션 경로) — SHA=${sha}  시각=${new Date().toISOString()}`);
+
+    const news = await fetchAllNews();
+    const clusters = clusterNewsByTopic(news);
+    const top = clusters.slice(0, N);
+    console.log(`# 수집 ${news.length} 아이템 → 클러스터 ${clusters.length} → top-${top.length}\n`);
+
     const model = new GoogleGenerativeAI(key).getGenerativeModel({ model: FLASH_MODEL });
-
-    let sets = SMOKE;
-    if (fileArg) {
-        const raw = JSON.parse(fs.readFileSync(fileArg.split('=')[1], 'utf-8'));
-        sets = raw.map((c: any, i: number) => ({ name: c.name || `golden-${i + 1}`, cluster: c.cluster || c }));
-    }
-
-    for (const s of sets) {
-        console.log(`\n========== ${s.name} (clusterSize=${s.cluster.length}) ==========`);
+    for (let i = 0; i < top.length; i++) {
+        const c = top[i];
+        console.log(`\n===== [카드 ${i + 1}] 입력 클러스터 (size=${c.length}) =====`);
+        c.forEach(n => console.log(`  - "${n.title}" — ${n.source}${/news\.google\.com/.test(n.url) ? ' (Google/미해석)' : ''}`));
         try {
-            const issue = await generateIssueFromCluster(model, s.cluster, []);
-            if (!issue) { console.log('  ⚠ null (생성 실패)'); continue; }
-            console.log(renderCard(issue));
+            const issue = await generateIssueFromCluster(model, c, []);
+            console.log(issue ? '\n' + renderCard(issue) : '  ⚠ null (생성 실패)');
         } catch (e) { console.log('  ✗', (e as Error).message); }
     }
 }

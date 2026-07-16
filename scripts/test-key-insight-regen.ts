@@ -96,11 +96,11 @@ async function run() {
 
     // 7. 대응 문장 없음(추상적) → 재생성 대상
     {
-        const bad =
-            'AI 규제가 강화되는 흐름이 나타나고 있다. 검증 비용이 늘어 대형 사업자에 유리할 수 있다. 관련 기업은 이를 예의주시해야 한다.';
+        // AM: 액션 검사 폐기. 대신 과장 지정학 수사(치명)로 재생성 트리거를 검증.
+        const bad = '빅테크가 기술 카르텔로 패권을 장악하고 있다. 시장이 재편될 수 있다.';
         const { gen } = mockGen(GOOD);
         const r = await ensureValidKeyInsight(bad, CTX, gen);
-        check('추상적 대응 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'vague_action'));
+        check('지정학 과장 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'geopolitics_hype'));
     }
 
     // 8. warning만 있는 경우(문체 과장) → 재생성하지 않음
@@ -123,12 +123,11 @@ async function run() {
 
     // 10. 재생성 결과가 더 나쁘면 1차 유지(fallback)
     {
-        // 1차: vague_action(에러 1건, 점수 10) / 재생성: 의도단정+대응없음(점수 20) → 1차 유지
-        const first =
-            'AI 규제가 강화되는 흐름이 나타나고 있다. 검증 비용이 늘어 대형 사업자에 유리할 수 있다. 관련 기업은 예의주시해야 한다.';
+        // 1차: 지정학 과장(에러 1건, 점수 10) / 재생성 STILL_BAD: 의도단정+분량(점수↑) → 1차 유지
+        const first = '빅테크가 카르텔로 시장을 재편하고 있다. 규제 변수가 커질 수 있다.';
         const { gen } = mockGen(STILL_BAD);
         const r = await ensureValidKeyInsight(first, CTX, gen);
-        check('재생성이 더 나쁨 → 1차 fallback', r.regenerated && r.chosen === 'first' && r.insight.includes('AI 규제'), `chosen=${r.chosen}`);
+        check('재생성이 더 나쁨 → 1차 fallback', r.regenerated && r.chosen === 'first' && r.insight.includes('카르텔'), `chosen=${r.chosen}`);
     }
 
     // 11. 생성기 오류 → 프로세스 중단 없이 1차 반환

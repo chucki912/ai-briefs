@@ -89,6 +89,7 @@ export interface IssueItem {
   keyInsight?: KeyInsightStructured;
   soWhatV2?: SoWhatV2;
   thesis?: string;          // F: singleTopicStatement+oneLineSummary 병합 단일 논지
+  clusterSize?: number;     // 사전태그: 생성 당시 입력 클러스터 크기(임계값 아님, 사후 분석용 기록)
 }
 
 // 브리핑 리포트 타입

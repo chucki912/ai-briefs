@@ -16,8 +16,10 @@ const parser = new Parser({
     },
 });
 
-const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY || '';
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '';
+// 호출 시점에 읽어야 한다: 모듈 스코프 캡처는 스크립트의 dotenv.config()보다
+// 먼저(import 호이스팅) 평가되어 로컬 실행에서 빈 값을 잡는다.
+const braveApiKey = () => process.env.BRAVE_SEARCH_API_KEY || '';
+const tavilyApiKey = () => process.env.TAVILY_API_KEY || '';
 
 // 뉴스 수집 메인 함수
 export async function fetchAllNews(): Promise<NewsItem[]> {
@@ -32,7 +34,7 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
     allNews.push(...googleNews);
 
     // 3. Brave Search에서 주요 키워드 검색 (강화)
-    if (BRAVE_API_KEY) {
+    if (braveApiKey()) {
         const braveNews = await fetchFromBraveSearch();
         allNews.push(...braveNews);
     } else {
@@ -40,7 +42,7 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
     }
 
     // 4. Tavily Search에서 주요 키워드 검색 (추가)
-    if (TAVILY_API_KEY) {
+    if (tavilyApiKey()) {
         const tavilyNews = await fetchFromTavilySearch();
         allNews.push(...tavilyNews);
     } else {
@@ -133,14 +135,18 @@ async function fetchFromBraveSearch(): Promise<NewsItem[]> {
     // Google News와 동일한 주요 키워드 사용 (교차 검증/보완)
     const searchKeywords = PRIMARY_KEYWORDS.slice(0, 5);
 
+    let first = true;
     for (const keyword of searchKeywords) {
+        // Brave 무료 티어는 1 req/s — 간격 없이 연속 호출하면 429로 키워드가 통째로 누락된다
+        if (!first) await new Promise(r => setTimeout(r, 1100));
+        first = false;
         try {
             const response = await fetch(
                 `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(keyword)}&count=5&search_lang=en&freshness=pd`,
                 {
                     headers: {
                         'Accept': 'application/json',
-                        'X-Subscription-Token': BRAVE_API_KEY
+                        'X-Subscription-Token': braveApiKey()
                     }
                 }
             );
@@ -205,7 +211,7 @@ async function fetchFromTavilySearch(): Promise<NewsItem[]> {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    api_key: TAVILY_API_KEY,
+                    api_key: tavilyApiKey(),
                     query: keyword,
                     search_depth: 'basic',
                     include_answer: false,

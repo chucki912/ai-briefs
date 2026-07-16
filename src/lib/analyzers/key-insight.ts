@@ -52,7 +52,6 @@ export type KeyInsightIssueCode =
     | 'empty' //          insight가 비어 있음
     | 'sentence_count' //  2~3문장 조건 위반
     | 'intent_assertion' // 근거 없는 의도 단정
-    | 'geopolitics_hype' // 과장된 패권·퇴출·완전 차단 등 확정 표현
     | 'style_hype' //      게임체인저·초격차 등 문체 과장(약한 경고)
     | 'unsupported_causal'; // 직접 근거 없는 강한 인과 주장
 
@@ -91,14 +90,6 @@ const INTENT_ASSERTION_PATTERNS: RegExp[] = [
     /(기득권|독점\s*체제|기존\s*질서)[을를]?\s*(지키|유지|공고|보호)/,
     /명분\s*(아래|하에|으로)/,
     /장치로\s*작용/,
-];
-
-/** 과장된 지정학·패권 수사(확정적으로 쓰면 치명적). */
-const GEOPOLITICS_HYPE_PATTERNS: RegExp[] = [
-    /카르텔/,
-    /패권(을|\s|주의)?/,
-    /완전(히)?\s*(차단|봉쇄|배제)/,
-    /(시장에서\s*)?(말살|퇴출|축출|고사)/,
 ];
 
 /** 문체 과장(약한 경고 수준). */
@@ -176,14 +167,7 @@ export function validateKeyInsight(insight: string): KeyInsightValidation {
         }
     }
 
-    // 3) 과장 지정학 수사(치명)
-    for (const re of GEOPOLITICS_HYPE_PATTERNS) {
-        const m = text.match(re);
-        if (m) {
-            issues.push({ code: 'geopolitics_hype', severity: 'error', message: `과장/지정학 수사 감지: "${m[0]}"` });
-            break;
-        }
-    }
+    // (지정학 수사 정규식 검사는 폐기됨 — 측정된 적중 없이 원본 카드를 역차단, 근본원인은 R5에서 중립화. AX)
 
     // 3-b) 문체 과장(경고)
     for (const re of STYLE_HYPE_PATTERNS) {
@@ -245,8 +229,6 @@ function issueToInstruction(code: KeyInsightIssueCode): string | null {
             return '총 2~3문장으로 맞출 것 (너무 짧거나 길지 않게)';
         case 'intent_assertion':
             return '특정 국가·정부·기업의 숨은 의도를 근거 없이 단정하지 말고, 구조적 결과(비용·경쟁구도 변화 등)로 서술할 것';
-        case 'geopolitics_hype':
-            return '패권·카르텔·완전 차단·퇴출 등 과장된 지정학 수사를 쓰지 말고 중립적·검증 가능한 표현으로 바꿀 것';
         case 'style_hype':
             return '게임체인저·초격차 등 과장 문체를 배제할 것';
         case 'unsupported_causal':

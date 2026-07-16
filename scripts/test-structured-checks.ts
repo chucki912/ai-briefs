@@ -2,7 +2,7 @@
 import {
     c1_allFactsSourced, c2_allSourcesResolved, c4_restsOnValid, c5prime_killTriggerFuture,
     c9prime_actRequiresHigh, c10_actComplete, c11_observeHasMetric, c12_noneIsEmpty,
-    c6_batchDupPairs, checkCard,
+    c13_highRequiresBinding, c14_minDistinctOutlets, c6_batchDupPairs, checkCard,
 } from '../src/lib/analyzers/structured-checks';
 import type { IssueItem, KeyFactStructured, KeyInsightStructured, SourceRef, SoWhatV2 } from '../src/types';
 
@@ -11,11 +11,12 @@ const chk = (name: string, cond: boolean, d?: string) => { if (cond) { pass++; c
 
 const facts: KeyFactStructured[] = [
     { id: 'f1', text: 'A', sourceIds: ['s1'] },
-    { id: 'f2', text: 'B', sourceIds: ['s2'] },
+    { id: 'f2', text: 'B', sourceIds: ['s2', 's3'] },
 ];
 const sources: SourceRef[] = [
     { id: 's1', url: 'https://reuters.com/a', outlet: 'Reuters', resolved: true },
     { id: 's2', url: 'https://theverge.com/b', outlet: 'Verge', resolved: true },
+    { id: 's3', url: 'https://bloomberg.com/c', outlet: 'Bloomberg', resolved: true },
 ];
 const insight: KeyInsightStructured = { text: 'x', claimType: 'inferred', restsOnFactIds: ['f1', 'f2'], confidence: 'high', mundaneAlternative: 'boring' };
 const swAct: SoWhatV2 = { ifInferenceHolds: 'a', unknown: 'b', actionType: 'act', action: { what: 'do', reversible: true, costIfWrong: 'c', costIfMissed: 'd' }, killTrigger: '2027년 12월 31일까지 50% 미달' };
@@ -50,6 +51,40 @@ chk('C11 정상', c11_observeHasMetric({ ...swAct, actionType: 'observe', action
 // C12
 chk('C12 none인데 action 존재 탐지', c12_noneIsEmpty({ ...swAct, actionType: 'none' }).length > 0);
 chk('C12 정상', c12_noneIsEmpty({ ...swAct, actionType: 'none', action: undefined }).length === 0);
+// C13 (high 결박 자격: restsOn fact ≥2 + outlets ≥3)
+chk('C13 high + 결박 충분 정상', c13_highRequiresBinding(insight, facts, sources).length === 0);
+chk('C13 high인데 outlet 부족 탐지', c13_highRequiresBinding(insight, [{ id: 'f1', text: 'A', sourceIds: ['s1'] }, { id: 'f2', text: 'B', sourceIds: ['s2'] }], sources).length > 0);
+chk('C13 high인데 restsOn fact 부족 탐지', c13_highRequiresBinding({ ...insight, restsOnFactIds: ['f2'] }, facts, sources).length > 0);
+chk('C13 medium은 비적용', c13_highRequiresBinding({ ...insight, confidence: 'medium', restsOnFactIds: ['f1'] }, facts, sources).length === 0);
+// C14 (무조건부 outlet 하한)
+chk('C14 단일 outlet 탐지', c14_minDistinctOutlets([sources[0]]).length > 0);
+chk('C14 동일 outlet 복수 기사 탐지', c14_minDistinctOutlets([
+    { id: 's1', url: 'https://techcrunch.com/a', outlet: 'TechCrunch AI' },
+    { id: 's2', url: 'https://techcrunch.com/b', outlet: 'TechCrunch AI' },
+]).length > 0);
+chk('C14 outlet 2개 정상', c14_minDistinctOutlets(sources.slice(0, 2)).length === 0);
+// BD: outlet 정규화 — host(url) 기준
+chk('BD 라벨 상이·동일 host = 1 outlet 탐지', c14_minDistinctOutlets([
+    { id: 's1', url: 'https://techcrunch.com/a', outlet: 'TechCrunch AI' },
+    { id: 's2', url: 'https://www.techcrunch.com/b', outlet: 'techcrunch.com' },
+]).length > 0);
+chk('BD 검색기 라벨 뭉개짐 해소(실 host 2개 = 정상)', c14_minDistinctOutlets([
+    { id: 's1', url: 'https://fortune.com/x', outlet: 'Tavily Search' },
+    { id: 's2', url: 'https://www.cbsnews.com/y', outlet: 'Tavily Search' },
+]).length === 0);
+// BE: 자사 채널 미계상
+chk('BE 보도자료는 독립 outlet 아님(1 독립 → 탐지)', c14_minDistinctOutlets([
+    sources[0],
+    { id: 's9', url: 'https://news.microsoft.com/x', outlet: 'news.microsoft.com' },
+]).length > 0);
+chk('BE newsroom/investor 패턴 탐지', c14_minDistinctOutlets([
+    { id: 's1', url: 'https://newsroom.acme.com/a', outlet: 'Acme' },
+    { id: 's2', url: 'https://investor.acme.com/b', outlet: 'Acme IR' },
+]).length > 0);
+chk('BE 프레스 있어도 독립 2개면 정상', c14_minDistinctOutlets([
+    sources[0], sources[1],
+    { id: 's9', url: 'https://news.microsoft.com/x', outlet: 'news.microsoft.com' },
+]).length === 0);
 // C6
 const card = (urls: string[]): IssueItem => ({ headline: 'h', keyFacts: [], insight: '', framework: '', sources: urls });
 chk('C6 교집합 병합후보', c6_batchDupPairs([card(['u1', 'u2']), card(['u1', 'u2', 'u3'])]).length === 1);

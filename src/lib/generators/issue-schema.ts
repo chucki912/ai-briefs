@@ -29,7 +29,9 @@ export const ISSUE_RESPONSE_SCHEMA = {
         excludedFacts: { type: 'array', items: { type: 'string' }, description: '주제와 무관하여 제외한 사실 1개 이상' },
         keyFacts: {
             type: 'array',
-            description: '정확히 3개. 보도된 사실만(메커니즘·인과·해석·의도 금지).',
+            minItems: 1,
+            maxItems: 3,
+            description: '최소 1개, 최대 3개. 보도된 사실만(메커니즘·인과·해석·의도 금지). 근거 있는 사실이 3개 미만이면 있는 만큼만 쓰고, 개수를 채우기 위해 사실을 만들지 말 것.',
             items: {
                 type: 'object',
                 properties: {
@@ -104,7 +106,7 @@ ${recentContextStr}
 ## 작성 규칙
 1. **headline**: keyFact에 있는 사건의 재진술. 새 주장·추론·지정학 수사를 도입하지 말 것. 30자 이내 한국어.
 2. **thesis**: 이 카드의 단일 논지 1문장(주장 명제). 사건 나열 금지.
-3. **keyFacts (정확히 3개)**: 보도된 사실만(수치·주체·날짜). **메커니즘·인과·해석·의도 추정 절대 금지**(그건 keyInsight 소관). 각 fact의 \`sourceIndices\`에 그 사실을 실제로 뒷받침하는 뉴스 번호를 **1개 이상** 넣을 것. 근거 없는 사실은 쓰지 말 것.
+3. **keyFacts (최소 1개, 최대 3개)**: 보도된 사실만(수치·주체·날짜). **메커니즘·인과·해석·의도 추정 절대 금지**(그건 keyInsight 소관). 각 fact의 \`sourceIndices\`에 그 사실을 실제로 뒷받침하는 뉴스 번호를 **1개 이상** 넣을 것. **입력에 근거 있는 사실이 3개 미만이면 그 개수만큼만 작성할 것 — 3개를 채우기 위해 사실을 만들지 말 것.**
 4. **keyInsight**:
 ${KEY_INSIGHT_GUIDE}
    - \`restsOnFactIndices\`: 이 인사이트가 근거하는 keyFacts 위치(1-based)를 명시.

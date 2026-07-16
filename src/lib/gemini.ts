@@ -4,7 +4,7 @@ import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matche
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
-import { checkCard, SOURCE_POLICY } from './analyzers/structured-checks';
+import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets } from './analyzers/structured-checks';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
@@ -152,15 +152,31 @@ export async function generateIssueFromCluster(
             .filter(f => f.sourceIds.length >= 1);
         if (structuredFacts.length < SOURCE_POLICY.MIN_SOURCED_FACTS) {
             console.warn(`[C2 hard-fail] "${parsed.headline}": 해석된 소스에 결박된 fact ${structuredFacts.length} < ${SOURCE_POLICY.MIN_SOURCED_FACTS} → 카드 폐기(미해석 소스 과다)`);
+            // 부검 덤프: 사인 판정용(BA). 원시 sourceIndices → 매핑된 id → resolved 필터 후를 단계별로 남긴다.
+            for (let i = 0; i < rawFacts.length; i++) {
+                const rawIdxs = Array.isArray(parsed.keyFacts?.[i]?.sourceIndices) ? parsed.keyFacts[i].sourceIndices : [];
+                const afterResolve = rawFacts[i].sourceIds.filter(id => resolvedRefIds.has(id));
+                console.warn(`[C2 autopsy] f${i + 1} "${rawFacts[i].text.slice(0, 70)}" 원시indices=[${rawIdxs.join(',')}] (클러스터 ${sourceRefs.length}건) → 유효id=[${rawFacts[i].sourceIds.join(',')}] → resolved후=[${afterResolve.join(',')}]`);
+            }
+            console.warn(`[C2 autopsy] refs: ${sourceRefs.map(s => `${s.id}=${s.outlet || s.url || '?'}${s.resolved === false ? '(미해석)' : ''}`).join(' ')}`);
             return null;
         }
         const survivingIds = new Set(structuredFacts.map(f => f.id));
         const cleanedFacts = structuredFacts.map(f => f.text);
 
-        // keyInsight: restsOnFactIndices(1-based) → fact.id (폐기된 fact 참조는 제거)
+        // keyInsight: restsOnFactIndices(1-based) → fact.id
         const kiRaw = parsed.keyInsight || {};
-        const restsOnFactIds = (Array.isArray(kiRaw.restsOnFactIndices) ? kiRaw.restsOnFactIndices : [])
-            .map((n: number) => rawFacts[n - 1]?.id).filter((x: any): x is string => !!x && survivingIds.has(x));
+        // AW / AR 규칙 (a): insight가 (C2로) 폐기된 fact를 하나라도 근거로 삼으면 카드 폐기.
+        //   silent 필터(폐기 참조만 지우고 발행)는 '지운 근거 위에 선 판단'을 내보낸다 —
+        //   271이 소스를 사후에 갈아엎던 것과 같은 구조. 정직한 사망을 택한다(AF 철학).
+        const restsOnRawIds: string[] = (Array.isArray(kiRaw.restsOnFactIndices) ? kiRaw.restsOnFactIndices : [])
+            .map((n: number) => rawFacts[n - 1]?.id).filter((x: any): x is string => !!x);
+        const droppedRestsOn = restsOnRawIds.filter(id => !survivingIds.has(id));
+        if (droppedRestsOn.length > 0) {
+            console.warn(`[AR hard-fail] "${parsed.headline}": keyInsight가 폐기된 fact(${droppedRestsOn.join(',')}) 위에 섬 → 카드 폐기`);
+            return null;
+        }
+        const restsOnFactIds = restsOnRawIds; // 전부 생존 fact(폐기 참조가 있었으면 위에서 이미 사망)
 
         // Key Insight 가드레일 검증 + 치명 위반 시 최대 1회 재생성 (insight 텍스트에 적용)
         const kiResult = await ensureValidKeyInsight(
@@ -201,6 +217,19 @@ export async function generateIssueFromCluster(
         const usedIds = new Set(structuredFacts.flatMap(f => f.sourceIds));
         const usedRefs = sourceRefs.filter(s => usedIds.has(s.id));
 
+        // C14 하드 실패: 단일 매체에만 근거한 카드는 내보내지 않는다(무조건부 outlet 하한, 원본 카드3 재발 방지).
+        const c14 = c14_minDistinctOutlets(usedRefs);
+        if (c14.length) {
+            console.warn(`[C14 hard-fail] "${parsed.headline}": ${c14[0].message} → 카드 폐기`);
+            return null;
+        }
+        // C13 하드 실패: 자기신고 high는 결박(restsOn fact 수·outlet 다양성)으로 자격을 증명해야 한다.
+        const c13 = c13_highRequiresBinding(keyInsight, structuredFacts, usedRefs);
+        if (c13.length) {
+            console.warn(`[C13 hard-fail] "${parsed.headline}": ${c13[0].message} → 카드 폐기`);
+            return null;
+        }
+
         const issue: IssueItem = {
             headline: parsed.headline,
             thesis: parsed.thesis,
@@ -219,6 +248,7 @@ export async function generateIssueFromCluster(
             soWhat: legacySoWhat, // legacy 파생
             framework: getFrameworkNames(frameworks),
             sources: usedRefs.map(s => s.url), // legacy 파생 (빈 배열이면 C1이 잡음, cluster[0] 날조 안 함)
+            clusterSize: cluster.length, // 사전태그(임계값 아님): size 하한 논의 재개 시 데이터로 쓰기 위한 기록
         };
 
         // 구조 체크 (C1/C2/C4/C5/C9'/C10/C11/C12)

@@ -2,7 +2,7 @@
  * 구조화 카드 컴퓨터블 체크 (LLM 없이 판정, 내용 미참조).
  * 전부 필드 관계·카디널리티·형식만 참조한다. 의미 판정은 여기 없다.
  *
- * 카드 단위: C1 C2 C4 C5 C9' C10 C11 C12
+ * 카드 단위: C1 C2 C4 C5 C9' C10 C11 C12 C13 C14
  * 배치 단위: C6
  */
 import type {
@@ -28,8 +28,13 @@ export interface CardCheckResult {
 /** 소스 무결성 실패로 간주할 도메인(R4 나이브 해석 0%). config에서 주입 가능. */
 export const BLOCKED_SOURCE_DOMAINS = ['news.google.com'];
 
-/** 소스 정책(튜너블). MIN_SOURCED_FACTS 미만이면 카드 폐기(AN). */
-export const SOURCE_POLICY = { MIN_SOURCED_FACTS: 2 };
+/** 소스 정책(튜너블). MIN_SOURCED_FACTS 미만이면 카드 폐기(AN). MIN_DISTINCT_OUTLETS 미만이면 카드 폐기(C14).
+ *  BC: MIN_SOURCED_FACTS 2→1 — fact 개수는 무결성 지표가 아니다(한계 fact를 끌어오는 슬롯 강요 재발).
+ *  무결성 = C1(fact당 소스 ≥1) + C14(카드당 독립 outlet ≥2)가 인수. */
+export const SOURCE_POLICY = { MIN_SOURCED_FACTS: 1, MIN_DISTINCT_OUTLETS: 2 };
+
+/** C13(튜너블): 자기신고 high의 결박 자격 요건. */
+export const C13_POLICY = { MIN_FACTS: 2, MIN_OUTLETS: 3 };
 
 function host(url: string): string {
     try {
@@ -37,6 +42,28 @@ function host(url: string): string {
     } catch {
         return '';
     }
+}
+
+/** outlet 식별자(BD): host(url) 우선 정규화 — 같은 실매체가 수집 경로에 따라
+ *  다른 라벨('TechCrunch AI' vs 'techcrunch.com')로 이중 계상되거나, 검색 수집기 라벨
+ *  ('Tavily Search')로 뭉개지는 것을 체크 시점에 해소한다. url 파싱 불가 시에만 라벨 폴백. */
+export function outletKey(s: SourceRef): string {
+    return host(s.url) || (s.outlet || '').trim() || s.url;
+}
+
+export function distinctOutlets(sources: SourceRef[]): number {
+    return new Set(sources.map(outletKey)).size;
+}
+
+/** BE: 자사 채널 도메인(보도자료·뉴스룸·IR). 사건의 1차 확인은 되지만 독립 검증이 아니므로
+ *  C14의 독립 outlet 계산에서 미계상한다(소스 표기에서는 유지 — 삭제가 아니라 미계상).
+ *  캐비앳: ^news\. 는 news.sky.com류 독립 매체도 걸 수 있다. 실측(2026-07-16) 부수 사망 0으로
+ *  단순 패턴을 유지하되, 운영에서 오탐이 확인되면 데이터로 돌아와 화이트리스트를 논한다. */
+export const PRESS_DOMAIN_PATTERNS: RegExp[] = [/^newsroom\./, /^press\./, /^news\./, /^investor(s)?\./];
+
+export function isPressDomain(url: string): boolean {
+    const h = host(url);
+    return !!h && PRESS_DOMAIN_PATTERNS.some(re => re.test(h));
 }
 
 /** killTrigger 채점 설정(튜너블). */
@@ -134,6 +161,35 @@ export function c11_observeHasMetric(sw: SoWhatV2): CheckIssue[] {
     return [];
 }
 
+/** C14: 카드가 결박한 소스의 독립 outlet 하한(무조건부). 단일 매체에만 근거한 카드 차단(원본 카드3).
+ *  BE: 자사 채널(PRESS_DOMAIN_PATTERNS)은 독립 outlet으로 세지 않는다. */
+export function c14_minDistinctOutlets(sources: SourceRef[], min = SOURCE_POLICY.MIN_DISTINCT_OUTLETS): CheckIssue[] {
+    const independent = sources.filter(s => !isPressDomain(s.url));
+    const n = distinctOutlets(independent);
+    return n < min
+        ? [{ code: 'c14_single_outlet', severity: 'error', message: `독립 outlet ${n} < ${min} (자사 채널 ${sources.length - independent.length}건 미계상)` }]
+        : [];
+}
+
+/** C13: confidence='high'는 결박으로 자격을 증명해야 함 — restsOn fact 수 + 그 fact들이 결박한 outlet 다양성. */
+export function c13_highRequiresBinding(
+    insight: KeyInsightStructured,
+    facts: KeyFactStructured[],
+    sources: SourceRef[],
+    policy = C13_POLICY,
+): CheckIssue[] {
+    if (insight.confidence !== 'high') return [];
+    const factById = new Map(facts.map(f => [f.id, f]));
+    const refById = new Map(sources.map(s => [s.id, s]));
+    const restsOn = insight.restsOnFactIds || [];
+    const sids = restsOn.flatMap(id => factById.get(id)?.sourceIds || []);
+    const outlets = new Set(sids.map(id => { const r = refById.get(id); return r ? outletKey(r) : id; })).size;
+    if (restsOn.length < policy.MIN_FACTS || outlets < policy.MIN_OUTLETS) {
+        return [{ code: 'c13_unbacked_high', severity: 'error', message: `confidence=high인데 restsOn fact ${restsOn.length}/${policy.MIN_FACTS}, outlets ${outlets}/${policy.MIN_OUTLETS} — 결박 미달` }];
+    }
+    return [];
+}
+
 /** C12: actionType='none' → action·observe 부재. */
 export function c12_noneIsEmpty(sw: SoWhatV2): CheckIssue[] {
     if (sw.actionType !== 'none') return [];
@@ -158,6 +214,8 @@ export function checkCard(issue: IssueItem, now: Date = new Date()): CardCheckRe
     issues.push(...c1_allFactsSourced(facts));
     issues.push(...c2_allSourcesResolved(sources));
     issues.push(...c4_restsOnValid(insight, facts));
+    issues.push(...c13_highRequiresBinding(insight, facts, sources));
+    issues.push(...c14_minDistinctOutlets(sources));
     issues.push(...c5prime_killTriggerFuture(sw, now));
     issues.push(...c9prime_actRequiresHigh(sw, insight));
     issues.push(...c10_actComplete(sw));

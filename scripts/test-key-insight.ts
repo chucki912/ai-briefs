@@ -28,11 +28,10 @@ const cases: Case[] = [
         mustWarnInclude: '의도 단정',
     },
     {
-        name: '과장 지정학 수사 (카르텔/패권)',
+        name: '[AX] 지정학 어휘 자체는 위반 아님 (정규식 게이트 폐기, 어휘 제어는 R5 프롬프트 소관)',
         insight:
             '빅테크는 기술 카르텔을 통해 패권을 장악하고 있다. 시장은 재편될 수 있다. 기업은 옵션을 확보할 필요가 있다.',
-        expectOk: false,
-        mustWarnInclude: '과장',
+        expectOk: true,
     },
     {
         name: '분량 위반 (1문장)',

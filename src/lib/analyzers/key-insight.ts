@@ -97,7 +97,6 @@ const INTENT_ASSERTION_PATTERNS: RegExp[] = [
 const GEOPOLITICS_HYPE_PATTERNS: RegExp[] = [
     /카르텔/,
     /패권(을|\s|주의)?/,
-    /헤게모니/,
     /완전(히)?\s*(차단|봉쇄|배제)/,
     /(시장에서\s*)?(말살|퇴출|축출|고사)/,
 ];

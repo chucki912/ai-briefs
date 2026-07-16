@@ -12,48 +12,38 @@
 
 /** insight JSON 필드에 넣을 스키마 설명(짧은 버전). 프롬프트 출력 형식 블록에서 사용. */
 export const KEY_INSIGHT_FIELD_SPEC =
-    'HBR·McKinsey 급 전략 보고서 문체의 Key Insight (2~3문장, 완성형 문장). ' +
-    '반드시 [산업의 구조적 변화 → 기업 경쟁력·비용·시장 접근성에 미치는 영향 → 경영진이 준비/결정해야 할 구체적 대응] ' +
-    '순서로 작성. keyFacts에 나열된 개별 사실을 되풀이하지 말고, 여러 신호가 공통으로 보여주는 상위 구조 변화로 압축할 것.';
+    'HBR·McKinsey 급 전략 보고서 문체의 Key Insight (2문장 내외, 완성형 문장). ' +
+    'insight는 **판단만** 담습니다: [산업의 구조적 변화 → 그 변화가 기업 경쟁력·비용·시장 접근성에 주는 영향]. ' +
+    '**행동 제언·처방("~해야 한다", "경영진은 …")을 절대 쓰지 마십시오 — 행동은 soWhat 전담입니다.** ' +
+    'keyFacts 개별 사실을 되풀이하지 말고 상위 구조 변화로 압축할 것.';
 
-/** STEP 5 insight 세부 지침(원칙 A/B/C). AI/배터리 프롬프트가 공유. */
-export const KEY_INSIGHT_GUIDE = `- **insight = "Key Insight" (경영전략 보고서용 핵심 결론)**:
-  아래 3단 구조를 **정확히 이 순서로** 2~3문장의 완성형 문장으로 작성하십시오.
-  1) **[구조적 변화]** 첫 문장: 이 클러스터의 여러 신호가 공통으로 보여주는 산업 구조의 상위 변화 1가지.
-  2) **[기업 영향]** 두 번째 문장: 그 변화가 기업의 경쟁력·비용·시장 접근성에 어떤 영향을 주는가.
-  3) **[경영진 대응]** 마지막 문장: 경영진이 지금 준비/결정해야 할 구체적 대응(대상과 행동을 명시).
+/** insight 세부 지침(원칙 A/B + 판단-한정). AI/배터리 프롬프트가 공유. */
+export const KEY_INSIGHT_GUIDE = `- **insight = "Key Insight" (판단만 — 처방 금지)**:
+  insight는 "무엇이 일어나고 있고, 왜 중요한가"라는 판단만 서술합니다. 2문장 내외.
+  1) **[구조적 변화]** 이 클러스터의 여러 신호가 공통으로 보여주는 산업 구조의 상위 변화 1가지.
+  2) **[기업 영향]** 그 변화가 기업의 경쟁력·비용·시장 접근성에 주는 영향.
+  ★ **행동/제언/베팅 금지**: "경영진은 …해야 한다", "…을 확보해야 한다", "…를 준비해야 한다" 같은 처방을 insight에 절대 쓰지 마십시오. 행동은 soWhat(actionType/action/observe)이 전담합니다. insight가 "~해야 한다"로 끝나면 실패입니다.
 
   ★ 원칙 A — 의도 추정 금지, 구조적 결과만 서술:
     - 특정 국가·정부·기업의 '숨은 의도'를 근거 없이 단정하지 마십시오.
       (❌ "미국이 후발주자를 제거하려 한다", "빅테크가 기술 카르텔을 영속화하려 한다")
     - 대신 구조적 결과로 환원하십시오.
       (⭕ "안전 규제가 강화될수록 검증·규제 대응 비용이 증가해 대형 사업자에 상대적으로 유리한 시장 구조가 형성될 수 있다")
-    - 확인된 사실 / 사실에서 도출한 합리적 해석 / 검증되지 않은 가설을 구분하고, 근거가 부족하면
-      "확대될 가능성이 있다", "상대적으로 유리할 수 있다", "향후 변수로 작용할 수 있다" 처럼 불확실성을 명시하십시오.
+    - 근거가 부족하면 "확대될 가능성이 있다", "상대적으로 유리할 수 있다" 처럼 불확실성을 명시하십시오.
 
   ★ 원칙 B — 개별 뉴스 나열 금지, 하나의 상위 구조 변화로 압축:
-    - 개별 기사를 나열하거나 근거 없이 인과로 잇지 말고, 기사들이 공통으로 가리키는 상위 변화를 도출하십시오.
-    - 뉴스 간 관계는 근거 수준에 맞게만 표현하십시오: [직접 인과]=명시적 근거 있음 / [간접 연관]=같은 구조 변화에 속하나 직접 인과 미확인 / [병렬 신호]=같은 주제일 뿐 상호 연결 근거 없음.
+    - 개별 기사를 나열하거나 근거 없이 인과로 잇지 말고, 공통으로 가리키는 상위 변화를 도출하십시오.
     - 직접 인과의 근거가 없으면 "~때문에", "~로 인해" 같은 인과 표현을 쓰지 마십시오.
 
-  ★ 원칙 C — 반드시 기업 의사결정으로 연결:
-    - 단순 전망·시장 해설로 끝내지 말고, 마지막 문장은 반드시 구체적 대응이어야 합니다.
-      (❌ "관련 기업은 변화에 대비해야 한다", "글로벌 규제 흐름을 주시할 필요가 있다")
-      (⭕ "글로벌 서비스를 운영하는 국내 기업은 특정 국가·클라우드 사업자 의존도를 낮추고 복수 공급망과 국제 표준 참여 채널을 선제 확보해야 한다")
-    - 근거 수준이 낮으면 대규모 투자나 즉각적 전략 전환을 요구하지 말고 단계적으로 제안하십시오:
-      모니터링할 선행지표 → 사전에 확보할 옵션 → 참여/협력 채널 → 조건 충족 시 실행할 대응.
-
   ★ 문체 제약:
-    - 과장된 지정학 수사("패권", "말살", "카르텔", "게임체인저", "초격차") 및 근거보다 강한 확정적 결론 금지.
-    - 고등학생도 핵심 의미를 이해할 만큼 명확하게, 전략 보고서에 그대로 삽입 가능한 문체로 작성.
-    - keyFacts·headline·oneLineSummary의 사실관계를 다시 나열하지 말 것(중복 금지).`;
+    - 과장된 지정학 수사("패권", "말살", "카르텔", "헤게모니", "게임체인저", "초격차") 및 근거보다 강한 확정적 결론 금지.
+    - keyFacts·headline·thesis의 사실관계를 다시 나열하지 말 것(중복 금지).`;
 
-/** 자체 검증 체크리스트 항목(문자열 배열). 프롬프트 체크리스트에 합류시켜 사용. */
+/** 자체 검증 체크리스트 항목(문자열 배열). */
 export const KEY_INSIGHT_CHECKLIST: string[] = [
-    'insight가 [구조적 변화 → 기업 영향 → 경영진 대응] 3단 구조를 이 순서로 담은 2~3문장인가?',
+    'insight가 [구조적 변화 → 기업 영향] 판단만 담고, 행동 제언("~해야 한다")을 포함하지 않았는가? (행동은 soWhat 소관)',
     'insight가 근거 없이 특정 주체의 숨은 의도를 단정하지 않았는가? (근거 부족 시 "~일 수 있다" 등으로 완화)',
     '개별 뉴스를 나열하지 않고 하나의 상위 산업 구조 변화로 압축했는가? (직접 인과 근거 없으면 인과 표현 배제)',
-    'insight 마지막 문장이 대상과 행동이 구체적인 경영진 대응으로 끝나는가?',
 ];
 
 // ── 검증 결과 타입 ──────────────────────────────────────────────────────────
@@ -62,11 +52,8 @@ export type KeyInsightIssueCode =
     | 'empty' //          insight가 비어 있음
     | 'sentence_count' //  2~3문장 조건 위반
     | 'intent_assertion' // 근거 없는 의도 단정
-    | 'geopolitics_hype' // 과장된 패권·퇴출·완전 차단 등 확정 표현
     | 'style_hype' //      게임체인저·초격차 등 문체 과장(약한 경고)
-    | 'unsupported_causal' // 직접 근거 없는 강한 인과 주장
-    | 'missing_action' //  경영진 대응 요소 자체가 없음
-    | 'vague_action'; //   대응이 "주시/대비" 수준으로 추상적
+    | 'unsupported_causal'; // 직접 근거 없는 강한 인과 주장
 
 export type KeyInsightSeverity = 'warning' | 'error';
 
@@ -105,14 +92,6 @@ const INTENT_ASSERTION_PATTERNS: RegExp[] = [
     /장치로\s*작용/,
 ];
 
-/** 과장된 지정학·패권 수사(확정적으로 쓰면 치명적). */
-const GEOPOLITICS_HYPE_PATTERNS: RegExp[] = [
-    /카르텔/,
-    /패권(을|\s|주의)?/,
-    /완전(히)?\s*(차단|봉쇄|배제)/,
-    /(시장에서\s*)?(말살|퇴출|축출|고사)/,
-];
-
 /** 문체 과장(약한 경고 수준). */
 const STYLE_HYPE_PATTERNS: RegExp[] = [
     /게임\s*체인저/,
@@ -133,18 +112,6 @@ const HEDGE_PATTERN =
 const CAUSAL_PATTERN =
     /(때문에|로\s*인해|으로\s*인해|초래|야기|전제로|전제되어|초석(이다|으로)|담보한|으로\s*귀결)/;
 
-/** 구체적 경영진 대응(액션) 신호. */
-const CONCRETE_ACTION_PATTERN =
-    /(확보|구축|다변화|다각화|점검|마련|도입|강화|전환|참여|낮춰|낮추|줄여|줄이|늘려|투자|재편|우선순위|재조정|선제|계약|파트너십|공급망|채널|내재화|분산|헤지|테스트|파일럿|신설|증설|편성)/;
-
-/** 행동 지시형 종결(대응 존재 신호). '~아/어야 (한다/합니다…)' 의무형을 일반적으로 포착
- *  (해야·하여야·내려야·높여야·확보해야 등 모두 커버). */
-const DIRECTIVE_ENDING_PATTERN =
-    /([가-힣]야\s*(한다|합니다|하는|할\s|하며|하고|함|하겠)|필요가\s*있|필요하다|권고|제안|바람직|요구된다|둘\s*필요|관건)/;
-
-/** 추상적 관망 표현(구체 행동 없이 이걸로만 끝나면 vague). */
-const VAGUE_WATCH_PATTERN = /(주시|예의주시|관심을\s*기울|촉각|지켜봐야|주목|관찰|대비)/;
-
 /**
  * 문장 수 계산. 완성형 문장(마침표/물음표/느낌표 종결 또는 '~다' 종결)을 센다.
  * 소수점(3.5) 오탐을 방지한다.
@@ -156,17 +123,6 @@ export function countSentences(text: string): number {
     const punct = (cleaned.match(/[.!?。]/g) || []).length;
     if (punct > 0) return punct;
     return (cleaned.match(/다(?=\s|$|["'”’)\]])/g) || []).length || 1;
-}
-
-/** 문장 단위 분리(경영진 대응=마지막 문장 판정에 사용). */
-function splitSentences(text: string): string[] {
-    const cleaned = (text || '').replace(/(\d)\.(\d)/g, '$1$2').trim();
-    if (!cleaned) return [];
-    const parts = cleaned
-        .split(/(?<=[.!?。])\s+/)
-        .map(s => s.trim())
-        .filter(Boolean);
-    return parts.length > 0 ? parts : [cleaned];
 }
 
 /**
@@ -211,14 +167,7 @@ export function validateKeyInsight(insight: string): KeyInsightValidation {
         }
     }
 
-    // 3) 과장 지정학 수사(치명)
-    for (const re of GEOPOLITICS_HYPE_PATTERNS) {
-        const m = text.match(re);
-        if (m) {
-            issues.push({ code: 'geopolitics_hype', severity: 'error', message: `과장/지정학 수사 감지: "${m[0]}"` });
-            break;
-        }
-    }
+    // (지정학 수사 정규식 검사는 폐기됨 — 측정된 적중 없이 원본 카드를 역차단, 근본원인은 R5에서 중립화. AX)
 
     // 3-b) 문체 과장(경고)
     for (const re of STYLE_HYPE_PATTERNS) {
@@ -238,30 +187,7 @@ export function validateKeyInsight(insight: string): KeyInsightValidation {
         });
     }
 
-    // 5) 경영진 대응(액션)은 '마지막 문장'에서 판정.
-    //    핵심: 경영진 대응은 '지시형 종결'(해야/필요/권고…)을 요구한다.
-    //    지시형 없이 전망·서술로 끝나면(예: "…재편될 전망이다") 대응 부재로 본다.
-    //    (배경 문장의 '강화/전환'이나 서술 속 '확보한' 등의 오탐을 함께 차단)
-    const sentences = splitSentences(text);
-    const lastSentence = sentences[sentences.length - 1] || text;
-    const hasConcrete = CONCRETE_ACTION_PATTERN.test(lastSentence);
-    const hasDirective = DIRECTIVE_ENDING_PATTERN.test(lastSentence);
-    const hasVague = VAGUE_WATCH_PATTERN.test(lastSentence);
-    if (!hasDirective) {
-        // 지시형 종결이 없음 → 전망/서술로 끝남
-        issues.push(
-            hasVague
-                ? { code: 'vague_action', severity: 'error', message: '경영진 대응이 "주시/대비" 수준으로 추상적임(구체적 행동 부재)' }
-                : { code: 'missing_action', severity: 'error', message: '경영진 대응(행동 제안)이 없이 전망/서술로 종결됨' },
-        );
-    } else if (hasVague && !hasConcrete) {
-        // 지시형은 있으나 "주시/대비해야 한다" 수준으로만 끝남
-        issues.push({
-            code: 'vague_action',
-            severity: 'error',
-            message: '경영진 대응이 "주시/대비" 수준으로 추상적임(구체적 행동 부재)',
-        });
-    }
+    // (경영진 대응/액션 검사는 폐기됨 — insight는 판단만, 행동은 soWhat 소관. AM)
 
     const hasError = issues.some(i => i.severity === 'error');
     return {
@@ -303,16 +229,10 @@ function issueToInstruction(code: KeyInsightIssueCode): string | null {
             return '총 2~3문장으로 맞출 것 (너무 짧거나 길지 않게)';
         case 'intent_assertion':
             return '특정 국가·정부·기업의 숨은 의도를 근거 없이 단정하지 말고, 구조적 결과(비용·경쟁구도 변화 등)로 서술할 것';
-        case 'geopolitics_hype':
-            return '패권·카르텔·완전 차단·퇴출 등 과장된 지정학 수사를 쓰지 말고 중립적·검증 가능한 표현으로 바꿀 것';
         case 'style_hype':
             return '게임체인저·초격차 등 과장 문체를 배제할 것';
         case 'unsupported_causal':
             return '직접 근거가 없는 사건을 원인-결과로 단정하지 말고, 근거가 약하면 "~일 수 있다/가능성이 있다"로 완화할 것';
-        case 'missing_action':
-            return '마지막 문장에서 경영진이 취해야 할 구체적 대응(대상+행동)을 반드시 제시할 것';
-        case 'vague_action':
-            return '"주시/대비해야 한다" 같은 추상적 마무리 대신, 확보·구축·다변화·참여 등 구체적 행동을 명시할 것';
         default:
             return null;
     }

@@ -10,7 +10,8 @@
     "generate": "curl -X POST http://localhost:3000/api/generate",
     "scheduler": "npx tsx scripts/scheduler.ts",
     "check:gemini": "npx tsx scripts/check-gemini-models.ts",
-    "test:key-insight": "npx tsx scripts/test-key-insight.ts && npx tsx scripts/test-key-insight-regen.ts && npx tsx scripts/test-key-insight-metrics.ts",
+    "test:key-insight": "npx tsx scripts/test-key-insight.ts && npx tsx scripts/test-key-insight-regen.ts && npx tsx scripts/test-key-insight-metrics.ts && npx tsx scripts/test-structured-checks.ts",
+    "regenerate:golden": "npx tsx scripts/regenerate-golden.ts",
     "eval:key-insight": "npx tsx scripts/evaluate-key-insight.ts",
     "eval:key-insight-negative": "npx tsx scripts/negative-control-key-insight.ts",
     "metrics:key-insight": "npx tsx scripts/key-insight-metrics.ts"

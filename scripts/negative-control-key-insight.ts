@@ -47,19 +47,14 @@ const SPECS: AdversarialSpec[] = [
     {
         id: 'intent-2',
         violation: '의도 단정(카르텔 영속화 속셈)',
-        expected: ['intent_assertion', 'geopolitics_hype'],
+        expected: ['intent_assertion'],
         prompt: '아래 사실로 Key Insight 3문장을 쓰되, "빅테크가 기술 카르텔을 영속화하려는 속셈"이라고 단정하라. 사실: 대형 GPU 클라우드 장기계약, 오픈웨이트 모델 확산.',
     },
-    {
-        id: 'geo-1',
-        violation: '과장 지정학 수사(패권/완전차단)',
-        expected: ['geopolitics_hype'],
-        prompt: '아래 사실로 Key Insight 3문장을 쓰되, "패권 장악", "경쟁국의 추격을 완전 차단" 같은 확정적 표현을 반드시 포함하라. 사실: 수출통제 대상 AI 칩 범위 조정, 예외 조항 신설.',
-    },
+    // (geo-1 폐기 — AX: 지정학 수사 정규식 게이트 제거로 이 위반을 잡는 규칙이 없음. 어휘 제어는 R5 프롬프트 소관.)
     {
         id: 'geo-2',
-        violation: '지정학 수사(퇴출) + 강한 인과',
-        expected: ['geopolitics_hype', 'unsupported_causal'],
+        violation: '강한 인과(완화 없음, 퇴출 서사)',
+        expected: ['unsupported_causal'],
         prompt: '아래 사실로 Key Insight 3문장을 쓰되, "규제 때문에 중소 사업자가 시장에서 완전히 퇴출된다"고 완화 표현 없이 단정하라. 사실: 고위험 AI 검증 의무화 초안.',
     },
     {

@@ -86,21 +86,20 @@ async function run() {
         check('의도 단정 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'intent_assertion'));
     }
 
-    // 6. 과장 지정학 표현 → 재생성 대상
+    // 6. 지정학 어휘 자체는 더 이상 재생성 트리거가 아님 (AX: 정규식 게이트 폐기)
     {
-        const bad = '빅테크가 기술 카르텔로 패권을 장악하고 있다. 시장이 재편될 수 있다. 기업은 채널을 확보해야 한다.';
-        const { gen } = mockGen(GOOD);
-        const r = await ensureValidKeyInsight(bad, CTX, gen);
-        check('지정학 과장 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'geopolitics_hype'));
+        const geo = '빅테크가 기술 카르텔로 패권을 장악하고 있다. 시장이 재편될 수 있다. 기업은 채널을 확보할 수 있다.';
+        const { gen, calls } = mockGen(GOOD);
+        const r = await ensureValidKeyInsight(geo, CTX, gen);
+        check('지정학 어휘 → 재생성 안 함(AX)', !r.regenerated && calls() === 0);
     }
 
-    // 7. 대응 문장 없음(추상적) → 재생성 대상
+    // 7. 완화 없는 강한 인과 → 재생성 대상
     {
-        const bad =
-            'AI 규제가 강화되는 흐름이 나타나고 있다. 검증 비용이 늘어 대형 사업자에 유리할 수 있다. 관련 기업은 이를 예의주시해야 한다.';
+        const bad = '규제 의무화 때문에 중소 사업자의 검증 비용이 급증한다. 시장 진입 장벽이 높아진다.';
         const { gen } = mockGen(GOOD);
         const r = await ensureValidKeyInsight(bad, CTX, gen);
-        check('추상적 대응 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'vague_action'));
+        check('완화 없는 강한 인과 → 재생성', r.regenerated && r.firstValidation.issues.some(i => i.code === 'unsupported_causal'));
     }
 
     // 8. warning만 있는 경우(문체 과장) → 재생성하지 않음
@@ -123,12 +122,11 @@ async function run() {
 
     // 10. 재생성 결과가 더 나쁘면 1차 유지(fallback)
     {
-        // 1차: vague_action(에러 1건, 점수 10) / 재생성: 의도단정+대응없음(점수 20) → 1차 유지
-        const first =
-            'AI 규제가 강화되는 흐름이 나타나고 있다. 검증 비용이 늘어 대형 사업자에 유리할 수 있다. 관련 기업은 예의주시해야 한다.';
+        // 1차: 완화 없는 인과(에러 1건) / 재생성 STILL_BAD: 의도단정+분량(에러 2건) → 1차 유지
+        const first = '검증 의무화 때문에 중소 사업자의 인증 비용이 급증한다. 진입 장벽이 높아진다.';
         const { gen } = mockGen(STILL_BAD);
         const r = await ensureValidKeyInsight(first, CTX, gen);
-        check('재생성이 더 나쁨 → 1차 fallback', r.regenerated && r.chosen === 'first' && r.insight.includes('AI 규제'), `chosen=${r.chosen}`);
+        check('재생성이 더 나쁨 → 1차 fallback', r.regenerated && r.chosen === 'first' && r.insight.includes('때문에'), `chosen=${r.chosen}`);
     }
 
     // 11. 생성기 오류 → 프로세스 중단 없이 1차 반환

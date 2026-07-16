@@ -1,8 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { NewsItem, IssueItem } from '@/types';
+import { NewsItem, IssueItem, SourceRef, KeyFactStructured, KeyInsightStructured, SoWhatV2 } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
-import { KEY_INSIGHT_FIELD_SPEC, KEY_INSIGHT_GUIDE, KEY_INSIGHT_CHECKLIST, ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
+import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
+import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
+import { checkCard } from './analyzers/structured-checks';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
@@ -106,212 +108,114 @@ export async function generateIssueFromCluster(
     const primaryNews = cluster[0];
     const frameworks = matchFrameworks(primaryNews.title, primaryNews.description);
 
-    // 뉴스 리스트에 인덱스 부여
-    const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n출처: ${n.url}`).join('\n\n');
+    // 소스 참조(fact 결박 대상, R2) — 카드 단위 flat sources 폐기
+    const sourceRefs: SourceRef[] = cluster.map((n, i) => ({
+        id: `s${i + 1}`,
+        url: n.url,
+        outlet: n.source,
+        title: n.title,
+        publishedAt: n.publishedAt instanceof Date ? n.publishedAt.toISOString() : undefined,
+        resolved: !/news\.google\.com/.test(n.url), // Google 리다이렉트는 미해석(R4 나이브 0%)
+    }));
+    // 뉴스 리스트에 인덱스 부여 (sourceIndices가 이 번호를 참조)
+    const indexedNews = cluster.map((n, i) => `[${i + 1}] ${n.title} — ${n.source || ''}`).join('\n');
+    const frameworkLines = frameworks.length
+        ? frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')
+        : '지정된 렌즈 없음(none). 프레임워크를 언급하지 말고 사실 기반으로만 분석할 것.';
 
     const recentContextStr = recentIssues.length > 0
         ? recentIssues.map(issue => `- [${issue.headline}]\n  인사이트 요약: ${issue.insight.substring(0, 100)}...`).join('\n')
         : '이전 브리프 내용 없음';
 
-    const prompt = `당신은 **글로벌 AI 산업 전략 애널리스트**입니다.
-
----
-
-## 뉴스 클러스터 정보 (인덱스 부여됨)
-${indexedNews}
-
----
-
-## 적용 분석 프레임워크
-${frameworks.length
-            ? `아래는 참고용 분석 렌즈임. 렌즈의 명칭·수사를 본문에 그대로 복제하지 말고, 제공된 사실에 근거한 분석에만 사용할 것.\n${frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}`
-            : `지정된 분석 렌즈 없음(none). 특정 프레임워크를 언급하거나 억지로 끼워넣지 말고, 오직 제공된 사실에 근거하여 분석할 것.`}
-
----
-
-## 브리프 시리즈 컨텍스트
-${recentContextStr}
-
----
-
-## 출력 형식 (JSON)
-
-{
-  "headline": "한국어 헤드라인 (30자 이내)",
-  "category": "아래 허용 목록 중 1개 선택",
-  "singleTopicStatement": "단일 주장/논지 (50자 이내): 핵심 사건 1개와 이를 보강하는 데이터들을 엮은 단일 핵심 논지/주장 문장",
-  "excludedFacts": ["주제와 무관하여 제외한 사실 1", "제외한 사실 2"],
-  "keyFacts": [
-    "[보도된 사실만: 구체적 수치·주체·날짜 포함. 메커니즘·인과·해석·의도는 절대 쓰지 말 것(그건 insight 소관). 출처·검증 꼬리표 없이 사실만 서술]",
-    "[보도된 사실만]",
-    "[보도된 사실만]"
-  ],
-  "insight": "${KEY_INSIGHT_FIELD_SPEC}",
-  "confidence": "high | medium | low 중 1개 — 이 insight의 근거 확실성 자기평가",
-  "soWhat": {
-    "ifTrue": "이 신호가 사실이라면 산업 구조/경쟁 구도에서 무엇이 바뀌는가 (완성형 1문장)",
-    "uncertain": "아직 검증되지 않았거나 주시해야 할 핵심 변수 (완성형 1문장)",
-    "bet": "지금 시점의 합리적 베팅/대응 방향 — 구체적 주어 포함 (완성형 1문장)",
-    "downside": "그 베팅이 틀렸을 때 감수해야 할 비용 또는 하방 리스크 (완성형 1문장)"
-  },
-  "hashtags": ["#키워드1", "#키워드2", "#키워드3"],
-  "oneLineSummary": "이 카드가 주장하는 단일 논지(Thesis) 1문장 (100자 이내). 요약이 아닌 핵심 주장 명제여야 하며 팩트의 단순 나열을 금지함.",
-  "relevantSourceIndices": [1, 2]
-}
-
----
-
-## 허용 category 목록 (반드시 아래 중 1개만 선택)
-
-- Platform & Ecosystem
-- Geopolitics & AI Regulation
-- Computing Infrastructure
-- AI Safety & Ethics
-- Investment & Capital
-- Enterprise AI Adoption
-- Model & Technology
-- Sovereign AI & Policy
-
----
-
-## 작성 절차 (반드시 아래 순서로 실행)
-
-### STEP 1. singleTopicStatement 확정 (단일 논지 지향)
-- 클러스터 내에서 가장 파급력이 큰 **"핵심 사건 1개"**와 이를 보강하는 관련 데이터 1~2개를 엮어, 파편화되지 않은 단일 논지(Thesis)를 세우십시오.
-- 클러스터에 서로 무관한 별개의 중대 발표들이 섞여 있다면 가장 지배적인 1개의 흐름만 선택하고 나머지는 버리십시오.
-
-### STEP 2. 후보 사실 필터링 및 쪼개기 (keyFacts 작성 전 필수 실행)
-- Q. "이 팩트는 STEP 1에서 선택한 핵심 논지를 뒷받침하는 팩트인가?"
-  - YES → keyFacts 후보에 포함
-  - NO  → 무조건 excludedFacts에 버릴 것.
-- **수치적 엄밀성**: keyFacts에 수치(금액, 비중, 성능 등)가 언급될 경우 가능한 한 구체적인 수치와 기업명을 명확히 포함하십시오.
-- **출처·검증 태그 금지**: keyFacts 문장 끝에 \`(Yahoo Finance, 2026년 7월 / 검증됨)\`, \`(... / 미검증)\`, \`(... 기준 / 신뢰도 보통)\` 같은 출처명·시점·신뢰도 꼬리표를 절대 붙이지 마십시오. 출처는 하단 Sources 링크로만 제공하며, 팩트 문장은 순수하게 사실만 서술합니다.
-  * 예: "NVIDIA의 Blackwell 칩 공급 지연 가능성 제기"
-  * 예: "CapEx $20B 투자 발표"
-- **중요 (독립성)**: keyFacts 작성 시 singleTopicStatement(논지) 및 insight(시사점)의 내용을 반복하여 재진술하지 마십시오. 오직 객관적 팩트와 수치 데이터 전달에 집중해야 합니다.
-- 팩트의 매끄러운 연결: 3개의 팩트는 핵심 논지를 구성하는 배경 -> 경과 -> 결과 또는 구체적 증거 데이터 형태로 긴밀히 연결되어야 합니다.
-- **keyFacts에는 메커니즘·인과·해석·의도 추정을 절대 포함하지 마십시오. 오직 보도된 사실(수치·주체·날짜)만 서술합니다. 해석은 insight에서만 전개합니다.**
-
-### STEP 4. 시리즈 컨텍스트 빌드업 (시리즈 컨텍스트가 있을 때 필수)
-- 이전 브리프들의 요약(이전 논지 및 인사이트)을 읽고 **유기적으로 연결되는 서사(Storyline)**를 구성하십시오.
-- 이전 브리프가 다룬 위협/기회와 어떻게 맞물려 흐름을 형성하는지 융합하십시오.
-
-### STEP 5. insight(Key Insight) 및 soWhat 작성 (★판단형 의사결정 체계 적용★)
-${KEY_INSIGHT_GUIDE}
-  - 프레임워크가 지정된 경우에만 분석 렌즈로 참고하되, 프레임워크 명칭·수사를 본문에 복제하지 마십시오. 지정되지 않았으면(none) 프레임워크를 언급하지 말고 사실 기반으로만 분석하십시오.
-  - soWhat은 위 Key Insight를 실행 관점에서 분해하는 상세 의사결정 매트릭스입니다. insight의 마지막(경영진 대응) 문장은 방향성 수준으로 제시하고, 구체적 베팅은 soWhat.bet에서 전개하여 문장을 그대로 복제하지 마십시오.
-- **soWhat (4분 구조)**:
-  - \`ifTrue\`: 이 신호가 노이즈가 아닌 실질적 사실이자 영구적 추세일 때 변하는 업계의 역학 구도를 기술하십시오.
-  - \`uncertain\`: 현재 시점에서 아직 확인되지 않은 핵심 변수나 위험 요소를 명시하십시오.
-  - \`bet\`: 현 상황에서 독자(의사결정 주체)가 감행해야 할 구체적이고 합리적인 베팅 전략을 구체적 주어(예: "국내 B2B SaaS 기업은...", "온디바이스 칩 제조사는...")를 포함하여 1문장으로 제시하십시오.
-  - \`downside\`: 이 베팅이 실패하거나 가정이 틀렸을 때 직면하게 될 기회비용 또는 하방 리스크를 냉정하게 1문장으로 명시하십시오.
-
----
-
-## 작성 규칙
-
-### [규칙 1] 문체
-- 100% 한국어 (기업명·전문용어 영문 병기)
-- 전 항목 개조식 축약 문체 (명사형 종결: ~함, ~임, ~전망). 단, **insight 및 soWhat의 각 필드는 인과가 흐르는 완성형 문장으로 작성**할 것.
-- 서술형 종결어미 완전 배제 (insight 및 soWhat 제외)
-
-### [규칙 2] category 선택
-- 허용 목록 중 1개만 선택
-
-### [규칙 3] excludedFacts 의무 기재
-- 후보에서 제외한 사실을 반드시 1개 이상 기재
-
-### [규칙 4] relevantSourceIndices
-- keyFacts에 직접 인용된 사실의 출처 기사 번호만 포함
-- 정수 배열로만 표기
-
----
-
-## 자체 검증 체크리스트 (JSON 출력 전 순서대로 확인)
-[ ] 1. 핵심 사건을 중심으로 단일 논지를 관통하는 singleTopicStatement를 확정했는가?
-[ ] 2. keyFacts 각 문장 끝에 출처명·시점·신뢰도(검증됨/미검증 등) 꼬리표가 붙지 않고 순수 사실만 서술되었는가?
-[ ] 3. (Key Insight) ${KEY_INSIGHT_CHECKLIST.map((c, i) => `3-${i + 1}. ${c}`).join('\n[ ] ')}
-[ ] 4. insight의 경영진 대응 문장이 soWhat.bet과 문장 단위로 중복되지 않고 방향성/실행의 층위가 구분되는가?
-[ ] 5. soWhat의 4가지 필드(ifTrue, uncertain, bet, downside)가 각각 명확하게 1문장씩의 완성형 문장으로 작성되었는가?
-[ ] 6. soWhat.bet에 구체적인 주어가 명시되어 있는가?
-[ ] 7. category가 허용 목록 내 1개인가?
-[ ] 8. relevantSourceIndices가 keyFacts 출처만 포함하는가?
-[ ] 9. 각 필드 간(headline, oneLineSummary, keyFacts, insight) 내용의 복제 및 중복 서술이 철저하게 배제되었는가? (헤드라인=사건, 요약=논지명제, 팩트=사실만, 인사이트=시사점만)
-[ ] 10. oneLineSummary가 단순한 사건 요약이 아니라, 이 브리프가 주장하는 핵심 논지(Thesis) 명제인가?
-
-**★ 위 2, 3, 5, 6, 9 항목 중 하나라도 실패하면 해당 섹션을 즉시 재생성할 것 ★**
-
-체크리스트 결과는 출력하지 마세요. JSON만 출력하세요.`;
+    const prompt = buildIssuePrompt(indexedNews, frameworkLines, recentContextStr);
 
     try {
-        const result = await generateWithRetry(model, prompt);
-        const response = await result.response;
-        const text = response.text();
+        // responseSchema로 구조화 출력 강제 (정규식 파싱 폐기). 전달받은 model의 클라이언트를 그대로 사용.
+        const result = await generateWithRetry(model, {
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json', responseSchema: ISSUE_RESPONSE_SCHEMA as any },
+        });
+        const parsed = JSON.parse((await result.response).text());
 
-        // JSON 추출
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            throw new Error('JSON not found in response');
-        }
+        // keyFacts: sourceIndices([n], 1-based) → sourceRef.id 결박 (R2)
+        const structuredFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: any, i: number) => {
+            const idxs: number[] = Array.isArray(f?.sourceIndices) ? f.sourceIndices : [];
+            const sourceIds = idxs.map(n => sourceRefs[n - 1]?.id).filter((x): x is string => !!x);
+            return { id: `f${i + 1}`, text: String(f?.text || '').trim(), sourceIds, publishedAt: f?.publishedAt || undefined };
+        });
+        const cleanedFacts = structuredFacts.map(f => f.text);
 
-        const parsed = JSON.parse(jsonMatch[0]);
+        // keyInsight: restsOnFactIndices(1-based) → fact.id
+        const kiRaw = parsed.keyInsight || {};
+        const restsOnFactIds = (Array.isArray(kiRaw.restsOnFactIndices) ? kiRaw.restsOnFactIndices : [])
+            .map((n: number) => structuredFacts[n - 1]?.id).filter((x: any): x is string => !!x);
 
-        // 1차 필터링: Gemini가 선택한 인덱스 사용
-        let selectedSources: string[] = [];
-        if (parsed.relevantSourceIndices && Array.isArray(parsed.relevantSourceIndices)) {
-            selectedSources = parsed.relevantSourceIndices
-                .map((idx: number) => cluster[idx - 1]?.url)
-                .filter((url: string) => url !== undefined);
-        }
-
-        // 2차 필터링 (강제): 헤드라인 키워드 기반 코드 레벨 검증
-        const headline = parsed.headline || parsed.title || '';
-        const headlineKeywords = headline.split(' ').filter((w: string) => w.length > 1);
-
-        const finalSources = (selectedSources.length > 0 ? selectedSources : cluster.map(c => c.url))
-            .filter((url, index) => {
-                const newsItem = cluster.find(c => c.url === url);
-                if (!newsItem) return false;
-
-                const content = (newsItem.title + ' ' + (newsItem.description || '')).toLowerCase();
-                const score = headlineKeywords.reduce((acc: number, kw: string) => {
-                    return acc + (content.includes(kw.toLowerCase()) ? 1 : 0);
-                }, 0);
-
-                return index === 0 || score > 0;
-            });
-
-        const cleanedFacts: string[] = (parsed.keyFacts || []).map((fact: string) => fact.split('|')[0].trim());
-
-        // Key Insight 검증 + 치명적 위반 시 최대 1회 재생성
+        // Key Insight 가드레일 검증 + 치명 위반 시 최대 1회 재생성 (insight 텍스트에 적용)
         const kiResult = await ensureValidKeyInsight(
-            parsed.insight || parsed.strategicInsight || '',
-            { facts: cleanedFacts, title: parsed.headline || parsed.title, audience: parsed.category },
-            async (regenPrompt: string) => {
-                const r = await generateWithRetry(model, regenPrompt);
-                return (await r.response).text();
-            },
+            String(kiRaw.text || ''),
+            { facts: cleanedFacts, title: parsed.headline, audience: parsed.category },
+            async (regenPrompt: string) => (await (await generateWithRetry(model, regenPrompt)).response).text(),
         );
-        logKeyInsightResult(`Key Insight (${parsed.headline || parsed.title})`, kiResult);
-        await recordKeyInsightMetrics(kiResult, 'ai'); // 내부에서 예외를 삼키므로 생성 실패로 이어지지 않음
+        logKeyInsightResult(`Key Insight (${parsed.headline})`, kiResult);
+        await recordKeyInsightMetrics(kiResult, 'ai');
         if (onKeyInsight) onKeyInsight(kiResult);
-        const finalInsight = kiResult.insight;
 
-        return {
-            headline: parsed.headline || parsed.title,
-            category: parsed.category,
-            singleTopicStatement: parsed.singleTopicStatement,
-            excludedFacts: parsed.excludedFacts || [],
-            prescriptionLevel: parsed.prescriptionLevel,
-            oneLineSummary: parsed.oneLineSummary,
-            hashtags: parsed.hashtags,
-            keyFacts: cleanedFacts,
-            insight: finalInsight,
-            confidence: parsed.confidence,
-            framework: getFrameworkNames(frameworks),
-            sources: finalSources.length > 0 ? finalSources : [cluster[0].url],
-            soWhat: parsed.soWhat,
+        const keyInsight: KeyInsightStructured = {
+            text: kiResult.insight,
+            claimType: 'inferred',
+            restsOnFactIds,
+            confidence: (['high', 'medium', 'low'].includes(kiRaw.confidence) ? kiRaw.confidence : 'medium'),
+            mundaneAlternative: String(kiRaw.mundaneAlternative || ''),
         };
+
+        // soWhat V2 + legacy 4분면 파생
+        const swRaw = parsed.soWhat || {};
+        const soWhatV2: SoWhatV2 = {
+            ifInferenceHolds: String(swRaw.ifInferenceHolds || ''),
+            unknown: String(swRaw.unknown || ''),
+            actionType: (['act', 'observe', 'none'].includes(swRaw.actionType) ? swRaw.actionType : 'none'),
+            action: swRaw.actionType === 'act' ? swRaw.action : undefined,
+            observe: swRaw.actionType === 'observe' ? swRaw.observe : undefined,
+            killTrigger: String(swRaw.killTrigger || ''),
+        };
+        const legacySoWhat = {
+            ifTrue: soWhatV2.ifInferenceHolds,
+            uncertain: soWhatV2.unknown,
+            bet: soWhatV2.action?.what || soWhatV2.observe?.metric || '지금 실행할 행동 없음(관망)',
+            downside: soWhatV2.action?.costIfWrong || soWhatV2.action?.costIfMissed || '—',
+        };
+
+        // 소스: fact가 실제 결박한 것만 (271 헤드라인 필터 + 312 cluster[0] 날조 폐기)
+        const usedIds = new Set(structuredFacts.flatMap(f => f.sourceIds));
+        const usedRefs = sourceRefs.filter(s => usedIds.has(s.id));
+
+        const issue: IssueItem = {
+            headline: parsed.headline,
+            thesis: parsed.thesis,
+            singleTopicStatement: parsed.thesis, // legacy alias(병합)
+            oneLineSummary: parsed.thesis, // legacy alias(병합)
+            category: parsed.category,
+            excludedFacts: parsed.excludedFacts || [],
+            hashtags: parsed.hashtags,
+            keyFacts: cleanedFacts, // legacy 파생
+            structuredFacts,
+            sourceRefs: usedRefs,
+            keyInsight,
+            insight: keyInsight.text, // legacy 파생
+            confidence: keyInsight.confidence,
+            soWhatV2,
+            soWhat: legacySoWhat, // legacy 파생
+            framework: getFrameworkNames(frameworks),
+            sources: usedRefs.map(s => s.url), // legacy 파생 (빈 배열이면 C1이 잡음, cluster[0] 날조 안 함)
+        };
+
+        // 구조 체크 (C1/C2/C4/C5/C9'/C10/C11/C12)
+        const cardCheck = checkCard(issue);
+        if (cardCheck.hasError) {
+            console.warn(`[Structured Check] "${parsed.headline}": ${cardCheck.issues.map(i => `${i.code}`).join(', ')}`);
+        }
+
+        return issue;
     } catch (error) {
         console.error('[Issue Generation Error]', error);
         return null;

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BATTERY_DEEP_DIVE_DOMAIN } from '@/lib/deep-dive-pipeline';
 import { kvGet } from '@/lib/store';
 
 // 배터리 트렌드 리포트 작업 상태 조회 API
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'jobId is required' }, { status: 400 });
         }
 
-        const jobStatus = await kvGet(`battery_trend_job:${jobId}`);
+        const jobStatus = await kvGet(`${BATTERY_DEEP_DIVE_DOMAIN.jobKeyPrefix}:${jobId}`);
 
         if (!jobStatus) {
             return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });

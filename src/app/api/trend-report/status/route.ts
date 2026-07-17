@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { AI_DEEP_DIVE_DOMAIN } from '@/lib/deep-dive-pipeline';
 import { kvGet } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
         }
 
-        const jobData = await kvGet(`trend_job:${jobId}`);
+        const jobData = await kvGet(`${AI_DEEP_DIVE_DOMAIN.jobKeyPrefix}:${jobId}`);
 
         if (!jobData) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });

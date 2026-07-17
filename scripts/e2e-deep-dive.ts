@@ -6,21 +6,36 @@ config({ path: '.env.local' });
 (async () => {
     // env 로드 후 import (모듈 로드 시점에 GEMINI_API_KEY를 읽는 구조라 정적 import 금지)
     const { generateTrendReport } = await import('../src/lib/gemini');
-    const { kvSet, kvGet } = await import('../src/lib/store');
-    const brief = require('../data/briefs/2026-01-30.json');
-    // 사용법: npx tsx scripts/e2e-deep-dive.ts [issueIndex] (기본 3)
-    const issueIndex = Number(process.argv[2] ?? 3);
-    const issue = brief.issues[issueIndex];
+    const { generateBatteryTrendReport } = await import('../src/lib/battery-gemini');
+    const { AI_DEEP_DIVE_DOMAIN, BATTERY_DEEP_DIVE_DOMAIN } = await import('../src/lib/deep-dive-pipeline');
+    const { kvSet, kvGet, getRecentIssues } = await import('../src/lib/store');
 
-    console.log(`E2E 대상: "${issue.headline}" | 입력 소스 ${issue.sources.length}개`);
-    const result = await generateTrendReport(issue, '');
+    // 사용법: npx tsx scripts/e2e-deep-dive.ts [issueIndex|battery] (기본 3 — AI 도메인)
+    const arg = process.argv[2] ?? '3';
+    const isBattery = arg === 'battery';
+
+    let issue;
+    if (isBattery) {
+        const batteryIssues = await getRecentIssues(30, 'battery');
+        issue = batteryIssues.find(i => (i.sources?.length ?? 0) >= 3) || batteryIssues[0];
+        if (!issue) { console.error('E2E 실패: 배터리 이슈 없음'); process.exit(1); }
+    } else {
+        const brief = require('../data/briefs/2026-01-30.json');
+        issue = brief.issues[Number(arg)];
+    }
+
+    console.log(`E2E 대상(${isBattery ? 'battery' : 'ai'}): "${issue.headline}" | 입력 소스 ${issue.sources.length}개`);
+    const result = isBattery
+        ? await generateBatteryTrendReport(issue, '')
+        : await generateTrendReport(issue, '');
     if (!result) {
-        console.error('E2E 실패: generateTrendReport가 null 반환');
+        console.error('E2E 실패: 생성 함수가 null 반환');
         process.exit(1);
     }
 
-    // route.ts와 동일한 레코드 형태로 KV 저장 → 재조회로 확인
-    const jobKey = 'trend_job:e2e-structured-test';
+    // route.ts와 동일한 레코드 형태로 KV 저장 → 재조회로 확인 (키 체계는 도메인 config)
+    const prefix = (isBattery ? BATTERY_DEEP_DIVE_DOMAIN : AI_DEEP_DIVE_DOMAIN).jobKeyPrefix;
+    const jobKey = `${prefix}:e2e-structured-test`;
     await kvSet(jobKey, {
         status: 'completed',
         progress: 100,
@@ -44,4 +59,5 @@ config({ path: '.env.local' });
     console.log(JSON.stringify(record.structured.watchlist, null, 2));
     console.log('\n===== 파생 마크다운 (앞 35줄) =====');
     console.log(record.report.split('\n').slice(0, 35).join('\n'));
+    process.exit(0); // Redis/KV 연결이 이벤트 루프를 잡아 프로세스가 안 끝나는 고아화 방지
 })();

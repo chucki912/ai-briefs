@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { generateTrendReport } from '@/lib/gemini';
+import { AI_DEEP_DIVE_DOMAIN } from '@/lib/deep-dive-pipeline';
 import { kvSet, kvGet } from '@/lib/store';
 import { IssueItem } from '@/types';
 import { waitUntil } from '@vercel/functions';
+
+const JOB_KEY = (jobId: string) => `${AI_DEEP_DIVE_DOMAIN.jobKeyPrefix}:${jobId}`;
 
 // Vercel Pro allows up to 300 seconds (5 minutes)
 export const maxDuration = 300;
@@ -17,7 +20,7 @@ export async function POST(req: Request) {
         const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         // Initial status
-        await kvSet(`trend_job:${jobId}`, { status: 'generating', progress: 10 }, 3600);
+        await kvSet(JOB_KEY(jobId), { status: 'generating', progress: 10 }, 3600);
 
         // Run Trend Report Generation in background (Monolithic)
         waitUntil((async () => {
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
                 const result = await generateTrendReport(issue, '');
 
                 if (result) {
-                    await kvSet(`trend_job:${jobId}`, {
+                    await kvSet(JOB_KEY(jobId), {
                         status: 'completed',
                         progress: 100,
                         report: result.markdown, // 파생 마크다운(renderDeepDiveB 산출, B유형) — 기존 프론트 계약 유지
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
                 }
             } catch (error: any) {
                 console.error(`[Job ${jobId}] Generation Failed:`, error);
-                await kvSet(`trend_job:${jobId}`, { status: 'failed', error: error.message }, 3600);
+                await kvSet(JOB_KEY(jobId), { status: 'failed', error: error.message }, 3600);
             }
         })());
 

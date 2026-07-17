@@ -126,7 +126,7 @@ export interface DeepDiveWatchItem {
 }
 
 export interface DeepDiveStructured {
-  reportType: 'deep_dive';
+  reportType: 'deep_dive' | 'battery_deep_dive'; // v3 파이프라인 공유 — 도메인 config가 stamp
   title: string;
   meta: {
     analysisTarget: string; audience: string; horizon: string;

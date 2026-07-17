@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { generateBatteryTrendReport } from '@/lib/battery-gemini';
+import { BATTERY_DEEP_DIVE_DOMAIN } from '@/lib/deep-dive-pipeline';
 import { kvSet } from '@/lib/store';
-import { IssueItem, ReportType } from '@/types';
+import { IssueItem } from '@/types';
 import { waitUntil } from '@vercel/functions';
+
+const JOB_KEY = (jobId: string) => `${BATTERY_DEEP_DIVE_DOMAIN.jobKeyPrefix}:${jobId}`;
 
 export const maxDuration = 300; // Vercel timeout up to 5 min
 
@@ -23,26 +26,29 @@ export async function POST(request: Request) {
         console.log('[Battery Trend API] 작업 시작:', jobId, issue.headline);
 
         // 초기 상태 설정
-        await kvSet(`battery_trend_job:${jobId}`, { status: 'generating', progress: 10 }, 3600);
+        await kvSet(JOB_KEY(jobId), { status: 'generating', progress: 10 }, 3600);
 
         // 백그라운드 작업 실행 (Vercel waitUntil 사용)
         waitUntil((async () => {
             try {
-                const report = await generateBatteryTrendReport(issue, '');
+                const result = await generateBatteryTrendReport(issue, '');
 
-                if (report) {
-                    await kvSet(`battery_trend_job:${jobId}`, {
+                if (result) {
+                    await kvSet(JOB_KEY(jobId), {
                         status: 'completed',
                         progress: 100,
-                        report,
-                        reportType: 'battery_deep_dive' satisfies ReportType,
+                        report: result.markdown, // 파생 마크다운(renderDeepDiveB 산출, B유형) — 기존 프론트 계약 유지
+                        structured: result.structured, // JSON 원본 (source of truth)
+                        reportType: result.reportType,
+                        triangulation: result.triangulation,
+                        contentGate: result.contentGate,
                     }, 3600);
                 } else {
                     throw new Error('리포트 생성 결과가 비어있습니다.');
                 }
             } catch (error: any) {
                 console.error(`[Battery Job ${jobId}] 실패:`, error);
-                await kvSet(`battery_trend_job:${jobId}`, {
+                await kvSet(JOB_KEY(jobId), {
                     status: 'failed',
                     error: error.message || '리포트 생성 중 오류가 발생했습니다.'
                 }, 3600);

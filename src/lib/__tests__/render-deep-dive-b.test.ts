@@ -102,5 +102,23 @@ chk('애그리게이터 검증 필요 표기', md.includes('tradethepool.com —
 // 7. 구 포맷 잔재 부재
 chk("구 포맷('■', [Signal]/[Anchor]) 미출현", !md.includes('■') && !md.includes('[Signal]') && !md.includes('[Anchor]'));
 
+// 8. anchor 결박 기반 출처 표기 (마무리 패치)
+{
+    // 혼합 결박: 비-애그리게이터(g1)만 표기, 애그리게이터(g2)는 제외
+    const s = clone();
+    s.anchor.sourceIds = ['g1', 'g2'];
+    const m = renderDeepDiveB(s);
+    const anchorLine = m.split('\n').find(l => l.includes(s.anchor.value)) || '';
+    chk('앵커 혼합 결박 → 비-애그리게이터만 표기', anchorLine.includes('trendforce.com') && !anchorLine.includes('tradethepool.com'), anchorLine);
+}
+{
+    // 방어 케이스: 전부 애그리게이터 결박 → 결박 표기 생략, 값·원출처·기준시점은 렌더
+    const s = clone();
+    s.anchor.sourceIds = ['g2'];
+    const m = renderDeepDiveB(s);
+    const anchorLine = m.split('\n').find(l => l.includes(s.anchor.value)) || '';
+    chk('앵커 전부 애그리게이터 결박 → 결박 표기 생략·값 렌더', anchorLine.includes(s.anchor.value) && anchorLine.includes('TrendForce, 2026-06') && !anchorLine.includes('tradethepool.com'), anchorLine);
+}
+
 console.log(`\nB유형 렌더러 테스트: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

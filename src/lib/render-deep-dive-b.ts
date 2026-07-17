@@ -72,7 +72,18 @@ export function renderDeepDiveB(r: DeepDiveStructured): string {
     out.push('', '## [논의 포인트]');
     out.push('- **① 정량 앵커**');
     if (!isBlank(r.anchor?.value)) {
-        const attribution = [r.anchor.source, r.anchor.asOf].filter(v => !isBlank(v)).join(', ');
+        // 출처 표기는 fact와 동일하게 sourceIds 결박 해석 — 단 애그리게이터 결박은 표기 제외.
+        // (전부 애그리게이터인 경우는 anchor_source_tier 게이트가 차단하므로 통과 산출물에선 도달 불가 —
+        //  방어적으로 그 경우엔 결박 표기만 생략하고 값·원출처·기준시점은 렌더)
+        const bindingLabels = [...new Set(
+            (r.anchor.sourceIds || [])
+                .map(id => refById.get(id))
+                .filter((ref): ref is SourceRef => !!ref && ref.tier !== 'aggregator')
+                .map(displaySource)
+                .filter((l): l is string => !!l)
+        )];
+        const attribution = [r.anchor.source, ...bindingLabels, r.anchor.asOf]
+            .filter((v): v is string => !isBlank(v)).join(', ');
         const head = isBlank(r.anchor.metric) ? r.anchor.value : `${r.anchor.metric}: ${r.anchor.value}`;
         out.push(`  - ${head}${attribution ? ` (${attribution})` : ''}`);
     }

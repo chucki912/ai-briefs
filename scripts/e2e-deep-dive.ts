@@ -25,11 +25,18 @@ config({ path: '.env.local' });
     }
 
     console.log(`E2E 대상(${isBattery ? 'battery' : 'ai'}): "${issue.headline}" | 입력 소스 ${issue.sources.length}개`);
-    const result = isBattery
-        ? await generateBatteryTrendReport(issue, '')
-        : await generateTrendReport(issue, '');
+    let result;
+    try {
+        result = isBattery
+            ? await generateBatteryTrendReport(issue, '')
+            : await generateTrendReport(issue, '');
+    } catch (e: any) {
+        // DeepDiveDiscardError — 게이트 정책에 의한 의도적 폐기 (사유 포함)
+        console.error(`E2E 실패: 리포트 폐기 — ${e?.message ?? e}`);
+        process.exit(1);
+    }
     if (!result) {
-        console.error('E2E 실패: 생성 함수가 null 반환');
+        console.error('E2E 실패: 생성 함수가 null 반환 (원인 미상 — 서버 로그 확인)');
         process.exit(1);
     }
 

@@ -44,7 +44,8 @@ export async function POST(request: Request) {
                         contentGate: result.contentGate,
                     }, 3600);
                 } else {
-                    throw new Error('리포트 생성 결과가 비어있습니다.');
+                    // null = 게이트 폐기가 아닌 원인 미상 실패(API 오류 등) — 폐기 사유는 DeepDiveDiscardError로 별도 전파됨
+                    throw new Error('Gemini 생성 오류로 리포트 미생성 (일시적 오류 가능 — 재시도 요망)');
                 }
             } catch (error: any) {
                 console.error(`[Battery Job ${jobId}] 실패:`, error);

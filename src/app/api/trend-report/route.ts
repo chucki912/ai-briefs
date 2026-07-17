@@ -40,7 +40,8 @@ export async function POST(req: Request) {
                         contentGate: result.contentGate, // 판단 완결성 게이트 결과 (tag 모드 미달 판별용)
                     }, 3600);
                 } else {
-                    throw new Error('Report generation returned null');
+                    // null = 게이트 폐기가 아닌 원인 미상 실패(API 오류 등) — 폐기 사유는 DeepDiveDiscardError로 별도 전파됨
+                    throw new Error('Gemini 생성 오류로 리포트 미생성 (일시적 오류 가능 — 재시도 요망)');
                 }
             } catch (error: any) {
                 console.error(`[Job ${jobId}] Generation Failed:`, error);

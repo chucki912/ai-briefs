@@ -40,9 +40,10 @@ export const SOURCE_TIERING = {
     // DENYLIST 후보 관측 대장 (2회 이상 관측 시 승격 검토 — 승격은 별도 결정, 자동 추가 금지):
     // tradingkey.com — 2026-07-17 anchor 출처로 1회 관측
     // getpanto.ai — 2026-07-17 grounding 출처로 2회 관측 (3a·티어링 e2e) → 승격 검토 대상
-    // valueaddvc.com — 2026-07-17 grounding 출처로 2회 관측 (3a·품질패치 e2e) → 승격 검토 대상
+    // valueaddvc.com — 2026-07-17 2회(3a·품질패치 e2e) + 2026-07-18 1회(null 진단 e2e) = 3회 관측 → 승격 검토 대상
     // moomoo.com, sqmagazine.co.uk, finpulse.dev — 2026-07-17 grounding 출처로 각 1회 관측
-    // aibusinessweekly.net, tisram.ai, mindstudio.ai, appeconomyinsights.com — 2026-07-17 e2e grounding 출처로 각 1회 관측
+    // aibusinessweekly.net — 2026-07-17 1회 + 2026-07-18 1회(null 진단 e2e) = 2회 관측 → 승격 검토 대상
+    // tisram.ai, mindstudio.ai, appeconomyinsights.com — 2026-07-17 e2e grounding 출처로 각 1회 관측
     EXCLUDE_DENYLISTED_FROM_TRIANGULATION: true,  // 독립 도메인 카운트에서 제외
     ENFORCE_ANCHOR_TIER: true,                    // anchor 출처 denylist 차단
 };

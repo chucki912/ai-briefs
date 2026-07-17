@@ -175,6 +175,15 @@ ${config.reasoningChain}
 브리프보다 '종(종)이 다른' 깊이를 만들지 못하면 작성 실패임.`;
 }
 
+// 게이트 정책에 의한 의도적 폐기 — 호출부(라우트)가 사유를 job 레코드에 실어 UI까지 전파.
+// API 오류 등 원인 미상 실패는 기존대로 null 반환(호출부의 generic 처리 유지).
+export class DeepDiveDiscardError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'DeepDiveDiscardError';
+    }
+}
+
 // ── 파이프라인 본체 (도메인 공통) ────────────────────────────────────────────
 export async function generateStructuredDeepDive(
     issue: IssueItem,
@@ -205,26 +214,41 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
         // 전역 예산: triangulation 재생성 + content gate 재실행을 합산한 pass 1 총 실행 상한
         const budget = { pass1Runs: 0 };
         let pass1ContentFeedback = '';
+        // zero-grounding 이월용: 다음 cycle의 pass 1 첫 시도에 실어 보낼 삼각검증 슬롯(RETRY FEEDBACK) 피드백
+        let pass1RegenCarry = '';
         // tag 모드 폴백용: 마지막으로 조립 가능했던 (draft, structured, gate) 묶음 — 항상 같은 draft 기준
         let last: { draft: DeepDivePass1Draft; structured: DeepDiveStructured; gate: ContentGateResult } | null = null;
 
         const maxCycles = 1 + CONTENT_GATE_CONFIG.MAX_PASS1_RERUNS;
         for (let cycle = 1; cycle <= maxCycles; cycle++) {
             // ── pass 1: 검색+분석 초안 (triangulation 게이트·재생성 루프 부착, 예산 차감) ──
-            const draft = await runDeepDivePass1(model, userPrompt, briefingSources, pass1ContentFeedback, budget, cycle);
+            const draft = await runDeepDivePass1(model, userPrompt, briefingSources, pass1ContentFeedback, budget, cycle, pass1RegenCarry);
+            pass1RegenCarry = '';
             if (!draft) break; // 예산 소진으로 이번 cycle의 pass 1을 시작조차 못 함 → 지금까지의 결과로 FAIL_MODE 처리
 
-            // 무검색 방어: 재시도 소진 후에도 grounding 0이면 FAIL_MODE와 무관하게 폐기 (tag 출고 금지)
+            // 무검색 방어: 재시도 소진 후에도 grounding 0이면 FAIL_MODE와 무관하게 출고 금지 (tag 모드 포함).
+            // 단, 무검색은 서버 측 간헐 현상(재시도로 회복되는 패턴 관측)이라 예산·cycle이 남았으면 즉시 폐기하지 않고 이월.
             if (GROUNDING_POLICY.REQUIRE_ANY_GROUNDING && draft.triangulation.totalChunks === 0) {
+                if (cycle < maxCycles && budget.pass1Runs < GLOBAL_BUDGET.MAX_TOTAL_PASS1_RUNS) {
+                    console.warn(`[Triangulation] zero-grounding — 예산 잔여(${budget.pass1Runs}/${GLOBAL_BUDGET.MAX_TOTAL_PASS1_RUNS}) → cycle ${cycle + 1}로 pass 1 재실행 이월: "${issue.headline}"`);
+                    pass1RegenCarry = `직전 시도에서 검색이 전혀 수행되지 않았음. 작성 전 Triple-Search(1차 사실 확인·구조적 맥락·독립 교차검증)를 반드시 수행할 것. 검색 없는 작성은 실패로 처리됨.`;
+                    continue;
+                }
+                // 출고 금지 대상은 '무검색 산출물'이지 리포트 전체가 아님 — 앞 cycle의 grounded 산출물이
+                // 있으면 이 draft만 버리고 FAIL_MODE 처리로 폴백 (tag 모드면 미달 태그 부착 출고)
+                if (last) {
+                    console.warn(`[Triangulation] zero-grounding — 무검색 draft만 폐기, 직전 grounded 산출물로 폴백: "${issue.headline}"`);
+                    break;
+                }
                 console.warn(`[Triangulation] zero-grounding reject → 리포트 폐기: "${issue.headline}" (검색 미수행 산출물은 tag 모드에서도 출고 금지)`);
-                return null;
+                throw new DeepDiveDiscardError('검색 그라운딩 미확보(무검색 산출물)로 리포트 폐기 — Gemini 검색 도구 간헐 미작동 가능성, 잠시 후 재시도 요망');
             }
 
             // triangulation 최종 미달 → FAIL_MODE (기존 패턴 유지)
             if (!draft.triangulation.pass) {
                 if (TRIANGULATION_CONFIG.FAIL_MODE === 'reject') {
                     console.warn(`[Triangulation] 최종 미달(FAIL_MODE=reject) → 리포트 폐기: "${issue.headline}"`);
-                    return null;
+                    throw new DeepDiveDiscardError(`독립 신규 출처 ${draft.triangulation.independentDomainCount}개로 삼각검증 기준(${TRIANGULATION_CONFIG.MIN_INDEPENDENT_DOMAINS}개) 미달 — 리포트 폐기`);
                 }
                 console.warn(`[Triangulation] 최종 미달(FAIL_MODE=tag) → depthWarning 부착하고 구조화 진행: "${issue.headline}"`);
             }
@@ -264,15 +288,16 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
         // ── 전 단계 소진 → FAIL_MODE 처리 (triangulation과 동일 패턴) ──
         if (!last) {
             console.error(`[DeepDive] 구조화 산출물 없음(파싱 실패/예산 소진) → 리포트 폐기: "${issue.headline}"`);
-            return null;
+            throw new DeepDiveDiscardError('구조화(JSON 추출) 실패 또는 생성 예산 소진으로 리포트 폐기 — 잠시 후 재시도 요망');
         }
         if (CONTENT_GATE_CONFIG.FAIL_MODE === 'reject') {
             console.warn(`[ContentGate] 최종 미달(FAIL_MODE=reject) → 리포트 폐기: "${issue.headline}"`);
-            return null;
+            throw new DeepDiveDiscardError(`판단 필드 ${last.gate.failures.length}건이 내용 게이트 기준 미달(FAIL_MODE=reject) — 리포트 폐기`);
         }
         console.warn(`[ContentGate] 최종 미달(FAIL_MODE=tag) → contentGate 결과 부착 반환: "${issue.headline}" (${last.gate.failures.length}건 미달)`);
         return assembleTrendReport(last, briefingSources.length, config);
     } catch (error) {
+        if (error instanceof DeepDiveDiscardError) throw error; // 게이트 폐기 사유는 호출부로 전파(UI 표시용)
         console.error('[Trend Report Error]', error);
         return null;
     }
@@ -293,9 +318,10 @@ async function runDeepDivePass1(
     contentFeedback: string,
     budget: { pass1Runs: number },
     cycle: number,
+    initialRegenFeedback = '', // zero-grounding 이월 시 새 cycle 첫 시도부터 RETRY FEEDBACK 슬롯에 주입
 ): Promise<DeepDivePass1Draft | null> {
     const maxAttempts = 1 + TRIANGULATION_CONFIG.MAX_REGEN_ATTEMPTS;
-    let regenFeedback = '';
+    let regenFeedback = initialRegenFeedback;
     let draft: DeepDivePass1Draft | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {

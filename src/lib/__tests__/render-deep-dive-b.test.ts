@@ -120,5 +120,20 @@ chk("구 포맷('■', [Signal]/[Anchor]) 미출현", !md.includes('■') && !md
     chk('앵커 전부 애그리게이터 결박 → 결박 표기 생략·값 렌더', anchorLine.includes(s.anchor.value) && anchorLine.includes('TrendForce, 2026-06') && !anchorLine.includes('tradethepool.com'), anchorLine);
 }
 
+// 9. 범위 구분자(~) 원형 보존 — 마크다운 뷰어의 single-tilde 취소선 해석과 무관하게
+//    렌더러 출력 문자열 자체는 '~'를 그대로 보존해야 함 (이스케이프·치환 금지)
+{
+    const s = clone();
+    s.keyDevelopments[0].facts[0].text = '15~20분 내 325~340km 충전(800V) 제공';
+    s.watchlist[0].threshold = '팩 기준 190~210 Wh/kg 구간 진입 시 재검토';
+    const m = renderDeepDiveB(s);
+    chk("'15~20분 내 325~340km' 원형 보존", m.includes('15~20분 내 325~340km 충전(800V) 제공'));
+    chk("threshold '190~210 Wh/kg' 원형 보존", m.includes('190~210 Wh/kg'));
+    chk("'~' 이스케이프(\\~) 미발생", !m.includes('\\~'));
+    const inTildes = (JSON.stringify(s).match(/~/g) || []).length;
+    const outTildes = (m.match(/~/g) || []).length;
+    chk('입력 대비 출력 ~ 개수 보존', outTildes === inTildes, `in=${inTildes} out=${outTildes}`);
+}
+
 console.log(`\nB유형 렌더러 테스트: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

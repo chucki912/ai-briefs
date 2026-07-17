@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBriefByDate, getAllBriefs } from '@/lib/store';
+import { getReportType, inferLegacyReportType } from '@/lib/report-type';
 
 // 배터리 브리프 조회 API
 export async function GET(request: Request) {
@@ -12,8 +13,8 @@ export async function GET(request: Request) {
         if (list === 'true') {
             const includeIssues = searchParams.get('include_issues') === 'true';
             const allBriefs = await getAllBriefs(50);
-            // battery- 접두사가 붙은 리포트만 필터링
-            const batteryBriefs = allBriefs.filter(b => b.id.startsWith('battery-'));
+            // 배터리 일일 브리프만 필터링
+            const batteryBriefs = allBriefs.filter(b => getReportType(b) === 'battery_daily_brief');
 
             return NextResponse.json({
                 success: true,
@@ -33,7 +34,8 @@ export async function GET(request: Request) {
         const dateStr = dateParam || nowDate.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
         // 배터리 브리프 조회 (저장 시 battery-YYYY-MM-DD 형식으로 저장)
-        const fullDateKey = dateStr.startsWith('battery-') ? dateStr : `battery-${dateStr}`;
+        // 요청 파라미터가 이미 배터리 키면 그대로, 날짜만 오면 키 스키마 접두사 부착
+        const fullDateKey = inferLegacyReportType({ id: dateStr }) === 'battery_daily_brief' ? dateStr : `battery-${dateStr}`;
         const brief = await getBriefByDate(fullDateKey);
 
         if (brief) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBriefByDate, getLatestBrief, getAllBriefs, deleteBrief } from '@/lib/store';
+import { getReportType, inferLegacyReportType } from '@/lib/report-type';
 
 // 브리핑 조회 API
 export async function GET(request: NextRequest) {
@@ -12,8 +13,8 @@ export async function GET(request: NextRequest) {
         if (list === 'true') {
             const includeIssues = searchParams.get('include_issues') === 'true';
             const allBriefs = await getAllBriefs(50);
-            // AI 브리프만 필터링 (battery- 접두사가 없는 것)
-            const aiBriefs = allBriefs.filter(b => !b.id.startsWith('battery-'));
+            // AI 일일 브리프만 필터링
+            const aiBriefs = allBriefs.filter(b => getReportType(b) === 'daily_brief');
 
             return NextResponse.json({
                 success: true,
@@ -30,8 +31,8 @@ export async function GET(request: NextRequest) {
 
         // 특정 날짜 조회
         if (date) {
-            // AI API에서는 battery- 접두사가 붙은 데이터를 조회할 수 없도록 차단
-            if (date.startsWith('battery-')) {
+            // AI API에서는 배터리 브리프 키를 조회할 수 없도록 차단 (요청 키는 레거시 키 스키마 → 헬퍼로 판별)
+            if (inferLegacyReportType({ id: date }) === 'battery_daily_brief') {
                 return NextResponse.json(
                     { success: false, error: '해당 데이터는 AI 브리핑이 아닙니다.' },
                     { status: 403 }
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 
         // 최신 브리핑 조회 (배터리 제외하고 AI 중 가장 최신 것 찾기)
         const all = await getAllBriefs(10);
-        const latestAI = all.find(b => !b.id.startsWith('battery-'));
+        const latestAI = all.find(b => getReportType(b) === 'daily_brief');
 
         if (!latestAI) {
             return NextResponse.json(

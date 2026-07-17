@@ -7,7 +7,9 @@ import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-export type ReportType = 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+// 통합 리포트의 '기간 구분'(주간/월간/커스텀). 리포트 '모드'는 @/types의 ReportType('consolidated')이며,
+// 이름 충돌을 피하기 위해 AggregationPeriod로 개명 (요청 계약의 허용 값은 불변).
+export type AggregationPeriod = 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
 
 interface ManualSourceContent {
     url: string;
@@ -59,7 +61,7 @@ export async function fetchContentFromUrls(urls: string[]): Promise<ManualSource
 export async function generateAggregatedReport(
     issues: IssueItem[],
     manualSources: string[] = [],
-    type: ReportType,
+    type: AggregationPeriod,
     periodLabel: string, // e.g., "2월 3주차", "2024년 2월"
     manualTexts: string[] = [] // 원문 붙여넣기 텍스트
 ): Promise<string> {

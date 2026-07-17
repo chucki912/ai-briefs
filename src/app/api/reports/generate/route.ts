@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateAggregatedReport, ReportType } from '@/lib/reports';
+import { generateAggregatedReport, AggregationPeriod } from '@/lib/reports';
 import { getIssuesByDateRange } from '@/lib/store';
-import { IssueItem } from '@/types';
+import { IssueItem, ReportType } from '@/types';
 
 export const maxDuration = 60; // Allow 60 seconds for report generation
 
 interface GenerateReportRequest {
-    type: ReportType;
+    type: AggregationPeriod; // 기간 구분(요청 계약 불변) — 모드는 아래 응답의 reportType
     selectionMethod: 'AUTO_DATE' | 'MANUAL_SELECTION' | 'MANUAL_ONLY';
     dateRange?: {
         startDate: string; // YYYY-MM-DD
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
             manualTexts || []
         );
 
-        return NextResponse.json({ report: markdownReport });
+        return NextResponse.json({ report: markdownReport, reportType: 'consolidated' satisfies ReportType });
 
     } catch (error: any) {
         console.error('[API] Report generation failed:', error);

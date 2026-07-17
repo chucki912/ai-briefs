@@ -97,7 +97,8 @@ async function handleBatteryGenerate(request: Request) {
                 generatedAt: nowDate.toISOString(),
                 totalIssues: 0,
                 issues: [],
-                markdown: `# 🔋 Battery Daily Brief - ${kstDisplayDate}\n\n수집된 배터리 뉴스가 없습니다.`
+                markdown: `# 🔋 Battery Daily Brief - ${kstDisplayDate}\n\n수집된 배터리 뉴스가 없습니다.`,
+                reportType: 'battery_daily_brief',
             };
             await saveBrief(emptyReport);
             return NextResponse.json({
@@ -122,7 +123,8 @@ async function handleBatteryGenerate(request: Request) {
             generatedAt: nowDate.toISOString(), // 실제 생성 시간을 UTC ISO 형식으로 저장 (UI에서 현지 시간으로 변환)
             totalIssues: issues.length,
             issues: issues,
-            markdown: buildBatteryMarkdown(issues, kstDisplayDate)
+            markdown: buildBatteryMarkdown(issues, kstDisplayDate),
+            reportType: 'battery_daily_brief',
         };
 
         // 4. 데이터베이스 저장

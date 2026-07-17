@@ -1,4 +1,5 @@
-import { BriefReport, IssueItem } from '@/types';
+import { BriefReport, IssueItem, ReportType } from '@/types';
+import { getReportType, inferLegacyReportType } from './report-type';
 import fs from 'fs/promises';
 import path from 'path';
 import { kv } from '@vercel/kv';
@@ -123,14 +124,12 @@ class FileSystemStorage implements StorageAdapter {
                 .filter(f => f.endsWith('.json'))
                 .filter(f => {
                     const fileName = f.replace('.json', '');
-                    const isBatteryFile = fileName.startsWith('battery-');
-                    const fileDateOnly = isBatteryFile ? fileName.replace('battery-', '') : fileName;
+                    // 1. Domain filtering — 파일명(=레거시 저장 키)만으로 판별하므로 레거시 추론 헬퍼 경유
+                    const wantedType: ReportType = domain === 'battery' ? 'battery_daily_brief' : 'daily_brief';
+                    if (inferLegacyReportType({ id: fileName }) !== wantedType) return false;
 
-                    // 1. Domain filtering
-                    if (domain === 'battery' && !isBatteryFile) return false;
-                    if (domain === 'ai' && isBatteryFile) return false;
-
-                    // 2. Date filtering
+                    // 2. Date filtering (battery- 는 키 스키마 접두사 — 날짜 부분만 추출)
+                    const fileDateOnly = fileName.replace(/^battery-/, '');
                     return fileDateOnly >= cutoffDateStr;
                 })
                 .sort()
@@ -384,12 +383,10 @@ class InMemoryStorage implements StorageAdapter {
 
         const recentBriefs = Array.from(this.store.values())
             .filter(b => {
-                const isBattery = b.date.startsWith('battery-');
-                const dateOnly = isBattery ? b.date.replace('battery-', '') : b.date;
+                const wantedType: ReportType = domain === 'battery' ? 'battery_daily_brief' : 'daily_brief';
+                if (getReportType(b) !== wantedType) return false;
 
-                if (domain === 'battery' && !isBattery) return false;
-                if (domain === 'ai' && isBattery) return false;
-
+                const dateOnly = b.date.replace(/^battery-/, ''); // 키 스키마 접두사 제거(날짜 추출)
                 return dateOnly >= cutoffDateStr;
             });
 

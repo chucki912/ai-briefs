@@ -1,4 +1,5 @@
 /** 주간 AI 단신 생성기 — 도메인 타입 */
+import type { ReportType } from '@/types';
 
 /** 한 꼭지의 출처 정보 (발표일/출처 라인 파싱 결과) */
 export interface FlashSource {
@@ -65,6 +66,8 @@ export interface FlashMemo {
   windowDays: number;
   /** 사용된 기준일 (YYYY-MM-DD) */
   baseDate: string;
+  /** 명시적 리포트 모드 (항상 'weekly_flash') */
+  reportType: ReportType;
 }
 
 /** /api/weekly-flash 응답 형태 */

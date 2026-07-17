@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { NewsItem, IssueItem, SourceRef, KeyFactStructured, KeyInsightStructured, SoWhatV2 } from '@/types';
+import { NewsItem, IssueItem, SourceRef, KeyFactStructured, KeyInsightStructured, SoWhatV2, ReportType, DeepDiveStructured } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
@@ -7,6 +7,11 @@ import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-sche
 import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets } from './analyzers/structured-checks';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
+import { TRIANGULATION_CONFIG, CONTENT_GATE_CONFIG, GLOBAL_BUDGET, SOURCE_TIERING, GROUNDING_POLICY } from './validation-config';
+import { validateTriangulation, toRegistrableDomain, urlToRegistrableDomain, isDenylistedDomain, type TriangulationResult } from './validate-triangulation';
+import { validateDeepDiveContent, type ContentGateResult } from './validate-deep-dive';
+import { DEEP_DIVE_RESPONSE_SCHEMA, DEEP_DIVE_STRUCTURING_SYSTEM_PROMPT, buildStructuringInput, buildPass1ContentFeedback } from './deep-dive-schema';
+import { renderDeepDiveB } from './render-deep-dive-b';
 
 // Gemini API 클라이언트 초기화
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -372,11 +377,24 @@ export async function testGeminiConnection(): Promise<boolean> {
     }
 }
 
+// 트렌드 센싱 리포트 (Deep Dive) 생성 결과.
+// structured(JSON)가 원본(source of truth)이고 markdown은 renderDeepDiveB(B유형)가 만든 파생물임.
+export interface TrendReportResult {
+    markdown: string;
+    structured: DeepDiveStructured;
+    triangulation: TriangulationResult;
+    contentGate: ContentGateResult;
+    reportType: ReportType;
+}
+
+// pass 2(구조화) 모델 — 추출 작업이므로 FLASH로 충분. 품질 문제 발견 시 이 상수만 교체.
+const DEEP_DIVE_STRUCTURING_MODEL = FLASH_MODEL;
+
 // 트렌드 센싱 리포트 (Deep Dive) 생성
 export async function generateTrendReport(
     issue: IssueItem,
     context: string // Kept for compatibility
-): Promise<string | null> {
+): Promise<TrendReportResult | null> {
     // Upgraded System Prompt: Deep Dive Integration Prompt v2
     const systemPrompt = `# SYSTEM INSTRUCTION — 브리프 심층 리포트(Deep Dive) 통합 프롬프트 v2
 
@@ -409,6 +427,10 @@ export async function generateTrendReport(
 - 브리프와 본 리포트의 Executive Summary를 나란히 놓았을 때 **같은 말을 하고 있으면 실패**임.
 - 브리프의 결론(soWhat)은 '가설'임. 본 리포트의 결론은 '외부 증거로 조사한 뒤의 **판정**'이어야 함.
 - "이렇게 보임"이 아니라 → "조사 결과 이러하며, 여기까지는 검증됐고 여기부터는 여전히 불확실함" 형태로 진술할 것.
+
+### Anti-Overclaim Litmus (자가 검증 — 위배 시 재작성)
+- 결론의 강도는 팩트의 스케일을 초과할 수 없음. 파일럿·초기 단계 팩트로 '완료·장악·확정·입증' 등 종결형 단정 금지 — '개시·전환 중·시사' 수준으로 기술하고, 종결형 단정은 그 규모를 증명하는 정량 근거가 결합된 경우에만 허용.
+- 각 핵심 주장에 대해 자문할 것: 이 주장을 뒷받침하는 팩트가 이 주장의 크기만큼 큰가? 아니라면 주장을 팩트 크기로 줄일 것.
 
 ---
 
@@ -445,72 +467,29 @@ export async function generateTrendReport(
 2. **No Mock Data (검증 강제)**: 모든 정량 주장(%, $, GWh, Ton, 점유율 등)에는 **인라인 출처와 기준시점을 괄호로 즉시 결합**할 것. 예: \`셀 원가 $89/kWh (BloombergNEF, 2025-09 기준)\`. 출처를 결합할 수 없는 수치는 작성 금지.
 3. **Mechanism Over Labels**: \`(Basis: 네트워크 효과)\` 같은 프레임워크 라벨의 기계적 부착을 **절대 금지**함. 대신 해당 효과가 *왜·어떻게* 작동하는지 인과관계 문장으로 본문에서 증명할 것. (※ 모든 모듈 공통 — 라벨 부착/금지 정책을 본 규칙으로 일원화함)
 4. **Source Expansion = Depth**: 입력 외 독립 신규 출처 최소 3개 확보. 미달 시 깊이 미달로 간주.
-5. **Label Precision**: 아래 Output Format의 대괄호 \`[]\` 안 레이블은 변경·축약 금지. 정확히 그대로 출력할 것.
-6. **No Empty Sections**: 모든 \`## ■\` 섹션에 실질적 내용을 포함할 것. 빈 섹션 금지.
+5. **Contract Completeness**: 아래 Output Format의 '계약 항목'을 하나도 빠짐없이 다룰 것. 누락된 항목은 최종 리포트에서 영구 공란이 됨.
+6. **No Empty Items**: 모든 계약 항목에 실질적 내용을 포함할 것. 항목만 언급하고 내용을 비우는 것 금지.
 7. **Professional Tone**: 모든 문장을 명사형 종결어미(~함, ~임, ~전망 등)의 짧은 '개조식 축약 문체'로 작성할 것. 긴 줄글(paragraph) 금지, 서술어(~습니다, ~한다) 금지, 하위 블릿(-) 적극 활용.
 8. **No Hype**: "세계 최고", "초격차", "게임체인저", "거대한 물줄기" 등 과장 수사 배제. 중립적·검증 가능한 서술로 채울 것.
+9. **당사자 프레임 검증**: 이해당사자의 자기 서사(벤더의 영업 화법·경쟁사 비교, 소송 당사자의 주장, 기업의 자체 성과 발표)를 인용할 때는 반드시 (a) 반대 당사자의 반박 또는 (b) 독립 제3자의 유보·검증 중 최소 1개를 같은 섹션에 결합할 것. 결합할 수 없으면 해당 주장을 '~라고 주장함' 수준의 귀속 표현으로 한정하고 리포트의 논지로 승격하지 말 것.
 
 ---
 
-## Output Format
-아래 포맷을 엄격히 준수할 것. 꺾쇠 \`< >\` 안 지시문은 실제 내용으로 치환하고, 대괄호 \`[ ]\` 레이블은 그대로 유지할 것.
+## Output Format — 분석 초안 (자유 서술)
+마크다운 템플릿이 아니라, 아래 '계약 항목'을 전부 다루는 **분석 초안**을 작성할 것.
+이 초안은 이후 구조화 단계(JSON 추출)의 유일한 원천임 — 초안에서 다루지 않은 항목은 최종 리포트에서 영구 공란이 됨.
+각 항목이 어디 있는지 식별 가능하도록 항목명을 소제목이나 라벨로 명시하며 서술할 것.
 
-# 브리프 심층 리포트: <이슈를 관통하는 제목>
-
-분석대상: <구체적 대상(기업·기술·소재명)>
-타겟: <의사결정자 유형 — CEO/CTO·전략기획·투자심사역 등>
-기간: <분석 기준일> 기준 향후 6~12개월 전망
-관점: <Technology / Market / Geopolitics / Supply Chain 중 택 1>
-
-## ■ Executive Summary
-> (브리프의 가설이 아니라, 외부 증거로 조사한 뒤의 '판정'으로 작성할 것)
-- **[Signal]** <이 이슈가 보내는 핵심 신호 — 정량 앵커 수치와 출처 포함>
-- **[Anchor]** <베팅의 크기·시점을 바꾸는 검증 가능한 핵심 수치 1개 + 그것이 뒤집히는 임계 수준 (출처 결합)>
-- **[Change]** <이로 인해 변경되는 산업 구조 — 브리프에 없던 구조적 통찰일 것>
-- **[So What]** <의사결정 프레임 — (사실일 때의 변화 / 아직 불확실한 것 / 합리적 베팅 / 하방 리스크) 4분면>
-
-## ■ Key Developments (Deep Dive)
-### <구체적 사건/발표명 1>
-- **[Fact]** <검색된 구체적 사실 (수치·날짜·주체 필수, 인라인 출처 결합)>
-- **[Analysis]** <산업 구조에 미치는 영향을 2~3개 하위 블릿으로 개조식 분석. 작동 메커니즘을 인과 문장으로 증명할 것 (Basis 꼬리표 금지)>
-
-### <구체적 사건/발표명 2>
-- **[Fact]** <검색된 구체적 사실 (인라인 출처 결합)>
-- **[Analysis]** <2~3개 하위 블릿으로 메커니즘 설명 (Basis 꼬리표 금지)>
-
-## ■ Second-Order Map (구조적 파급 지도)
-> (브리프가 다루지 못한 '연결선'. 헤드라인에 아직 없는 2·3차 파급을 반드시 신규 발굴할 것)
-- **[Primary Shift]** <이 사건이 드러낸 핵심 구조 변화 1줄>
-- **[Upstream]** <후방(소재·부품·공급망)에 미치는 파급 — 누구의 마진/물량이 변하는가>
-- **[Downstream]** <전방(완제품·수요처)에 미치는 파급>
-- **[Adjacent]** <인접 시장(예: ESS·전력·반도체 등)이 흡수할 충격 또는 반사이익>
-
-## ■ Implications
-- **[Market]** <사실일 때의 시장 규모·CapEx·BM 영향과 하방 비용 — 수치·출처 포함>
-- **[Tech]** <돌파 가능한 기술 경로와 잔존하는 불확실성>
-- **[Comp]** <글로벌 경쟁사의 실질적 대응 동향 및 베팅 방향>
-- **[Policy]** <관련 정책·규제 리스크의 트리거 조건>
-
-## ■ Risks & Uncertainties
-- **[Tech]** <기술 리스크 + 그것이 틀렸을 때의 하방 비용>
-  - Mitigation: <대응 방안>
-- **[Market]** <시장/거시 리스크 + 판단 유보 요인>
-  - Mitigation: <대응 방안>
-- **[Reg]** <규제 리스크 + 트리거 조건>
-  - Mitigation: <대응 방안>
-
-## ■ Watchlist: Indicators to Monitor
-- **<핵심 선행 지표 1>**
-  (Why) <왜 이것이 중요한 선행 트리거인지>
-  (Threshold) <어떤 수치·국면에서 전략적 피보팅이 필요한지>
-  (폐기 트리거) <이 가정과 논지가 완전히 무너지는 조건 1줄 — 필수>
-- **<핵심 선행 지표 2>**
-  (Why) <설명>
-  (Threshold) <피보팅 기준>
-  (폐기 트리거) <논지가 무너지는 조건 1줄 — 필수>
-
-## ■ Sources
-(시스템이 자동 주입함. 단, 본문 인라인 출처는 모델이 직접 결합할 것)
+### 계약 항목 (전부 필수)
+1. **제목 + 메타**: 이슈를 관통하는 제목 / 분석대상(기업·기술·소재명) / 타겟 독자(CEO/CTO·전략기획·투자심사역 등) / 전망 기간(분석 기준일 기준 향후 6~12개월) / 관점(Technology·Market·Geopolitics·Supply Chain 중 택 1)
+2. **센싱 배경**: 왜 지금 이 이슈인가(Why Now) + 이 사건이 놓인 과거 궤적(Trajectory — 시간 도약)
+3. **Signal**: 이 이슈가 보내는 핵심 신호 — 정량 앵커 수치와 출처 포함
+4. **Anchor**: 베팅의 크기·시점을 바꾸는 검증 가능한 핵심 수치 1개 — 지표명/수치/출처/기준시점/판단이 뒤집히는 임계치(flipThreshold)를 전부 명시
+5. **Key Developments 2건 이상**: 각각 Fact(검색된 구체적 사실 — 수치·날짜·주체, 인라인 출처 결합) + Analysis(작동 메커니즘을 인과 문장으로 증명하는 개조식 블릿 2~3개, Basis 꼬리표 금지)
+6. **Second-Order Map**: Primary Shift(핵심 구조 변화 1줄) / Upstream(후방 파급 — 누구의 마진·물량이 변하는가) / Downstream(전방 파급) / Adjacent(인접 시장의 충격·반사이익) — 헤드라인에 아직 없는 2·3차 파급을 신규 발굴할 것
+7. **So What 4요소**: 추론이 유지될 때 바뀌는 것 / 아직 확인되지 않은 핵심 변수 / 행동 판단(지금 실행할 것이 있으면 그 행동과 양쪽 비용, 관측만 필요하면 셀 수 있는 지표와 주기, 없으면 '행동 없음'을 명시) / 폐기 트리거(killTrigger — 날짜·수치 포함)
+8. **Risks**: 기술(tech)·시장(market)·규제(reg) 각각에 대해 리스크 + 하방 비용 + Mitigation
+9. **Watchlist 2개 이상**: 선행 지표 / 왜 중요한 트리거인지(Why) / 피보팅 기준(Threshold) / 논지가 무너지는 조건(폐기 트리거) / 그 지표를 공개적으로 관측할 수 있는 곳(dataSource)
 
 ## START
 지금 즉시 검색을 시작하고, 팩트를 기반으로 작성할 것. 상상하지 말고 검색할 것.
@@ -534,63 +513,244 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
 - TODAY_KST: ${kstDateStr}`;
 
     try {
-        console.log('[Trend API] 상세 리포트 생성 시작 (Pro 모델 / 소스 확장 로직)...');
-        const result = await generateWithRetry(model, userPrompt);
-        const response = await result.response;
-        let text = response.text();
+        console.log('[Trend API] 상세 리포트 생성 시작 (2-pass: Pro 검색 초안 → Flash 구조화 → 내용 게이트)...');
 
-        // 소스 일관성 및 강화 로직
         const briefingSources = issue.sources || [];
-        const additionalSources: string[] = [];
+        // 전역 예산: triangulation 재생성 + content gate 재실행을 합산한 pass 1 총 실행 상한
+        const budget = { pass1Runs: 0 };
+        let pass1ContentFeedback = '';
+        // tag 모드 폴백용: 마지막으로 조립 가능했던 (draft, structured, gate) 묶음 — 항상 같은 draft 기준
+        let last: { draft: DeepDivePass1Draft; structured: DeepDiveStructured; gate: ContentGateResult } | null = null;
 
-        // Grounding Metadata에서 신규 소스 추출
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        if (groundingMetadata?.groundingChunks) {
-            groundingMetadata.groundingChunks.forEach((chunk: any) => {
-                if (chunk.web?.url) {
-                    const url = chunk.web.url;
-                    if (!briefingSources.includes(url)) {
-                        additionalSources.push(url);
-                    }
+        const maxCycles = 1 + CONTENT_GATE_CONFIG.MAX_PASS1_RERUNS;
+        for (let cycle = 1; cycle <= maxCycles; cycle++) {
+            // ── pass 1: 검색+분석 초안 (triangulation 게이트·재생성 루프 부착, 예산 차감) ──
+            const draft = await runDeepDivePass1(model, userPrompt, briefingSources, pass1ContentFeedback, budget, cycle);
+            if (!draft) break; // 예산 소진으로 이번 cycle의 pass 1을 시작조차 못 함 → 지금까지의 결과로 FAIL_MODE 처리
+
+            // 무검색 방어: 재시도 소진 후에도 grounding 0이면 FAIL_MODE와 무관하게 폐기 (tag 출고 금지)
+            if (GROUNDING_POLICY.REQUIRE_ANY_GROUNDING && draft.triangulation.totalChunks === 0) {
+                console.warn(`[Triangulation] zero-grounding reject → 리포트 폐기: "${issue.headline}" (검색 미수행 산출물은 tag 모드에서도 출고 금지)`);
+                return null;
+            }
+
+            // triangulation 최종 미달 → FAIL_MODE (기존 패턴 유지)
+            if (!draft.triangulation.pass) {
+                if (TRIANGULATION_CONFIG.FAIL_MODE === 'reject') {
+                    console.warn(`[Triangulation] 최종 미달(FAIL_MODE=reject) → 리포트 폐기: "${issue.headline}"`);
+                    return null;
                 }
-            });
+                console.warn(`[Triangulation] 최종 미달(FAIL_MODE=tag) → depthWarning 부착하고 구조화 진행: "${issue.headline}"`);
+            }
+
+            // 소스 참조는 코드가 결정적으로 구성 — LLM의 URL 날조 여지 차단(JSON 원본의 무결성)
+            const sourceRefs = buildDeepDiveSourceRefs(briefingSources, draft.groundingMetadata);
+
+            // ── pass 2 + 내용 게이트: 1차 복구 = 구조화만 재시도 (추출 누락은 싸게 복구) ──
+            let gateFeedback = '';
+            const maxPass2 = 1 + CONTENT_GATE_CONFIG.MAX_PASS2_RETRIES;
+            for (let attempt = 1; attempt <= maxPass2; attempt++) {
+                const structured = await structureDeepDiveDraft(draft.text, sourceRefs, gateFeedback);
+                if (!structured) continue; // 파싱 실패(내부 재시도 포함) — 남은 attempt로 이월
+
+                const gate = validateDeepDiveContent(structured, CONTENT_GATE_CONFIG, SOURCE_TIERING);
+                console.log(
+                    `[ContentGate] attempt=${attempt} stage=pass2 cycle=${cycle} pass=${gate.pass} ` +
+                    `failures=${gate.failures.length} paths=[${gate.failures.map(f => f.path).join(', ')}]`
+                );
+                last = { draft, structured, gate };
+                if (gate.pass) return assembleTrendReport(last, briefingSources.length);
+
+                gateFeedback =
+                    `직전 추출에서 다음 필드가 계약 미달임: ${gate.failures.map(f => `${f.path}: ${f.detail}`).join('; ')}. ` +
+                    `초안에서 해당 내용을 다시 찾아 채울 것. 초안에 정말 없으면 빈 값으로 둘 것.`;
+            }
+
+            // ── 2차 복구: pass 2 소진 → 초안 자체에 판단 내용이 없는 경우, pass 1부터 재실행 ──
+            if (cycle < maxCycles) {
+                pass1ContentFeedback = last
+                    ? buildPass1ContentFeedback(last.gate.failures)
+                    : '직전 시도는 구조화(JSON 추출) 자체가 실패했음. 계약 항목을 명시적 소제목으로 구분해 서술할 것.';
+                console.log(`[ContentGate] stage=pass1 cycle=${cycle + 1} 재실행 예약 (직전 미달 ${last?.gate.failures.length ?? '파싱실패'}건)`);
+            }
         }
 
-        // 최종 소스 결합
-        const combinedSourcesSet = new Set([...briefingSources, ...additionalSources]);
-        const finalUniqueSources = Array.from(combinedSourcesSet);
-
-        // 소스 섹션 렌더링
-        let newSourcesSection = '\n## ■ Sources\n';
-        finalUniqueSources.forEach((url, idx) => {
-            try {
-                const urlObj = new URL(url);
-                const hostname = urlObj.hostname.replace('www.', '');
-                const label = briefingSources.includes(url) ? 'Brief Origin' : 'Deep Research';
-                newSourcesSection += `- [${idx + 1}] ${hostname} | ${kstDateStr.split(' ')[0]} | [${label}] ${url}\n`;
-            } catch (e) {
-                newSourcesSection += `- [${idx + 1}] Source | ${kstDateStr.split(' ')[0]} | ${url}\n`;
-            }
-        });
-
-        const expansionCount = finalUniqueSources.length - briefingSources.length;
-        newSourcesSection += expansionCount > 0
-            ? `\n(브리프 소스 ${briefingSources.length}개를 모두 상속하였으며, 추가 연구를 통해 ${expansionCount}개의 신규 출처를 확보했습니다.)\n`
-            : `\n(브리프 작성에 사용된 모든 원본 소스 ${briefingSources.length}개를 기반으로 작성되었습니다.)\n`;
-
-        const sourcesPattern = /(?:##?\s*)?■\s*Sources[\s\S]*$/i;
-        const bodyContent = text.replace(sourcesPattern, '').trim();
-
-        const finalReport = `${bodyContent}\n\n${newSourcesSection}`;
-
-        console.log(`[Trend API] 소스 검증 완료: 브리프(${briefingSources.length}) -> 리포트(${finalUniqueSources.length})`);
-
-        return finalReport;
+        // ── 전 단계 소진 → FAIL_MODE 처리 (triangulation과 동일 패턴) ──
+        if (!last) {
+            console.error(`[DeepDive] 구조화 산출물 없음(파싱 실패/예산 소진) → 리포트 폐기: "${issue.headline}"`);
+            return null;
+        }
+        if (CONTENT_GATE_CONFIG.FAIL_MODE === 'reject') {
+            console.warn(`[ContentGate] 최종 미달(FAIL_MODE=reject) → 리포트 폐기: "${issue.headline}"`);
+            return null;
+        }
+        console.warn(`[ContentGate] 최종 미달(FAIL_MODE=tag) → contentGate 결과 부착 반환: "${issue.headline}" (${last.gate.failures.length}건 미달)`);
+        return assembleTrendReport(last, briefingSources.length);
     } catch (error) {
         console.error('[Trend Report Error]', error);
         return null;
     }
 }
+
+interface DeepDivePass1Draft {
+    text: string;
+    groundingMetadata: unknown;
+    triangulation: TriangulationResult;
+}
+
+// pass 1 실행기: triangulation 게이트+재생성 루프를 포함하며, 전역 예산(GLOBAL_BUDGET)을 차감.
+// 예산이 소진되어 이번 cycle에서 한 번도 실행하지 못하면 null.
+async function runDeepDivePass1(
+    model: ReturnType<typeof genAI.getGenerativeModel>,
+    userPrompt: string,
+    briefingSources: string[],
+    contentFeedback: string,
+    budget: { pass1Runs: number },
+    cycle: number,
+): Promise<DeepDivePass1Draft | null> {
+    const maxAttempts = 1 + TRIANGULATION_CONFIG.MAX_REGEN_ATTEMPTS;
+    let regenFeedback = '';
+    let draft: DeepDivePass1Draft | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (budget.pass1Runs >= GLOBAL_BUDGET.MAX_TOTAL_PASS1_RUNS) {
+            console.warn(`[Budget] pass1 총 실행 ${budget.pass1Runs}회 = 상한(${GLOBAL_BUDGET.MAX_TOTAL_PASS1_RUNS}) → 추가 실행 중단`);
+            break;
+        }
+        budget.pass1Runs++;
+
+        let attemptPrompt = userPrompt;
+        if (contentFeedback) attemptPrompt += `\n\n# CONTENT FEEDBACK (직전 리포트 판단 필드 미달 — 아래 항목 필수 서술)\n${contentFeedback}`;
+        if (regenFeedback) attemptPrompt += `\n\n# RETRY FEEDBACK (직전 시도 삼각검증 미달)\n${regenFeedback}`;
+
+        const result = await generateWithRetry(model, attemptPrompt);
+        const response = await result.response;
+        const text = response.text();
+        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+
+        // 삼각검증 게이트: 검색이 일어난 pass 1의 groundingMetadata가 게이트 입력 (+티어 제외)
+        const triangulation = validateTriangulation(groundingMetadata, briefingSources, TRIANGULATION_CONFIG, SOURCE_TIERING);
+        // 무검색 진단: 필드 자체 부재(요청 구성 문제 의심) vs 존재하되 청크 0/무필드(모델이 검색 스킵)
+        const gmState = groundingMetadata == null
+            ? 'metadata-absent'
+            : `metadata-present chunks=${triangulation.totalChunks}`;
+        console.log(
+            `[Triangulation] attempt=${attempt} cycle=${cycle} pass1Runs=${budget.pass1Runs}/${GLOBAL_BUDGET.MAX_TOTAL_PASS1_RUNS} ` +
+            `pass=${triangulation.pass} domains=${triangulation.independentDomainCount}/${TRIANGULATION_CONFIG.MIN_INDEPENDENT_DOMAINS} ` +
+            `independent=[${triangulation.independentDomains.join(', ')}] ` +
+            `excludedDenylisted=[${triangulation.excludedDenylisted.join(', ')}] ` +
+            `input=[${triangulation.inputDomains.join(', ')}] unresolved=${triangulation.unresolvedChunks} grounding=${gmState}`
+        );
+
+        draft = { text, groundingMetadata, triangulation };
+        if (triangulation.pass) break;
+
+        // 무검색(청크 0)이면 '독립 출처 미달'이 아니라 '검색 미수행'이 원인 — 전용 피드백
+        regenFeedback = triangulation.totalChunks === 0
+            ? `직전 시도에서 검색이 전혀 수행되지 않았음. 작성 전 Triple-Search(1차 사실 확인·구조적 맥락·독립 교차검증)를 반드시 수행할 것. 검색 없는 작성은 실패로 처리됨.`
+            : `직전 시도는 독립 신규 출처가 ${triangulation.independentDomainCount}개로 기준(${TRIANGULATION_CONFIG.MIN_INDEPENDENT_DOMAINS}개) 미달이었음. ` +
+            `입력 소스(${triangulation.inputDomains.join(', ')})와 다른 도메인의 독립 출처를 추가 검색으로 확보할 것. ` +
+            `동일 사건의 재보도가 아닌, 배경·구조·경쟁 동향을 다루는 별도 스토리를 우선할 것.`;
+    }
+    return draft;
+}
+
+// 최종 결과 조립: 마크다운은 파생물 — 항상 B유형 렌더러가 JSON에서 생성(설계 원칙 1)
+function assembleTrendReport(
+    last: { draft: DeepDivePass1Draft; structured: DeepDiveStructured; gate: ContentGateResult },
+    briefSourceCount: number,
+): TrendReportResult {
+    const markdown = renderDeepDiveB(last.structured);
+    const refCount = last.structured.sourceRefs.length;
+    console.log(`[Trend API] 완료: sources=${refCount} (brief ${briefSourceCount} + research ${refCount - briefSourceCount}), developments=${last.structured.keyDevelopments.length}, contentGate=${last.gate.pass}`);
+    return {
+        markdown,
+        structured: last.structured,
+        triangulation: last.draft.triangulation,
+        contentGate: last.gate,
+        reportType: 'deep_dive',
+    };
+}
+
+// Deep Dive 소스 참조 구성: 입력 브리프 소스(s1…) + pass 1 grounding 신규 소스(g1…).
+// grounding URL은 Google 리다이렉트라 canonical 미해석(resolved:false), 도메인 힌트는 web.title.
+function buildDeepDiveSourceRefs(briefingSources: string[], groundingMetadata: unknown): SourceRef[] {
+    // 출처 티어 태깅: denylist 매칭='aggregator', 그 외='unknown' (positive 판정 안 함 — allowlist 승급 전)
+    const tierOf = (domain: string | null): SourceRef['tier'] =>
+        isDenylistedDomain(domain, SOURCE_TIERING.AGGREGATOR_DENYLIST) ? 'aggregator' : 'unknown';
+
+    const refs: SourceRef[] = briefingSources.map((url, i) => ({
+        id: `s${i + 1}`,
+        url,
+        resolved: !/news\.google\.com/.test(url),
+        tier: tierOf(urlToRegistrableDomain(url)),
+    }));
+    const chunks = (groundingMetadata as { groundingChunks?: Array<{ web?: { uri?: string; url?: string; title?: string } }> } | null | undefined)?.groundingChunks;
+    if (Array.isArray(chunks)) {
+        const seen = new Set(briefingSources);
+        let g = 0;
+        for (const chunk of chunks) {
+            const url = chunk?.web?.url || chunk?.web?.uri;
+            if (!url || seen.has(url)) continue;
+            seen.add(url);
+            g += 1;
+            const title = chunk?.web?.title;
+            refs.push({
+                id: `g${g}`,
+                url,
+                outlet: title,
+                title,
+                resolved: false,
+                // grounding URL은 리다이렉트라 도메인 판별은 title 경유 (triangulation과 동일 원칙)
+                tier: tierOf(typeof title === 'string' ? toRegistrableDomain(title) : null),
+            });
+        }
+    }
+    return refs;
+}
+
+// pass 2: 초안 → DeepDiveStructured. JSON 파싱 실패 시 1회 재시도, 재실패 시 null(기존 에러 경로 준용).
+// gateFeedback: 내용 게이트 미달 필드 목록(1차 복구) — 초안에서 재탐색하도록 지시.
+async function structureDeepDiveDraft(draftText: string, sourceRefs: SourceRef[], gateFeedback = ''): Promise<DeepDiveStructured | null> {
+    const model = genAI.getGenerativeModel({
+        model: DEEP_DIVE_STRUCTURING_MODEL,
+        systemInstruction: DEEP_DIVE_STRUCTURING_SYSTEM_PROMPT,
+    });
+    const catalog = sourceRefs.map(r => ({ id: r.id, label: r.outlet || r.title || r.url }));
+    let input = buildStructuringInput(draftText, catalog);
+    if (gateFeedback) input += `\n\n# RETRY FEEDBACK (직전 추출 계약 미달)\n${gateFeedback}`;
+    const validIds = new Set(sourceRefs.map(r => r.id));
+
+    const PARSE_ATTEMPTS = 2; // 초기 1회 + 파싱 실패 시 재시도 1회
+    for (let attempt = 1; attempt <= PARSE_ATTEMPTS; attempt++) {
+        try {
+            const result = await generateWithRetry(model, {
+                contents: [{ role: 'user', parts: [{ text: input }] }],
+                generationConfig: { responseMimeType: 'application/json', responseSchema: DEEP_DIVE_RESPONSE_SCHEMA as any },
+            });
+            const parsed = JSON.parse((await result.response).text());
+
+            // 카탈로그에 없는 sourceId는 폐기 — 창작 금지 규칙(설계 원칙 5)의 코드측 방어선
+            for (const dev of Array.isArray(parsed.keyDevelopments) ? parsed.keyDevelopments : []) {
+                for (const fact of Array.isArray(dev.facts) ? dev.facts : []) {
+                    fact.sourceIds = (Array.isArray(fact.sourceIds) ? fact.sourceIds : []).filter((id: string) => validIds.has(id));
+                }
+            }
+            // anchor 결박도 동일 방어 — 필터 후 비면 anchor_source_binding 게이트가 잡아 복구 경로로 승급
+            if (parsed.anchor) {
+                parsed.anchor.sourceIds = (Array.isArray(parsed.anchor.sourceIds) ? parsed.anchor.sourceIds : []).filter((id: string) => validIds.has(id));
+            }
+
+            // reportType·sourceRefs는 코드가 stamp(스키마에 없음 — 날조 방지)
+            return { ...parsed, reportType: 'deep_dive', sourceRefs } as DeepDiveStructured;
+        } catch (e) {
+            console.warn(`[DeepDive Structuring] pass 2 시도 ${attempt}/${PARSE_ATTEMPTS} 실패: ${e instanceof Error ? e.message : e}`);
+        }
+    }
+    return null;
+}
+
+// (3b) 계약 공란 warn 로그는 validateDeepDiveContent 게이트로 대체됨 — validate-deep-dive.ts 참조.
 
 // Helper: Retry logic for API calls
 async function generateWithRetry(model: any, prompt: string | any, retries = 3, delay = 2000) {

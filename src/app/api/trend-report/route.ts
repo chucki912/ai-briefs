@@ -24,13 +24,17 @@ export async function POST(req: Request) {
             try {
                 // generateTrendReport now handles EVERYTHING (Research + Synthesis) internally
                 // because Vercel Pro timeout (300s) is sufficient.
-                const report = await generateTrendReport(issue, '');
+                const result = await generateTrendReport(issue, '');
 
-                if (report) {
+                if (result) {
                     await kvSet(`trend_job:${jobId}`, {
                         status: 'completed',
                         progress: 100,
-                        report
+                        report: result.markdown, // 파생 마크다운(renderDeepDiveB 산출, B유형) — 기존 프론트 계약 유지
+                        structured: result.structured, // JSON 원본 (source of truth)
+                        reportType: result.reportType,
+                        triangulation: result.triangulation, // FAIL_MODE='tag' 시 depthWarning 판별용 (pass=false)
+                        contentGate: result.contentGate, // 판단 완결성 게이트 결과 (tag 모드 미달 판별용)
                     }, 3600);
                 } else {
                     throw new Error('Report generation returned null');

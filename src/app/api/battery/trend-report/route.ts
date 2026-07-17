@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateBatteryTrendReport } from '@/lib/battery-gemini';
 import { kvSet } from '@/lib/store';
-import { IssueItem } from '@/types';
+import { IssueItem, ReportType } from '@/types';
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 300; // Vercel timeout up to 5 min
@@ -34,7 +34,8 @@ export async function POST(request: Request) {
                     await kvSet(`battery_trend_job:${jobId}`, {
                         status: 'completed',
                         progress: 100,
-                        report
+                        report,
+                        reportType: 'battery_deep_dive' satisfies ReportType,
                     }, 3600);
                 } else {
                     throw new Error('리포트 생성 결과가 비어있습니다.');

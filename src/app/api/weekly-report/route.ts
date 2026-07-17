@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { clusterIssuesByAI, generateWeeklyReport } from '@/lib/weekly-report';
 import { kvSet } from '@/lib/store';
 import { getRecentIssues } from '@/lib/store';
+import { ReportType } from '@/types';
 import { waitUntil } from '@vercel/functions';
 
 // Vercel Pro allows up to 300 seconds (5 minutes)
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
                         status: 'completed',
                         progress: 100,
                         report,
+                        reportType: 'weekly' satisfies ReportType,
                         clusterCount: clusters.length,
                         issueCount: issues.length,
                     }, 3600);

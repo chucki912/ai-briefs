@@ -29,6 +29,7 @@ export function buildReport(issues: IssueItem[], date: Date = new Date()): Brief
         totalIssues: issues.length,
         generatedAt: new Date().toISOString(),
         markdown,
+        reportType: 'daily_brief',
     };
 }
 

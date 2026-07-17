@@ -128,5 +128,6 @@ export async function generateWeeklyFlash(
     groundingSources,
     windowDays,
     baseDate,
+    reportType: 'weekly_flash',
   };
 }

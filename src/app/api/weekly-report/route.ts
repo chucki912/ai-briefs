@@ -6,7 +6,9 @@ import { ReportType } from '@/types';
 import { waitUntil } from '@vercel/functions';
 
 // Vercel Pro allows up to 300 seconds (5 minutes)
-export const maxDuration = 300;
+// 전제: Vercel Fluid Compute 활성 (2026-07-18 대시보드 확인). 주간은 수집→클러스터링→생성
+// 다단계라 장시간 실행 — Deep Dive 라우트와 동일 상한.
+export const maxDuration = 800;
 
 export async function POST(req: Request) {
     try {

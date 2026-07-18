@@ -131,12 +131,13 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         };
     }, []);
 
-    // 폴링 타임아웃: 서버 최악 경로(pass 1 ×4 + pass 2 ×6 ≈ 490초) + 여유. 초과 시 폴링만 중단 —
-    // 서버 waitUntil 처리는 계속 중일 수 있으므로 실패 단정 대신 새로고침/재시도 안내.
-    const POLL_TIMEOUT_MS = 12 * 60 * 1000;
+    // 폴링 타임아웃: 서버 maxDuration 800초(13분20초)보다 커야 함 — 클라이언트가 먼저 포기하는
+    // 역전 금지(2026-07-18 프로덕션 실측: 12분 타임아웃이 서버 한도보다 짧아 정상 실행을 끊음).
+    // 초과 시 폴링만 중단 — 서버 waitUntil 처리는 계속 중일 수 있으므로 실패 단정 대신 재시도 안내.
+    const POLL_TIMEOUT_MS = 15 * 60 * 1000;
     const POLL_TIMEOUT_NOTICE = '리포트 생성이 예상보다 오래 걸리고 있습니다 — 서버 처리가 계속 중일 수 있으니 잠시 후 새로고침 또는 재시도해 주세요.';
 
-    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (통상 4~5분, 최대 8분대 소요)');
+    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (통상 4~5분, 서버 한도 최대 13분)');
 
     useEffect(() => {
         if (!loading && report && !issue && !weeklyMode) {
@@ -145,7 +146,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             // Single Issue Deep Dive mode
             const fetchTrendReport = async () => {
                 setIsPolling(true);
-                setStatusMessage('심층 분석 및 리포트 작성 중... (통상 4~5분, 최대 8분대 소요)');
+                setStatusMessage('심층 분석 및 리포트 작성 중... (통상 4~5분, 서버 한도 최대 13분)');
                 try {
                     const startRes = await fetch(trendReportApiUrl, {
                         method: 'POST',

@@ -3,7 +3,9 @@ import { generateAggregatedReport, AggregationPeriod } from '@/lib/reports';
 import { getIssuesByDateRange } from '@/lib/store';
 import { IssueItem, ReportType } from '@/types';
 
-export const maxDuration = 60; // Allow 60 seconds for report generation
+// 전제: Vercel Fluid Compute 활성 (2026-07-18 대시보드 확인). 통합 리포트는 복수 이슈 +
+// 수동 소스 분석으로 60초를 초과할 수 있음(빈 섹션·강제 종료의 유력 원인) — Deep Dive와 동일 상한.
+export const maxDuration = 800;
 
 interface GenerateReportRequest {
     type: AggregationPeriod; // 기간 구분(요청 계약 불변) — 모드는 아래 응답의 reportType

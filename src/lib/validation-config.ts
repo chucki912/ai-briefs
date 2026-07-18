@@ -39,9 +39,12 @@ export const SOURCE_TIERING = {
         'valueaddvc.com',       // 관측 3회(2026-07-17 ×2, 2026-07-18 ×1) → 대장 규칙(2회 이상)에 따라 승격: VC 큐레이션·리라이팅
         'aibusinessweekly.net', // 관측 2회(2026-07-17, 2026-07-18) → 대장 규칙(2회 이상)에 따라 승격: AI 뉴스 집계·리라이팅
     ],
-    // DENYLIST 후보 관측 대장 (2회 이상 관측 시 승격 검토 — 승격은 별도 결정, 자동 추가 금지):
+    // DENYLIST 후보 관측 대장 — 승격 규칙(2026-07-18 명문화, 재량 판단 금지):
+    //   · anchor 또는 fact 결박 출처로 2회 관측 시 승격
+    //   · 단순 grounding 등장은 3회 관측 시 승격
+    //   (자동 추가 금지 — 승격 시 위 규칙·관측 횟수·일자를 denylist 주석에 기록)
     // tradingkey.com — 2026-07-17 anchor 출처로 1회 관측
-    // getpanto.ai — 2026-07-17 grounding 출처로 2회 관측 (3a·티어링 e2e) → 승격 검토 대상
+    // getpanto.ai — 2026-07-17 단순 grounding 등장 2회 관측 (3a·티어링 e2e) → 규칙상 유지, 3회째 관측 시 승격
     // moomoo.com, sqmagazine.co.uk, finpulse.dev — 2026-07-17 grounding 출처로 각 1회 관측
     // tisram.ai, mindstudio.ai, appeconomyinsights.com — 2026-07-17 e2e grounding 출처로 각 1회 관측
     EXCLUDE_DENYLISTED_FROM_TRIANGULATION: true,  // 독립 도메인 카운트에서 제외

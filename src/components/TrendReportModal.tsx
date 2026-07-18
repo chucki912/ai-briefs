@@ -131,7 +131,12 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         };
     }, []);
 
-    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
+    // 폴링 타임아웃: 서버 최악 경로(pass 1 ×4 + pass 2 ×6 ≈ 490초) + 여유. 초과 시 폴링만 중단 —
+    // 서버 waitUntil 처리는 계속 중일 수 있으므로 실패 단정 대신 새로고침/재시도 안내.
+    const POLL_TIMEOUT_MS = 12 * 60 * 1000;
+    const POLL_TIMEOUT_NOTICE = '리포트 생성이 예상보다 오래 걸리고 있습니다 — 서버 처리가 계속 중일 수 있으니 잠시 후 새로고침 또는 재시도해 주세요.';
+
+    const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (통상 4~5분, 최대 8분대 소요)');
 
     useEffect(() => {
         if (!loading && report && !issue && !weeklyMode) {
@@ -140,7 +145,7 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
             // Single Issue Deep Dive mode
             const fetchTrendReport = async () => {
                 setIsPolling(true);
-                setStatusMessage('심층 분석 및 리포트 작성 중... (최대 3분 소요)');
+                setStatusMessage('심층 분석 및 리포트 작성 중... (통상 4~5분, 최대 8분대 소요)');
                 try {
                     const startRes = await fetch(trendReportApiUrl, {
                         method: 'POST',
@@ -151,7 +156,16 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     if (!startRes.ok) throw new Error('Failed to start report generation');
                     const { data: { jobId } } = await startRes.json();
 
+                    const pollStart = Date.now();
                     pollIntervalRef.current = setInterval(async () => {
+                        if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
+                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                            setIsPolling(false);
+                            alert(POLL_TIMEOUT_NOTICE);
+                            onGenerationComplete?.();
+                            onClose();
+                            return;
+                        }
                         try {
                             const statusRes = await fetch(`${trendReportApiUrl}/status?jobId=${jobId}`);
                             if (!statusRes.ok) return;
@@ -202,7 +216,16 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                     if (!startRes.ok) throw new Error('Failed to start weekly report generation');
                     const { data: { jobId } } = await startRes.json();
 
+                    const pollStart = Date.now();
                     pollIntervalRef.current = setInterval(async () => {
+                        if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
+                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                            setIsPolling(false);
+                            setParseError(true);
+                            setLocalReport(`## ⏳ 생성이 예상보다 오래 걸리고 있음\n\n${POLL_TIMEOUT_NOTICE}`);
+                            onGenerationComplete?.();
+                            return;
+                        }
                         try {
                             const statusRes = await fetch(`/api/weekly-report/status?jobId=${jobId}`);
                             if (!statusRes.ok) return;

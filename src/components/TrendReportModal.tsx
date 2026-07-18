@@ -676,89 +676,11 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
         return { url, title };
     };
 
+    // 복사원은 KV의 report 원문(마크다운 문자열)으로 통일 — 구조화 뷰·raw 폴백 어느 경로든 동일 동작.
+    // (기존: prop `report`를 복사원으로 사용 → 폴링 경로에선 prop이 빈 문자열이라 빈 값이 복사되는 결함)
     const handleCopy = () => {
-        let textToCopy = report;
-        if (parsedReport) {
-            try {
-                textToCopy = `[트렌드 리포트] ${parsedReport.report_meta?.title || ''}\n\n`;
-                textToCopy += `분석대상: ${parsedReport.report_meta?.coverage || '-'}\n`;
-                textToCopy += `타겟: ${parsedReport.report_meta?.audience || '-'}\n`;
-                textToCopy += `기간: ${parsedReport.report_meta?.time_window || '-'}\n`;
-                textToCopy += `관점: ${parsedReport.report_meta?.lens || '-'}\n\n`;
-
-                textToCopy += `■ Executive Summary\n`;
-                parsedReport.executive_summary?.signal_summary?.forEach(s => textToCopy += `- [Signal] ${s.text}\n`);
-                parsedReport.executive_summary?.what_changed?.forEach(s => textToCopy += `- [Change] ${s.text}\n`);
-                parsedReport.executive_summary?.so_what?.forEach(s => textToCopy += `- [So What] ${s.text}\n`);
-
-                if (parsedReport.key_developments?.length) {
-                    textToCopy += `\n■ Key Developments\n`;
-                    parsedReport.key_developments.forEach(d => {
-                        textToCopy += `\n[${d.headline}]\n`;
-                        d.facts?.forEach(f => textToCopy += `- (Fact) ${f.text}\n`);
-                        d.analysis?.forEach(a => {
-                            const basisSuffix = a.basis ? `(Basis: ${a.basis})` : '';
-                            const analysisLines = a.text.split('\n').map(l => l.trim()).filter(Boolean);
-                            textToCopy += `- (Analysis)\n`;
-                            analysisLines.forEach(line => {
-                                textToCopy += `  ${line}\n`;
-                            });
-                            if (basisSuffix) {
-                                textToCopy += `  - ${basisSuffix}\n`;
-                            }
-                        });
-                        d.why_it_matters?.forEach(w => textToCopy += `- (Structural Linkage) ${w.text}\n`);
-                    });
-                }
-
-                if (parsedReport.themes?.length > 0) {
-                    textToCopy += `\n■ ${weeklyMode ? 'Second-Order Economic Insights' : 'Core Themes'}\n`;
-                    parsedReport.themes.forEach(t => {
-                        textToCopy += `\n[${t.theme}]\n`;
-                        t.drivers?.forEach(d => {
-                            const driverLines = d.text.split('\n').map(l => l.trim()).filter(Boolean);
-                            driverLines.forEach((line, idx) => {
-                                textToCopy += idx === 0 ? `- ${line}\n` : `  ${line}\n`;
-                            });
-                        });
-                    });
-                }
-
-                if (parsedReport.implications) {
-                    textToCopy += `\n■ Implications\n`;
-                    parsedReport.implications?.market_business?.forEach(s => textToCopy += `- [Market] ${s?.text || ''}\n`);
-                    parsedReport.implications?.tech_product?.forEach(s => textToCopy += `- [Tech] ${s?.text || ''}\n`);
-                    parsedReport.implications?.competitive_landscape?.forEach(s => textToCopy += `- [Comp] ${s?.text || ''}\n`);
-                    parsedReport.implications?.policy_regulation?.forEach(s => textToCopy += `- [Policy] ${s?.text || ''}\n`);
-                }
-
-                if (parsedReport.risks_and_uncertainties?.length) {
-                    textToCopy += `\n■ Risks & Uncertainties\n`;
-                    parsedReport.risks_and_uncertainties.forEach(r => {
-                        textToCopy += `- [${r.type.toUpperCase()}] ${r.risk}\n`;
-                        r.impact_paths?.forEach(p => textToCopy += `  - Impact: ${p.text}\n`);
-                    });
-                }
-
-                if (parsedReport.watchlist?.length) {
-                    textToCopy += `\n■ Watchlist\n`;
-                    parsedReport.watchlist.forEach(w => {
-                        textToCopy += `- ${w.signal}: ${w.why}\n`;
-                    });
-                }
-
-                if (parsedReport.sources?.length) {
-                    textToCopy += `\n■ Sources\n`;
-                    parsedReport.sources.forEach(src => {
-                        const { url, title } = getSourceInfo(src);
-                        textToCopy += `[${src.sid}] ${title} (${src.publisher})\n${url}\n`;
-                    });
-                }
-            } catch (e) {
-                console.error('Text formatting failed', e);
-                textToCopy = report;
-            }
-        }
+        const textToCopy = localReport || report;
+        if (!textToCopy) return;
         navigator.clipboard.writeText(textToCopy);
         setShowCopyToast(true);
         setTimeout(() => setShowCopyToast(false), 2000);

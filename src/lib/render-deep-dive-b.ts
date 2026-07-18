@@ -138,7 +138,12 @@ export function renderDeepDiveB(r: DeepDiveStructured): string {
     (r.sourceRefs || []).forEach((ref, i) => {
         const label = displaySource(ref);
         const aggregatorMark = ref.tier === 'aggregator' ? ' (애그리게이터 — 검증 필요)' : '';
-        out.push(`${i + 1}. ${label ? `${label} — ` : ''}${ref.url}${aggregatorMark}`);
+        if (ref.resolved === false) {
+            // 미해석 소스: 리다이렉트 원문 URL 출력 금지 — 도메인 힌트만 표기 (R4)
+            out.push(`${i + 1}. (원문 링크 미해석 — 도메인: ${label || '불명'})${aggregatorMark}`);
+        } else {
+            out.push(`${i + 1}. ${label ? `${label} — ` : ''}${ref.url}${aggregatorMark}`);
+        }
     });
 
     return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';

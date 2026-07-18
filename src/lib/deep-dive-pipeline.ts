@@ -255,6 +255,7 @@ ${issue.sources ? issue.sources.join('\\n') : 'URL 없음'}
 
             // 소스 참조는 코드가 결정적으로 구성 — LLM의 URL 날조 여지 차단(JSON 원본의 무결성)
             const sourceRefs = buildDeepDiveSourceRefs(briefingSources, draft.groundingMetadata);
+            await resolveRedirectUrls(sourceRefs); // R4: pass 2 이전에 해석 — 결박 카탈로그·렌더 모두 최종 URL 사용
 
             // ── pass 2 + 내용 게이트: 1차 복구 = 구조화만 재시도 (추출 누락은 싸게 복구) ──
             let gateFeedback = '';
@@ -420,6 +421,44 @@ function buildDeepDiveSourceRefs(briefingSources: string[], groundingMetadata: u
         }
     }
     return refs;
+}
+
+// R4: 리다이렉트 URL(vertexaisearch grounding·news.google)을 HTTP redirect-follow로 원 URL 해석.
+// 병렬 + 요청당 3초 타임아웃, 전체 상한 10초(생성 시간 볼모 금지). 실패 시 무해석 유지(resolved:false) —
+// 렌더러가 resolved:false의 URL 원문을 출력하지 않으므로 리다이렉트 문자열 노출 경로가 없음.
+const REDIRECT_HOSTS = ['vertexaisearch.cloud.google.com', 'news.google.com'];
+const URL_RESOLVE_TIMEOUT_MS = 3000;
+const URL_RESOLVE_TOTAL_CAP_MS = 10000;
+
+function isRedirectUrl(url: string): boolean {
+    try { return REDIRECT_HOSTS.includes(new URL(url).hostname.replace(/^www\./, '')); } catch { return false; }
+}
+
+async function resolveRedirectUrls(refs: SourceRef[]): Promise<void> {
+    const targets = refs.filter(r => !r.resolved && isRedirectUrl(r.url));
+    if (!targets.length) return;
+    const controllers: AbortController[] = [];
+    const work = Promise.allSettled(targets.map(async ref => {
+        const ctrl = new AbortController();
+        controllers.push(ctrl);
+        const timer = setTimeout(() => ctrl.abort(), URL_RESOLVE_TIMEOUT_MS);
+        try {
+            const res = await fetch(ref.url, { redirect: 'follow', signal: ctrl.signal });
+            // res.url = redirect 체인의 최종 URL. 여전히 리다이렉트 도메인이면(HTML/JS 리다이렉트) 미해석 유지.
+            if (res.url && !isRedirectUrl(res.url)) {
+                ref.url = res.url;
+                ref.resolved = true;
+            }
+            await res.body?.cancel();
+        } finally {
+            clearTimeout(timer);
+        }
+    }));
+    await Promise.race([
+        work,
+        new Promise<void>(r => setTimeout(() => { controllers.forEach(c => c.abort()); r(); }, URL_RESOLVE_TOTAL_CAP_MS)),
+    ]);
+    console.log(`[R4] 리다이렉트 해석: ${targets.filter(t => t.resolved).length}/${targets.length}건 성공`);
 }
 
 // pass 2: 초안 → DeepDiveStructured. JSON 파싱 실패 시 1회 재시도, 재실패 시 null(기존 에러 경로 준용).

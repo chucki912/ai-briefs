@@ -323,6 +323,10 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
 
     // Markdown 텍스트를 구조화된 데이터로 변환하는 파서
     const parseMarkdownToStructure = (md: string): TrendReportData | null => {
+        // 이 파서는 구 포맷(■ 등 섹션 마커) 전용. 마커가 없는 마크다운(v3 Deep Dive B유형 등)을
+        // 넣으면 제목만 뽑힌 빈 구조를 '성공'으로 반환해 빈 섹션 뷰가 렌더되는 결함이 있었음
+        // (2026-07-18 프로덕션 실측) — 비레거시 입력은 null을 반환해 raw 마크다운 렌더로 폴백.
+        if (!/[■●◆★🔹]/.test(md)) return null;
         try {
             const data: any = {
                 report_meta: {},

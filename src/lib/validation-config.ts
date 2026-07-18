@@ -37,7 +37,7 @@ export const SOURCE_TIERING = {
         'biyapay.com',          // e2e 실측(3a): anchor 출처로 등장한 결제/리서치 리라이팅
         'tradethepool.com',     // e2e 실측(3b): anchor 출처로 등장한 트레이딩 블로그
         'valueaddvc.com',       // 관측 3회(2026-07-17 ×2, 2026-07-18 ×1) → 대장 규칙(2회 이상)에 따라 승격: VC 큐레이션·리라이팅
-        'aibusinessweekly.net', // 관측 2회(2026-07-17, 2026-07-18) → 대장 규칙(2회 이상)에 따라 승격: AI 뉴스 집계·리라이팅
+        'aibusinessweekly.net', // 관측 2회(2026-07-17, 2026-07-18): AI 뉴스 집계·리라이팅 — 규칙 명문화 이전 명시 승격(단순 2회), 소급 미적용
     ],
     // DENYLIST 후보 관측 대장 — 승격 규칙(2026-07-18 명문화, 재량 판단 금지):
     //   · anchor 또는 fact 결박 출처로 2회 관측 시 승격

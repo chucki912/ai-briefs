@@ -7,7 +7,9 @@ import { waitUntil } from '@vercel/functions';
 
 const JOB_KEY = (jobId: string) => `${BATTERY_DEEP_DIVE_DOMAIN.jobKeyPrefix}:${jobId}`;
 
-export const maxDuration = 300; // Vercel timeout up to 5 min
+// 전제: Vercel Fluid Compute 활성 (2026-07-18 대시보드 확인 — 미활성 시 이 값은 플랜 상한으로 클램프됨).
+// 파이프라인 최악 경로(pass 1 ×4 + pass 2 ×6) 실측 기반 ~490초 수용.
+export const maxDuration = 800;
 
 // 배터리 트렌드 리포트 생성 API (비동기 처리)
 export async function POST(request: Request) {

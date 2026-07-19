@@ -44,6 +44,7 @@ export async function POST(request: Request) {
                         reportType: result.reportType,
                         triangulation: result.triangulation,
                         contentGate: result.contentGate,
+                        attemptTrace: result.attemptTrace, // pass 1 시도별 진단 흔적 (폐기율 진단 비교군, UI 미노출)
                     }, 3600);
                 } else {
                     // null = 게이트 폐기가 아닌 원인 미상 실패(API 오류 등) — 폐기 사유는 DeepDiveDiscardError로 별도 전파됨
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
                 console.error(`[Battery Job ${jobId}] 실패:`, error);
                 await kvSet(JOB_KEY(jobId), {
                     status: 'failed',
-                    error: error.message || '리포트 생성 중 오류가 발생했습니다.'
+                    error: error.message || '리포트 생성 중 오류가 발생했습니다.',
+                    attemptTrace: error.trace ?? [], // DeepDiveDiscardError의 폐기 시점까지 흔적 (진단용)
                 }, 3600);
             }
         })());

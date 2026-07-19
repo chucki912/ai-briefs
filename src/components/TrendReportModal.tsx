@@ -138,69 +138,86 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
     const POLL_TIMEOUT_NOTICE = '리포트 생성이 예상보다 오래 걸리고 있습니다 — 서버 처리가 계속 중일 수 있으니 잠시 후 새로고침 또는 재시도해 주세요.';
 
     const [statusMessage, setStatusMessage] = useState<string>('심층 분석 및 리포트 작성 중... (통상 4~5분, 서버 한도 최대 13분)');
+    // 폐기 UX: alert 대신 모달 내 사유 표시 + 수동 [다시 시도] (자동 재시도 금지 — 1회 수 분짜리 요청의 비용 폭주 방지)
+    const [deepDiveError, setDeepDiveError] = useState<string>('');
+    const [retryCount, setRetryCount] = useState(0);
+
+    // Deep Dive 시작 — 최초(useEffect)와 [다시 시도] 버튼이 공유 (재시도는 새 jobId로 재요청)
+    const startDeepDive = async () => {
+        setDeepDiveError('');
+        setIsPolling(true);
+        setStatusMessage('심층 분석 및 리포트 작성 중... (통상 4~5분, 서버 한도 최대 13분)');
+        try {
+            const startRes = await fetch(trendReportApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ issue })
+            });
+
+            if (!startRes.ok) throw new Error('Failed to start report generation');
+            const { data: { jobId } } = await startRes.json();
+
+            const pollStart = Date.now();
+            pollIntervalRef.current = setInterval(async () => {
+                if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    setIsPolling(false);
+                    alert(POLL_TIMEOUT_NOTICE);
+                    onGenerationComplete?.();
+                    onClose();
+                    return;
+                }
+                try {
+                    const statusRes = await fetch(`${trendReportApiUrl}/status?jobId=${jobId}`);
+                    if (!statusRes.ok) return;
+
+                    const { data: statusData } = await statusRes.json();
+
+                    if (statusData.status === 'completed') {
+                        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                        processReport(statusData.report);
+                        setIsPolling(false);
+                        onGenerationComplete?.();
+                    } else if (statusData.status === 'failed') {
+                        // 폐기 사유를 모달 안에 남기고 열어둠 — 사용자가 사유를 읽고 수동 재시도
+                        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                        setIsPolling(false);
+                        setDeepDiveError(statusData.error || '알 수 없는 오류');
+                        onGenerationComplete?.();
+                    }
+                } catch (e) {
+                    console.error('Polling error', e);
+                }
+            }, 2000);
+
+        } catch (e) {
+            console.error('Error starting trend report', e);
+            setParseError(true);
+            setIsPolling(false);
+            onGenerationComplete?.();
+            onClose();
+        }
+    };
+
+    const handleDeepDiveRetry = () => {
+        setRetryCount(c => c + 1);
+        startDeepDive();
+    };
+
+    // 모달 닫힘 시 폐기 상태 초기화 (다음 이슈에 이전 사유·카운트 잔존 방지)
+    useEffect(() => {
+        if (!isOpen) {
+            setDeepDiveError('');
+            setRetryCount(0);
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (!loading && report && !issue && !weeklyMode) {
             processReport(report);
         } else if (isOpen && loading && issue && !weeklyMode) {
             // Single Issue Deep Dive mode
-            const fetchTrendReport = async () => {
-                setIsPolling(true);
-                setStatusMessage('심층 분석 및 리포트 작성 중... (통상 4~5분, 서버 한도 최대 13분)');
-                try {
-                    const startRes = await fetch(trendReportApiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ issue })
-                    });
-
-                    if (!startRes.ok) throw new Error('Failed to start report generation');
-                    const { data: { jobId } } = await startRes.json();
-
-                    const pollStart = Date.now();
-                    pollIntervalRef.current = setInterval(async () => {
-                        if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
-                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                            setIsPolling(false);
-                            alert(POLL_TIMEOUT_NOTICE);
-                            onGenerationComplete?.();
-                            onClose();
-                            return;
-                        }
-                        try {
-                            const statusRes = await fetch(`${trendReportApiUrl}/status?jobId=${jobId}`);
-                            if (!statusRes.ok) return;
-
-                            const { data: statusData } = await statusRes.json();
-
-                            if (statusData.status === 'completed') {
-                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                                processReport(statusData.report);
-                                setIsPolling(false);
-                                onGenerationComplete?.();
-                            } else if (statusData.status === 'failed') {
-                                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                                setParseError(true);
-                                alert('리포트 생성 실패: ' + (statusData.error || '알 수 없는 오류'));
-                                setIsPolling(false);
-                                onGenerationComplete?.();
-                                onClose();
-                            }
-                        } catch (e) {
-                            console.error('Polling error', e);
-                        }
-                    }, 2000);
-
-                } catch (e) {
-                    console.error('Error starting trend report', e);
-                    setParseError(true);
-                    setIsPolling(false);
-                    onGenerationComplete?.();
-                    onClose();
-                }
-            };
-
-            fetchTrendReport();
+            startDeepDive();
         } else if (isOpen && loading && weeklyMode) {
             // Weekly Report mode
             const fetchWeeklyReport = async () => {
@@ -730,7 +747,18 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                 </div>
 
                 <div className="modal-body">
-                    {loading || isPolling ? (
+                    {deepDiveError && !isPolling ? (
+                        <div className="loading-state">
+                            <p className="status-message-large">🚫 리포트 생성 실패</p>
+                            <p style={{ color: 'var(--text-secondary)', maxWidth: '540px', textAlign: 'center', lineHeight: 1.6 }}>{deepDiveError}</p>
+                            {retryCount > 0 && (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>재시도 {retryCount}회차 실패</p>
+                            )}
+                            <button className="btn btn-secondary" onClick={handleDeepDiveRetry}>
+                                🔄 다시 시도{retryCount > 0 ? ` (${retryCount + 1}회차)` : ''}
+                            </button>
+                        </div>
+                    ) : loading || isPolling ? (
                         <div className="loading-state">
                             <div className="loading-visual">
                                 <div className="spinner"></div>
@@ -752,6 +780,9 @@ export default function TrendReportModal({ isOpen, onClose, report, loading, iss
                                 </div>
                             </div>
                             <p className="status-message-large">{statusMessage}</p>
+                            {retryCount > 0 && !weeklyMode && (
+                                <span className="loading-tip">재시도 {retryCount}회차 진행 중</span>
+                            )}
                             {weeklyMode && (
                                 <span className="loading-tip">💡 AI가 지난 1주일간의 기사를 분석하고 있습니다. 잠시만 기다려주세요.</span>
                             )}

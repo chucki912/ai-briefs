@@ -30,5 +30,21 @@ for (const [label, p] of [['AI', ai], ['battery', battery]] as const) {
 // (금지 문구 'Basis 꼬리표 금지'·'(Basis: 네트워크 효과)' 예시는 잔재가 아님 — 부착 지시만 검사)
 chk('battery: Basis 부착 지시 소멸', !battery.includes('Expert Analytical Basis') && !battery.includes('(Basis: <'));
 
+// attemptTrace — grounding 상태 판별 + 폐기 에러의 trace 운반 (진단 인프라)
+{
+    const { buildAttemptTraceEntry, DeepDiveDiscardError } = require('../deep-dive-pipeline');
+    chk('trace: metadata 부재 → absent',
+        buildAttemptTraceEntry(1, 1, null, 0, 82_300).grounding === 'absent');
+    chk('trace: metadata 존재·청크 0 → zero',
+        buildAttemptTraceEntry(1, 2, {}, 0, 60_000).grounding === 'zero');
+    chk('trace: 청크 N → chunks=N',
+        buildAttemptTraceEntry(2, 1, { groundingChunks: [] }, 12, 75_000).grounding === 'chunks=12');
+    const e = buildAttemptTraceEntry(1, 1, null, 0, 82_349);
+    chk('trace: elapsedSec 0.1초 단위 반올림', e.elapsedSec === 82.3 && e.cycle === 1 && e.attempt === 1);
+    const err = new DeepDiveDiscardError('폐기', [e]);
+    chk('DeepDiveDiscardError가 trace 운반', err.trace.length === 1 && err.trace[0].grounding === 'absent');
+    chk('DeepDiveDiscardError trace 기본값 빈 배열', new DeepDiveDiscardError('폐기').trace.length === 0);
+}
+
 console.log(`\n도메인 주입 테스트: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

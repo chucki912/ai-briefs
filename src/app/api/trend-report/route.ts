@@ -39,6 +39,7 @@ export async function POST(req: Request) {
                         reportType: result.reportType,
                         triangulation: result.triangulation, // FAIL_MODE='tag' 시 depthWarning 판별용 (pass=false)
                         contentGate: result.contentGate, // 판단 완결성 게이트 결과 (tag 모드 미달 판별용)
+                        attemptTrace: result.attemptTrace, // pass 1 시도별 진단 흔적 (폐기율 진단 비교군, UI 미노출)
                     }, 3600);
                 } else {
                     // null = 게이트 폐기가 아닌 원인 미상 실패(API 오류 등) — 폐기 사유는 DeepDiveDiscardError로 별도 전파됨
@@ -46,7 +47,11 @@ export async function POST(req: Request) {
                 }
             } catch (error: any) {
                 console.error(`[Job ${jobId}] Generation Failed:`, error);
-                await kvSet(JOB_KEY(jobId), { status: 'failed', error: error.message }, 3600);
+                await kvSet(JOB_KEY(jobId), {
+                    status: 'failed',
+                    error: error.message,
+                    attemptTrace: error.trace ?? [], // DeepDiveDiscardError의 폐기 시점까지 흔적 (진단용)
+                }, 3600);
             }
         })());
 

@@ -16,20 +16,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
     const searchParams = useSearchParams();
 
-    // 관리자 모드 체크 로직
+    // 관리자 모드 체크 로직 — B2 세션 영속화 (2026-07-19 정책 변경)
+    // 구 정책: 파라미터 없는 로드는 무조건 권한 해제("매우 엄격하게 적용") → 링크 이동·재방문마다
+    // 심층 리포트 등 admin 버튼이 사라져 구 통합 버튼으로 오도되는 문제 실측(#9 배선 감사).
+    // 신 정책: ?admin=true 1회 부여 후 localStorage로 유지, ?admin=false로만 명시 해제.
     const checkAdmin = () => {
         setLoading(true);
-        // 1. URL 파라미터 체크 (?admin=true 또는 특정 키)
         const adminParam = searchParams.get('admin');
 
-        // 2. 관리자 파라미터가 있는 경우에만 권한 부여 (매우 엄격하게 적용)
         if (adminParam === 'true' || adminParam === 'secret_key') {
             setIsAdmin(true);
             localStorage.setItem('is_admin_mode', 'true');
-        } else {
-            // 파라미터가 없으면 무조건 권한 해제 (기존 세션도 만료 처리)
+        } else if (adminParam === 'false') {
             setIsAdmin(false);
             localStorage.removeItem('is_admin_mode');
+        } else {
+            // 파라미터 없음 → 저장된 세션 존중
+            setIsAdmin(localStorage.getItem('is_admin_mode') === 'true');
         }
         setLoading(false);
     };

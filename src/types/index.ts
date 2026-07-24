@@ -1,3 +1,5 @@
+import type { IndustryTag } from '@/configs/industry-tags';
+
 // 뉴스 아이템 타입
 export interface NewsItem {
   id: string;
@@ -168,4 +170,20 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ── 주간 트렌드 파이프라인 v2 — 스레드 인덱스 ────────────────────────────────
+// 과거 관측을 threadKey 단위로 누적해 게이트/등급 판정(M1·priorWeeksInternal)의
+// 결정론적 근거로 쓴다. 저장 키: threadIndex:{threadKey} (원본 브리핑 90일 TTL과
+// 분리, 최소 365일 유지). 접근 레이어는 src/lib/thread-index.ts.
+export interface ThreadIndexEntry {
+  threadKey: string;                     // 영문 스네이크케이스, 스레드 안정 식별자
+  label: string;                         // 사람이 읽는 스레드명(최신 관측 우선)
+  firstObservedAt: string;               // 최초 관측일 YYYY-MM-DD
+  lastObservedAt: string;                // 최종 관측일 YYYY-MM-DD
+  weeklyCounts: Record<string, number>;  // { isoWeek: count } — 예: "2026-W30": 3 (주 단위 overwrite)
+  representativeMetrics: string[];       // 대표 수치(add-only 누적, dedup)
+  anchorSourceIds: string[];             // 앵커 소스 id(add-only 누적, dedup)
+  domainTags: string[];                  // 관측된 vertical(ai|battery) — add-only
+  industryTags: IndustryTag[];           // M4 판정용 폐쇄형 산업 태그 — add-only(삭제 불가)
 }

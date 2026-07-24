@@ -15,6 +15,7 @@
     "test:render-b": "npx tsx src/lib/__tests__/render-deep-dive-b.test.ts",
     "test:content-gate": "npx tsx src/lib/__tests__/validate-deep-dive.test.ts",
     "test:deep-dive-domain": "npx tsx src/lib/__tests__/deep-dive-domain.test.ts",
+    "test:thread-index": "npx tsx src/lib/__tests__/thread-index.test.ts",
     "regenerate:golden": "npx tsx scripts/regenerate-golden.ts",
     "eval:key-insight": "npx tsx scripts/evaluate-key-insight.ts",
     "eval:key-insight-negative": "npx tsx scripts/negative-control-key-insight.ts",

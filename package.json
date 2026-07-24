@@ -16,6 +16,8 @@
     "test:content-gate": "npx tsx src/lib/__tests__/validate-deep-dive.test.ts",
     "test:deep-dive-domain": "npx tsx src/lib/__tests__/deep-dive-domain.test.ts",
     "test:thread-index": "npx tsx src/lib/__tests__/thread-index.test.ts",
+    "test:weekly": "npx tsx src/lib/__tests__/thread-index.test.ts && npx tsx src/lib/__tests__/weekly-gate.test.ts && npx tsx src/lib/__tests__/weekly-clustering.test.ts",
+    "backfill:thread-index": "npx tsx scripts/backfill-thread-index.ts",
     "regenerate:golden": "npx tsx scripts/regenerate-golden.ts",
     "eval:key-insight": "npx tsx scripts/evaluate-key-insight.ts",
     "eval:key-insight-negative": "npx tsx scripts/negative-control-key-insight.ts",

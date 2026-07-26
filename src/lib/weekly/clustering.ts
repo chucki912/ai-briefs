@@ -154,15 +154,20 @@ ${itemList}
 JSON만 출력하라.`;
 }
 
-async function generateWithRetry(model: GenerativeModel, prompt: string, retries = 3, delay = 2000): Promise<string> {
+const NETWORK_ERR = /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|socket hang up|network|und_err/i;
+
+/** 일시적 실패(429/503 + 네트워크 blip)에 지수 백오프 재시도. 백필이 blip에 죽지 않도록. */
+async function generateWithRetry(model: GenerativeModel, prompt: string, retries = 4, delay = 2000): Promise<string> {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             const result = await model.generateContent(prompt);
             return result.response.text();
         } catch (err: unknown) {
-            const e = err as { status?: number; response?: { status?: number } };
+            const e = err as { status?: number; code?: string; message?: string; cause?: unknown; response?: { status?: number } };
             const status = e?.status ?? e?.response?.status;
-            if ((status === 429 || status === 503) && attempt < retries) {
+            const blob = `${e?.code ?? ''} ${e?.message ?? ''} ${JSON.stringify(e?.cause ?? '')}`;
+            const transient = status === 429 || status === 503 || NETWORK_ERR.test(blob);
+            if (transient && attempt < retries) {
                 await new Promise(r => setTimeout(r, delay * (attempt + 1)));
                 continue;
             }

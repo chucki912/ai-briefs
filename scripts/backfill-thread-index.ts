@@ -87,4 +87,8 @@ async function main() {
     console.log(`\n${write ? `✅ threadIndex 기록 완료: ${threadsWritten} 스레드-주` : 'ℹ️ dry-run 종료(미기록). --write 로 실제 기록.'}\n`);
 }
 
-main().catch(err => { console.error('백필 실패:', err); process.exit(1); });
+// redis 클라이언트가 open handle로 이벤트 루프를 잡아 자연 종료를 막으므로(ECONNRESET
+// 로그 스팸 원인) 작업 완료 후 명시적으로 종료한다. 모든 write는 이 시점 이전에 await 완료.
+main()
+    .then(() => process.exit(0))
+    .catch(err => { console.error('백필 실패:', err); process.exit(1); });

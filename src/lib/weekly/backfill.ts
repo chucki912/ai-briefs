@@ -18,8 +18,35 @@ import { collectCorpus } from './corpus';
 import { clusterItems, type ThreadCandidate } from './clustering';
 import { evaluateGate } from './gate';
 import {
-    getAllThreadIndexes, getThreadIndex, saveThreadIndex, isoWeekKey,
+    getAllThreadIndexes, getThreadIndex, saveThreadIndex, isoWeekKey, mergeThreadIndex,
 } from '../thread-index';
+
+/**
+ * threadIndex 저장 추상화. 백필은 이 인터페이스로만 인덱스에 접근한다.
+ *   - KV 구현: 프로덕션 영속(--write). saveThreadIndex가 검증+add-only merge.
+ *   - 인메모리 구현: dry-run 측정용. 주 간 누적을 재현해 matched/M1을 진짜로 측정하되
+ *     프로덕션을 건드리지 않는다. (mergeThreadIndex 동일 로직 사용)
+ */
+export interface ThreadIndexStore {
+    getAll(): Promise<ThreadIndexEntry[]>;
+    get(threadKey: string): Promise<ThreadIndexEntry | null>;
+    save(entry: ThreadIndexEntry): Promise<void>;
+}
+
+const kvThreadIndexStore: ThreadIndexStore = {
+    getAll: () => getAllThreadIndexes(),
+    get: (k) => getThreadIndex(k),
+    save: async (e) => { await saveThreadIndex(e); },
+};
+
+class InMemoryThreadIndexStore implements ThreadIndexStore {
+    private map = new Map<string, ThreadIndexEntry>();
+    async getAll() { return Array.from(this.map.values()); }
+    async get(threadKey: string) { return this.map.get(threadKey) ?? null; }
+    async save(entry: ThreadIndexEntry) {
+        this.map.set(entry.threadKey, mergeThreadIndex(this.map.get(entry.threadKey) ?? null, entry));
+    }
+}
 
 const NUMERIC = /\d/;
 const REP_METRICS_PER_WEEK = 6;
@@ -84,7 +111,8 @@ export interface BackfillOptions {
     asOfDate: Date;
     weeks: number;                 // 백필 주 수(기본 8)
     domains: ('ai' | 'battery')[];
-    write: boolean;                // false면 dry-run(threadIndex 미기록)
+    write: boolean;                // true면 프로덕션 KV 영속, false면 인메모리 누적(측정용)
+    store?: ThreadIndexStore;      // 주입 override(테스트용). 미지정 시 write 플래그로 결정
     onLog?: (msg: string) => void;
 }
 
@@ -98,6 +126,9 @@ export async function runBackfill(opts: BackfillOptions): Promise<BackfillResult
     const log = opts.onLog ?? (() => { });
     const stats: WeekDomainStat[] = [];
     let threadsWritten = 0;
+    // write=true → 프로덕션 KV 영속. dry-run(write=false) → 인메모리 누적으로 주 간
+    // matched/M1을 프로덕션 오염 없이 진짜로 측정.
+    const store: ThreadIndexStore = opts.store ?? (opts.write ? kvThreadIndexStore : new InMemoryThreadIndexStore());
 
     // 시간순(오래된 주 → 최근 주): offset weeks..1
     for (let offset = opts.weeks; offset >= 1; offset--) {
@@ -117,7 +148,7 @@ export async function runBackfill(opts: BackfillOptions): Promise<BackfillResult
                 continue;
             }
 
-            const candidates: ThreadCandidate[] = (await getAllThreadIndexes())
+            const candidates: ThreadCandidate[] = (await store.getAll())
                 .map(t => ({ threadKey: t.threadKey, label: t.label }));
 
             const clusters = await clusterItems(items, candidates, domain);
@@ -125,7 +156,7 @@ export async function runBackfill(opts: BackfillOptions): Promise<BackfillResult
 
             let gated = 0, demoted = 0, singleton = 0, fresh = 0, matched = 0, m1 = 0;
             for (const cluster of clusters) {
-                const priorEntry = await getThreadIndex(cluster.threadKey);
+                const priorEntry = await store.get(cluster.threadKey);
                 const gate = evaluateGate(cluster, itemsById, priorEntry, { asOf });
 
                 if (gate.hardGatePass) gated++; else demoted++;
@@ -133,10 +164,9 @@ export async function runBackfill(opts: BackfillOptions): Promise<BackfillResult
                 if (cluster.matchedExisting) matched++; else fresh++;
                 if (gate.motionCandidates.M1) m1++;
 
-                if (opts.write) {
-                    await saveThreadIndex(buildEntryFromGate(gate, cluster, itemsById, isoWeek, domain));
-                    threadsWritten++;
-                }
+                // 두 모드 모두 store에 누적(주 간 연속성 재현). threadsWritten은 실제 KV 기록만 카운트.
+                await store.save(buildEntryFromGate(gate, cluster, itemsById, isoWeek, domain));
+                if (opts.write) threadsWritten++;
             }
 
             stats.push({

@@ -56,13 +56,13 @@ async function main() {
 
     // ── 분포 리포트 ──────────────────────────────────────────────────────────
     console.log(`\n=== 주차별 스레드 분포 ===`);
-    const header = ['isoWeek', 'domain', 'items', 'threads', 'gated', 'demoted', 'singleton', 'new', 'matched', 'M1'];
-    console.log(header.map(h => h.padStart(9)).join(' '));
+    const header = ['isoWeek', 'domain', 'items', 'threads', 'promo', 'A', 'B', 'C', 'demoted', 'single', 'matched', 'M1'];
+    console.log(header.map(h => h.padStart(8)).join(' '));
     for (const s of stats) {
         console.log([
-            s.isoWeek, s.domain, s.itemCount, s.threadCount, s.gatedCount, s.demotedCount,
-            s.singletonThreadCount, s.newThreadCount, s.matchedThreadCount, s.m1Count,
-        ].map(v => String(v).padStart(9)).join(' '));
+            s.isoWeek, s.domain, s.itemCount, s.threadCount, s.promotedCount, s.gradeA, s.gradeB, s.gradeC,
+            s.demotedCount, s.singletonThreadCount, s.matchedThreadCount, s.m1Count,
+        ].map(v => String(v).padStart(8)).join(' '));
     }
 
     // ── 파편화/건강도 요약 ────────────────────────────────────────────────────
@@ -74,13 +74,16 @@ async function main() {
         const items = sum(s => s.itemCount), threads = sum(s => s.threadCount);
         const singleton = sum(s => s.singletonThreadCount), gated = sum(s => s.gatedCount);
         const matched = sum(s => s.matchedThreadCount), m1 = sum(s => s.m1Count);
+        const promoted = sum(s => s.promotedCount), a = sum(s => s.gradeA), b = sum(s => s.gradeB), c = sum(s => s.gradeC);
         const avgMembers = threads > 0 ? (items / threads).toFixed(2) : '0';
         const singletonRate = threads > 0 ? ((singleton / threads) * 100).toFixed(1) : '0';
         const gateRate = threads > 0 ? ((gated / threads) * 100).toFixed(1) : '0';
         const matchRate = threads > 0 ? ((matched / threads) * 100).toFixed(1) : '0';
+        const avgPromoWk = ds.length > 0 ? (promoted / ds.length).toFixed(1) : '0';
         console.log(`[${domain}] 관측주=${ds.length} items=${items} threads=${threads} 평균멤버/스레드=${avgMembers}`);
         console.log(`        singleton율=${singletonRate}% (파편화 지표) | 게이트통과율=${gateRate}% | 매칭율=${matchRate}% | M1누적=${m1}`);
-        if (Number(singletonRate) > 60) console.log(`        ⚠️ singleton율 60%↑ — 과도 파편화 가능. T3 이전 클러스터링 기준 조정 검토.`);
+        console.log(`        승격=${promoted} (A${a}/B${b}/C${c}) | 주당 평균 승격=${avgPromoWk}건`);
+        if (Number(singletonRate) > 60) console.log(`        ⚠️ singleton율 60%↑ — 과도 파편화 가능. 클러스터링 기준 조정 검토.`);
         if (Number(avgMembers) > 8) console.log(`        ⚠️ 평균 멤버 8↑ — 과도 병합(under-clustering) 가능. 메커니즘 분리 기준 강화 검토.`);
     }
 

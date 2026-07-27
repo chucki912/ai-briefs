@@ -72,7 +72,9 @@ ${priorLines}
 ${input.bodyText.slice(0, 2000)}
 
 ## 시사점 규칙
-- ${LENGTH.IMPLICATION_MIN}~${LENGTH.IMPLICATION_MAX}자(**목표 약 330자** — 본문의 20~25%가 되도록).
+- **분량 엄수: ${LENGTH.IMPLICATION_MIN}자 이상 ${LENGTH.IMPLICATION_MAX}자 이하, 목표 약 330자.**
+  ${LENGTH.IMPLICATION_MIN}자에 못 미치면 "틀릴 수 있는 지점" 또는 조건부 전개를 한 문장 더
+  구체화해 채운다. ${LENGTH.IMPLICATION_MAX}자를 넘기지 않는다.
   본문 사실의 재요약이 아니라 **조건부 전개**
   ("만약 X가 지속되면 Y", 등급·운동유형이 함의하는 바)로 쓴다.
 - **우리(경영진)가 무엇을 결정·조정해야 하는지 지목**하고, **이 판단이 틀릴 수 있는 지점**을 명시한다.

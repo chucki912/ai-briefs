@@ -51,3 +51,36 @@ export const OVERCLAIM_FORBIDDEN = [
 
 /** 강등(단발 관측) 섹션에서도 금지되는 어휘. */
 export const DEMOTED_FORBIDDEN = ['트렌드', '흐름', '추세', '조짐'] as const;
+
+/**
+ * 정량 근거 정의 — DoD #7(distinct 수치)과 헤드라인 수치 선택이 공유하는 단일 원천.
+ *
+ * 인정: 단위(%, 원, 달러, GWh, 대, 건 등) 또는 규모(천/만/억/조, K/M/B)를 동반한 수치만.
+ * 불인정: ISO 주차(2026-W30)·연도(2026년)·날짜(2026-07-20)·버전(v1.2)·일련번호.
+ * 이유: "2026-W23" 같은 시점 표기가 수치로 계수되면 정량 근거형 보증이 거짓 통과한다.
+ */
+// 시점/버전 표기 — 정량 수치에서 제외(먼저 제거).
+const NON_METRIC_PATTERNS: RegExp[] = [
+    /\d{4}-W\d{2}/g,                 // ISO 주차
+    /\d{4}-\d{2}-\d{2}/g,            // 날짜(YYYY-MM-DD)
+    /\d{4}-\d{2}(?!\d)/g,            // 연-월
+    /(?:19|20)\d{2}\s*년/g,          // 연도(2026년)
+    /(?:19|20)\d{2}(?![\d.])/g,      // 4자리 연도 단독
+    /\bv?\d+\.\d+(?:\.\d+)+\b/gi,    // 버전 x.y.z
+];
+// 단위/규모 동반 수치. 캘린더 단위(년/분기/주간)는 제외.
+const QUANT_UNIT = String.raw`%|퍼센트|원|달러|USD|\$|GWh|MWh|kWh|Wh\/kg|Wh|km|톤|대|건|명|개소|개|배|억달러|억원|억|만|천|조`;
+const QUANT_RE = new RegExp(String.raw`\d[\d,.]*\s*(?:${QUANT_UNIT})|\$\s*\d[\d,.]*\s*[KMB]?|\d[\d,.]*\s*[KMB]\b`, 'g');
+
+/** 텍스트에서 단위/규모 동반 정량 수치만 추출(시점/버전 제외, dedup). */
+export function extractQuantitativeMetrics(text: string): string[] {
+    let scrubbed = text;
+    for (const re of NON_METRIC_PATTERNS) scrubbed = scrubbed.replace(re, ' ');
+    const found = scrubbed.match(QUANT_RE) ?? [];
+    return Array.from(new Set(found.map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)));
+}
+
+/** 문자열이 정량 수치를 하나라도 담는지(헤드라인/metricsUsed 필터용). */
+export function isQuantitativeMetric(s: string): boolean {
+    return extractQuantitativeMetrics(s).length > 0;
+}

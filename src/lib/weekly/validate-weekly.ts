@@ -8,6 +8,7 @@
  */
 import {
     LENGTH, STRUCTURE, PARAGRAPH_MIX, IMPLICATION_FORBIDDEN_ENDINGS, OVERCLAIM_FORBIDDEN,
+    extractQuantitativeMetrics, isQuantitativeMetric,
 } from '@/configs/weekly-house-style';
 import type { WeeklyThreadContent } from './report-gen';
 
@@ -91,10 +92,13 @@ export function validateWeeklyThread(c: WeeklyThreadContent): WeeklyGateFailure[
     // 5: 시사점 명시율 100% (비어있지 않음)
     if (implLen === 0) fails.push({ rule: 'implication_present', severity: 'hard', detail: '시사점이 비어 있음.' });
 
-    // 7: distinct 수치 >=3
-    const distinctNums = new Set([...(c.metricsUsed ?? []), ...(body.match(/\d[\d,.%조억만천]*/g) ?? [])]);
+    // 7: distinct 정량 수치 >=3 (단위/규모 동반만 — 시점/연도/버전 제외, 헤드라인과 동일 정의)
+    const distinctNums = new Set([
+        ...(c.metricsUsed ?? []).filter(isQuantitativeMetric),
+        ...extractQuantitativeMetrics(body),
+    ]);
     if (distinctNums.size < STRUCTURE.MIN_DISTINCT_METRICS) {
-        fails.push({ rule: 'distinct_metrics', severity: 'hard', detail: `서로 다른 수치 ${distinctNums.size}개 (>= ${STRUCTURE.MIN_DISTINCT_METRICS} 필요).` });
+        fails.push({ rule: 'distinct_metrics', severity: 'hard', detail: `정량 수치(단위/규모 동반) ${distinctNums.size}개 (>= ${STRUCTURE.MIN_DISTINCT_METRICS} 필요). 시점/연도는 불인정.` });
     }
     // 7: 비교 구조 표 >=1 (헤더>=2, 행>=2)
     if (!c.table || c.table.headers.length < 2 || c.table.rows.length < 2) {

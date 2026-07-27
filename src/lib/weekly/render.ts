@@ -9,6 +9,7 @@
 import type { WeeklyReportContent, WeeklyThreadContent } from './report-gen';
 import type { DemotedThread } from './pipeline';
 import type { WeeklyTable } from './structure';
+import { extractQuantitativeMetrics, isQuantitativeMetric } from '@/configs/weekly-house-style';
 
 export type ShowDemoted = 'full' | 'titles' | 'off';
 
@@ -30,9 +31,12 @@ function renderTable(t: WeeklyTable): string {
     return `${title}${head}\n${sep}\n${body}`;
 }
 
-/** 헤드라인 1줄: [등급] 라벨 — 수치 1개(필수). */
+/** 헤드라인 1줄: [등급] 라벨 — 정량 수치 1개(단위/규모 동반, 시점 표기 불인정). */
 function headlineLine(c: WeeklyThreadContent): string {
-    const metric = c.metricsUsed[0] ?? `관측 ${c.observedDates.length}일`;
+    const metric =
+        c.metricsUsed.find(isQuantitativeMetric)
+        ?? extractQuantitativeMetrics(`${c.background} ${c.mainContent}`)[0]
+        ?? `관측 ${c.observedDates.length}일`; // 정량 수치 부재 시 관측일 수(진짜 카운트) 폴백
     return `- [${c.grade}] ${c.label} — ${metric}`;
 }
 

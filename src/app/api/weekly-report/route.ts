@@ -27,7 +27,10 @@ export async function POST(req: Request) {
 
         waitUntil((async () => {
             try {
-                const asOf = new Date();
+                // 프로덕션 정상 사용은 현재 주. asOf는 dryRun 진단에서만 특정 주 타깃 허용.
+                const asOf = (dryRun && typeof body.asOf === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.asOf))
+                    ? new Date(`${body.asOf}T12:00:00`)
+                    : new Date();
                 const dates = currentIsoWeekDates(asOf);
                 const isoWeek = isoWeekKey(dates[0]);
 

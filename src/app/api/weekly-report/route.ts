@@ -19,6 +19,8 @@ export async function POST(req: Request) {
         const body = await req.json().catch(() => ({}));
         const domain: 'ai' | 'battery' = body.domain === 'battery' ? 'battery' : 'ai';
         const showDemoted: ShowDemoted = ['full', 'titles', 'off'].includes(body.showDemoted) ? body.showDemoted : 'titles';
+        // dryRun: threadIndex 미기록(검증용). 스펙: 검증 전 기록은 이후 8주 등급 계산을 오염.
+        const dryRun: boolean = body.dryRun === true;
 
         const jobId = `weekly_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await kvSet(`weekly_job:${jobId}`, { status: 'collecting', progress: 5 }, 3600);
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
                 await kvSet(`weekly_job:${jobId}`, { status: 'clustering', progress: 25, message: `${items.length}개 항목 클러스터링·판정 중...` }, 3600);
                 const result = await runDeterministicPasses({
                     dates, domain, asOf, isoWeek,
-                    store: kvThreadIndexStore, persist: true,
+                    store: kvThreadIndexStore, persist: !dryRun,
                     webBoost: makeWebBoost(), items,
                 });
 
@@ -57,13 +59,25 @@ export async function POST(req: Request) {
 
                 const report = renderWeeklyReport(content, { showDemoted });
 
+                // dryRun 진단: 스레드별 확정 사실값(승인 검증용)
+                const threadsDebug = dryRun ? content.threads.map(t => {
+                    const g = result.promoted.find(p => p.threadKey === t.threadKey);
+                    return {
+                        threadKey: t.threadKey, grade: t.grade, motionTypes: t.motionTypes,
+                        observedDates: t.observedDates, publisherCount: g?.gate.publisherCount ?? t.anchorSourceIds.length,
+                        priorWeeksInternal: t.priorWeeksInternal, metricsUsed: t.metricsUsed,
+                        industryTags: g?.gate.industryTags ?? [],
+                    };
+                }) : undefined;
+
                 await kvSet(`weekly_job:${jobId}`, {
                     status: 'completed', progress: 100, report,
                     reportType: 'weekly' satisfies ReportType,
                     promotedCount: content.promotedCount,
                     demotedCount: content.demoted.length,
-                    isoWeek,
+                    isoWeek, dryRun,
                     attemptTraces: content.attemptTraces, // 진단(UI 미노출)
+                    ...(threadsDebug ? { threadsDebug } : {}),
                 }, 3600);
                 console.log(`[Weekly v2 ${jobId}] 완료: 승격 ${content.promotedCount}, 강등 ${content.demoted.length}`);
 

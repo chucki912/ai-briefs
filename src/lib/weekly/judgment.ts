@@ -30,6 +30,7 @@ export interface JudgmentInput {
     priorEvidence: PriorEvidence[];
     observedDates: string[];
     bodyText: string;               // 맥락용(재요약 금지)
+    regenFeedback?: string;         // 직전 DoD 미달 교정 지시
 }
 
 export interface Judgment {
@@ -83,7 +84,7 @@ ${isC ? '- 등급 C: 단정하지 마라. 무엇을 더 관측해야 판단이 �
 
 ## 다음 주 확인 포인트
 - 검증 이벤트와 예정 날짜(가능한 한 구체적).
-
+${input.regenFeedback ? `\n## 재생성 피드백(직전 DoD 미달 — 반드시 교정)\n${input.regenFeedback}\n` : ''}
 JSON만 출력.`;
 }
 

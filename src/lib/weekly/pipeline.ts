@@ -74,7 +74,7 @@ export interface GradedThread {
     gradeResult: GradeResult;
 }
 
-export type DemotedThreadReason = DemotedReason | 'no_prior_evidence';
+export type DemotedThreadReason = DemotedReason | 'no_prior_evidence' | 'dod_failed';
 
 export interface DemotedThread {
     threadKey: string;

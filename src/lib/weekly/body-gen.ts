@@ -57,6 +57,7 @@ export function buildBodyPrompt(input: {
     motionTypes: MotionTypeCode[];
     priorEvidence: PriorEvidence[];
     items: NormalizedItem[];
+    regenFeedback?: string;
 }): string {
     const facts = input.items.flatMap(it => it.keyFacts).slice(0, 20).map(f => `- ${f}`).join('\n');
     const sources = Array.from(new Set(input.items.flatMap(it => it.sourceUrls))).slice(0, 15).join('\n');
@@ -100,16 +101,17 @@ ${input.observedDates.length === 1 ? '- ⚠️ 단일일 관측: "트렌드/흐�
 - M2(가속)는 서로 다른 두 시점의 수치 2개와 변화를 본문에 실제로 제시한 경우에만.
 - M4(확산)는 서로 다른 산업/기업군 사례 2건을 본문에 제시한 경우에만.
 
+${input.regenFeedback ? `\n## 재생성 피드백(직전 초안 DoD 미달 — 반드시 교정)\n${input.regenFeedback}\n` : ''}
 본문(마크다운) 작성 후 마지막 줄에 <<MOTION>> 라인을 넣어라.`;
 }
 
-/** PASS 4 실행. grounded 초안 생성 후 <<MOTION>> 확정 파싱. */
-export async function generateBody(thread: GradedThread, items: NormalizedItem[]): Promise<BodyDraft> {
+/** PASS 4 실행. grounded 초안 생성 후 <<MOTION>> 확정 파싱. regenFeedback 있으면 교정 지시. */
+export async function generateBody(thread: GradedThread, items: NormalizedItem[], regenFeedback?: string): Promise<BodyDraft> {
     const model = genAI.getGenerativeModel({ model: MODEL, tools: [{ googleSearch: {} } as never] });
     const prompt = buildBodyPrompt({
         label: thread.label, grade: thread.grade, observedDates: thread.gate.observedDates,
         priorWeeksInternal: thread.gate.priorWeeksInternal, motionTypes: thread.motionTypes,
-        priorEvidence: thread.priorEvidence, items,
+        priorEvidence: thread.priorEvidence, items, regenFeedback,
     });
     const result = await generateWithRetry(model, prompt);
     const text = (await result.response).text();

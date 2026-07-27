@@ -99,13 +99,23 @@ export interface RunDeterministicOptions {
     isoWeek: string;            // 대상 주 라벨
     store: ThreadIndexStore;
     persist: boolean;           // true면 관측을 threadIndex에 증분 기록
-    /** T4(PASS 2.5) 웹 근거 주입 훅. 미지정 시 internal 근거만 사용. */
-    webPriorEvidence?: (threadKey: string) => PriorEvidence[];
+    /** PASS 2.5(T4) 웹 보강 훅. priorWeeksInternal==0 스레드에만 호출된다(전량 검색 금지). */
+    webBoost?: WebBoostFn;
     /** 사전 수집된 코퍼스 주입(테스트/백필 재사용). 미지정 시 collectCorpus 호출. */
     items?: NormalizedItem[];
     /** 클러스터링 함수 주입(테스트용). 미지정 시 PASS 1 clusterItems(LLM). */
     clusterFn?: (items: NormalizedItem[], candidates: ThreadCandidate[], domain: 'ai' | 'battery') => Promise<ClusterAssignment[]>;
 }
+
+/** PASS 2.5 웹 보강 컨텍스트 — priorWeeksInternal==0 스레드에만 전달된다. */
+export interface WebBoostContext {
+    threadKey: string;
+    label: string;
+    priorWeeksInternal: number;
+    keyFacts: string[];
+    asOf: string | Date;
+}
+export type WebBoostFn = (ctx: WebBoostContext) => Promise<PriorEvidence[]>;
 
 /** 한 (주, 도메인)의 PASS 0-3 실행. */
 export async function runDeterministicPasses(opts: RunDeterministicOptions): Promise<DeterministicWeekResult> {
@@ -122,10 +132,17 @@ export async function runDeterministicPasses(opts: RunDeterministicOptions): Pro
         const priorEntry = await opts.store.get(cluster.threadKey);
         const gate = evaluateGate(cluster, itemsById, priorEntry, { asOf: opts.asOf });
 
-        const priorEvidence: PriorEvidence[] = [
-            ...internalPriorEvidence(priorEntry, opts.asOf),
-            ...(opts.webPriorEvidence?.(cluster.threadKey) ?? []),
-        ];
+        // PASS 2.5: 내부 선행 근거가 전무한 스레드에만 웹 보강(전량 검색 금지, 등급 인플레이션 방지)
+        const internal = internalPriorEvidence(priorEntry, opts.asOf);
+        let web: PriorEvidence[] = [];
+        if (gate.priorWeeksInternal === 0 && opts.webBoost) {
+            const keyFacts = cluster.members.flatMap(m => itemsById.get(m.itemId)?.keyFacts ?? []);
+            web = await opts.webBoost({
+                threadKey: cluster.threadKey, label: cluster.label,
+                priorWeeksInternal: gate.priorWeeksInternal, keyFacts, asOf: opts.asOf,
+            });
+        }
+        const priorEvidence: PriorEvidence[] = [...internal, ...web];
         const motionTypes = candidateMotionTypes(gate.motionCandidates);
         const gradeResult = assignGrade({ priorWeeksInternal: gate.priorWeeksInternal, motionTypes, priorEvidence });
 
@@ -170,7 +187,7 @@ export async function runWeeklyDeterministic(opts: {
     domain: 'ai' | 'battery';
     persist: boolean;
     store?: ThreadIndexStore;
-    webPriorEvidence?: (threadKey: string) => PriorEvidence[];
+    webBoost?: WebBoostFn;
 }): Promise<DeterministicWeekResult> {
     const dates = currentIsoWeekDates(opts.asOf);
     return runDeterministicPasses({
@@ -180,6 +197,6 @@ export async function runWeeklyDeterministic(opts: {
         isoWeek: isoWeekKey(dates[0]),
         store: opts.store ?? kvThreadIndexStore,
         persist: opts.persist,
-        webPriorEvidence: opts.webPriorEvidence,
+        webBoost: opts.webBoost,
     });
 }

@@ -13,6 +13,7 @@ import { generateBody } from './body-gen';
 import { getJudgmentProvider, type JudgmentProvider } from './judgment';
 import { structureBody, type WeeklyTable } from './structure';
 import { validateWeeklyThread, hasHardFailure, buildRegenFeedback } from './validate-weekly';
+import { repairThreadLengths } from './length-repair';
 
 export interface WeeklyThreadContent {
     threadKey: string;
@@ -106,7 +107,7 @@ async function buildThreadContent(
     // PASS 6: 구조화(실패 시 초안 텍스트를 mainContent로 폴백)
     const structured = await structureBody(draft.draftText);
 
-    return {
+    const content: WeeklyThreadContent = {
         threadKey: thread.threadKey, label: thread.label, grade: regrade.grade, motionTypes: finalMotions,
         observedDates: thread.gate.observedDates, priorWeeksInternal: thread.gate.priorWeeksInternal,
         background: structured?.background ?? '',
@@ -118,6 +119,9 @@ async function buildThreadContent(
         metricsUsed: structured?.metricsUsed ?? [],
         anchorSourceIds: thread.gate.publishers,
     };
+
+    // PASS 6.5: 결정론적 길이 보정(재생성 전 창 안으로 유도 → 재생성 빈도·타이밍 완화)
+    return repairThreadLengths(content);
 }
 
 /** PASS 7: 검증 → hard 위반 시 재생성 1회 → 재실패 시 강등. attemptTrace 기록. */

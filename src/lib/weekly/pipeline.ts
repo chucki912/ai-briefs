@@ -132,10 +132,12 @@ export async function runDeterministicPasses(opts: RunDeterministicOptions): Pro
         const priorEntry = await opts.store.get(cluster.threadKey);
         const gate = evaluateGate(cluster, itemsById, priorEntry, { asOf: opts.asOf });
 
-        // PASS 2.5: 내부 선행 근거가 전무한 스레드에만 웹 보강(전량 검색 금지, 등급 인플레이션 방지)
+        // PASS 2.5: 내부 선행 근거가 전무한 스레드에만 웹 보강(전량 검색 금지).
+        // 하드게이트 통과 스레드로 한정 — 게이트 탈락 클러스터는 웹 근거가 있어도 승격 불가라
+        // 검색이 순수 낭비(순차 웹검색이 maxDuration 초과의 주원인이었음).
         const internal = internalPriorEvidence(priorEntry, opts.asOf);
         let web: PriorEvidence[] = [];
-        if (gate.priorWeeksInternal === 0 && opts.webBoost) {
+        if (gate.hardGatePass && gate.priorWeeksInternal === 0 && opts.webBoost) {
             const keyFacts = cluster.members.flatMap(m => itemsById.get(m.itemId)?.keyFacts ?? []);
             web = await opts.webBoost({
                 threadKey: cluster.threadKey, label: cluster.label,

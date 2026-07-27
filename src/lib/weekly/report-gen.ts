@@ -50,6 +50,8 @@ export interface WeeklyReportContent {
 }
 
 const MAX_REGEN = 1; // 재생성 1회(800s 안착), 재실패 시 강등
+const MAX_PROMOTED = 5; // 스펙: 트렌드 스레드 3~5개. 초과 시 등급·관측폭 상위로 컷(본문생성 전).
+const GRADE_RANK: Record<Grade, number> = { A: 3, B: 2, C: 1, demoted: 0 };
 
 /** 동시 실행 상한 하에 매핑(순서 보존). */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
@@ -167,14 +169,23 @@ export async function generateWeeklyReportContent(
     const provider = opts.provider ?? getJudgmentProvider();
     const concurrency = opts.concurrency ?? 2;
 
-    const outcomes = await mapWithConcurrency(result.promoted, concurrency, (t) => processThread(t, items, provider));
+    // 스펙: 트렌드 스레드 3~5개. 초과 시 등급·관측폭 상위로 컷(본문생성 전 — 비용·시간 절약).
+    const ranked = [...result.promoted].sort((a, b) =>
+        GRADE_RANK[b.grade] - GRADE_RANK[a.grade] || b.gate.priorWeeksInternal - a.gate.priorWeeksInternal);
+    const selected = ranked.slice(0, MAX_PROMOTED);
+    const cut = ranked.slice(MAX_PROMOTED);
+    if (cut.length > 0) {
+        console.log(`[WeeklyReport] 승격 후보 ${ranked.length}건 중 상위 ${MAX_PROMOTED}건만 작성(스펙 상한). 컷: ${cut.map(c => `${c.threadKey}(${c.grade})`).join(', ')}`);
+    }
+
+    const outcomes = await mapWithConcurrency(selected, concurrency, (t) => processThread(t, items, provider));
 
     const threads: WeeklyThreadContent[] = [];
     const extraDemoted: DemotedThread[] = [];
     const attemptTraces: Record<string, WeeklyAttemptEntry[]> = {};
     for (let i = 0; i < outcomes.length; i++) {
         const o = outcomes[i];
-        const threadKey = result.promoted[i].threadKey;
+        const threadKey = selected[i].threadKey;
         attemptTraces[threadKey] = o.trace;
         if (o.kind === 'content') threads.push(o.content);
         else extraDemoted.push(o.demoted);

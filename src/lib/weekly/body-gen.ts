@@ -87,7 +87,8 @@ ${sources}
 - 라벨: ${STRUCTURE.LABELS.slice(0, 2).join(' , ')} 두 단만(대괄호 그대로).
   [배경]: 과거 시그널 위치·상태(M1/priorWeeksInternal 근거). ${LENGTH.IMPLICATION_MIN}자 이하로 간결.
     선행 근거 없으면 "선행 관측 없음"이라 명시(빈칸 금지).
-  [주요 내용]: 이번 주 관측 사실 + 정량 근거. 두 단 합계 ${LENGTH.BODY_MIN}~${LENGTH.BODY_MAX}자.
+  [주요 내용]: 이번 주 관측 사실 + 정량 근거. 두 단 합계 ${LENGTH.BODY_MIN}~${LENGTH.BODY_MAX}자
+    (**목표 약 1350자** — 시사점 비율 확보를 위해 하한이 아니라 상한 근처를 노려라).
 - 서로 다른 수치 ${STRUCTURE.MIN_DISTINCT_METRICS}개 이상 사용.
 - 시점(전주/전월/전년) 또는 대상 간 **비교 표 1개 이상**(마크다운). 단순 나열 표 금지.
 - 헤더 ${STRUCTURE.HEADER_MIN}~${STRUCTURE.HEADER_MAX}개, 최대 깊이 ${STRUCTURE.MAX_DEPTH}.

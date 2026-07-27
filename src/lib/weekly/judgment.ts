@@ -72,7 +72,8 @@ ${priorLines}
 ${input.bodyText.slice(0, 2000)}
 
 ## 시사점 규칙
-- ${LENGTH.IMPLICATION_MIN}~${LENGTH.IMPLICATION_MAX}자. 본문 사실의 재요약이 아니라 **조건부 전개**
+- ${LENGTH.IMPLICATION_MIN}~${LENGTH.IMPLICATION_MAX}자(**목표 약 330자** — 본문의 20~25%가 되도록).
+  본문 사실의 재요약이 아니라 **조건부 전개**
   ("만약 X가 지속되면 Y", 등급·운동유형이 함의하는 바)로 쓴다.
 - **우리(경영진)가 무엇을 결정·조정해야 하는지 지목**하고, **이 판단이 틀릴 수 있는 지점**을 명시한다.
 - 금지 어미로 끝내지 마라: ${IMPLICATION_FORBIDDEN_ENDINGS.join(', ')}.

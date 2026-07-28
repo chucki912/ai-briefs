@@ -190,6 +190,73 @@ export function c13_highRequiresBinding(
     return [];
 }
 
+// ── 시점 오염 방지 체크 (factAssertedAt / temporalRole) ──────────────────────
+// 일일 추출에서 오래된(2024 등) 배경 사실이 '현재 전개'처럼 렌더되는 오염을 막는다.
+// 렌더는 keyFact.text(문자열)만 노출하므로, 시점은 반드시 text 문장 안에 있어야 한다.
+
+/** factAssertedAt 정규화: 'YYYY' | 'YYYY-MM'만 인정, 그 외(빈값·자유서술)는 'unknown'으로 강제(추측 방지). */
+export function normFactAssertedAt(v: unknown): string {
+    const s = String(v ?? '').trim();
+    return /^\d{4}(-\d{2})?$/.test(s) ? s : 'unknown';
+}
+
+/** 문장 내 절대 연도 표기(19xx/20xx). 상대표현(작년/지난해)은 재열람 시 모호하므로 불인정. */
+const IN_TEXT_TIMEPOINT = /(19|20)\d{2}/;
+export function hasInTextTimepoint(text: string): boolean {
+    return IN_TEXT_TIMEPOINT.test(text || '');
+}
+
+/** 정량 주장(수치+단위/규모). '추세·비교의 근거'로 오인될 수 있는 수치 포함 여부. */
+const QUANT_CLAIM = /\d+\s?%|[$₩]\s?\d|\d+(\.\d+)?\s?(억|조|천|백만|배|GW|MW|GWh|kWh|TWh|bp|건|개|명|달러|원|위안|유로|엔)/;
+export function hasQuantitativeClaim(text: string): boolean {
+    return QUANT_CLAIM.test(text || '');
+}
+
+/** C15: temporalRole='background' fact는 문장 내에 시점(연도)을 반드시 표기.
+ *  미표기 background는 '오래된 맥락이 현재처럼 읽히는' 오염이므로 위반. */
+export function c15_backgroundNeedsTimepoint(facts: KeyFactStructured[]): CheckIssue[] {
+    const bad = facts.filter(f => f.temporalRole === 'background' && !hasInTextTimepoint(f.text));
+    return bad.length
+        ? [{ code: 'c15_background_no_timepoint', severity: 'error', message: `배경(background) fact ${bad.length}건이 문장 내 시점 미표기: ${bad.map(f => `"${f.text.slice(0, 40)}"`).join(' / ')}` }]
+        : [];
+}
+
+/** C16: factAssertedAt='unknown'인 정량 fact를 keyInsight가 근거(restsOn)로 삼으면 위반.
+ *  시점 불명 수치를 '현재 근거'로 쓰는 것을 막는다(unknown은 수치 근거 미사용). */
+export function c16_unknownNotNumericBasis(insight: KeyInsightStructured, facts: KeyFactStructured[]): CheckIssue[] {
+    const byId = new Map(facts.map(f => [f.id, f]));
+    const bad = (insight.restsOnFactIds || [])
+        .map(id => byId.get(id))
+        .filter((f): f is KeyFactStructured => !!f && f.factAssertedAt === 'unknown' && hasQuantitativeClaim(f.text));
+    return bad.length
+        ? [{ code: 'c16_unknown_numeric_basis', severity: 'warning', message: `keyInsight가 시점불명(unknown) 정량 fact ${bad.length}건에 근거: ${bad.map(f => f.id).join(',')}` }]
+        : [];
+}
+
+/** 시점 분포 집계(지표·검증용). LLM 없이 필드만 참조. */
+export interface TemporalDistribution {
+    total: number;
+    current: number;
+    background: number;
+    unknown: number;        // factAssertedAt === 'unknown'
+    datedYear: number;      // 'YYYY'
+    datedMonth: number;     // 'YYYY-MM'
+    backgroundMissingTimepoint: number; // C15 위반 건수
+}
+export function factTemporalDistribution(facts: KeyFactStructured[]): TemporalDistribution {
+    const d: TemporalDistribution = { total: 0, current: 0, background: 0, unknown: 0, datedYear: 0, datedMonth: 0, backgroundMissingTimepoint: 0 };
+    for (const f of facts) {
+        d.total += 1;
+        if (f.temporalRole === 'background') d.background += 1; else d.current += 1;
+        const fa = f.factAssertedAt || 'unknown';
+        if (fa === 'unknown') d.unknown += 1;
+        else if (/^\d{4}-\d{2}$/.test(fa)) d.datedMonth += 1;
+        else if (/^\d{4}$/.test(fa)) d.datedYear += 1;
+        if (f.temporalRole === 'background' && !hasInTextTimepoint(f.text)) d.backgroundMissingTimepoint += 1;
+    }
+    return d;
+}
+
 /** C12: actionType='none' → action·observe 부재. */
 export function c12_noneIsEmpty(sw: SoWhatV2): CheckIssue[] {
     if (sw.actionType !== 'none') return [];
@@ -221,6 +288,8 @@ export function checkCard(issue: IssueItem, now: Date = new Date()): CardCheckRe
     issues.push(...c10_actComplete(sw));
     issues.push(...c11_observeHasMetric(sw));
     issues.push(...c12_noneIsEmpty(sw));
+    issues.push(...c15_backgroundNeedsTimepoint(facts));
+    issues.push(...c16_unknownNotNumericBasis(insight, facts));
 
     const hasError = issues.some(i => i.severity === 'error');
     return { ok: issues.length === 0, hasError, issues };

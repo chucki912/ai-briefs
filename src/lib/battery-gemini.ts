@@ -2,12 +2,14 @@
 // 배터리 산업 전용 분석기 (K-Battery 관점)
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { NewsItem, IssueItem } from '@/types';
+import { NewsItem, IssueItem, KeyFactStructured } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
 import { getRecentIssues } from './store';
 import { checkDuplicateIssues, calculateSimilarity } from './gemini';
 import { KEY_INSIGHT_FIELD_SPEC, KEY_INSIGHT_GUIDE, KEY_INSIGHT_CHECKLIST, ensureValidKeyInsight, logKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
+import { normFactAssertedAt } from './analyzers/structured-checks';
+import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, BATTERY_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
 
@@ -133,6 +135,11 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
     "핵심 사실 2",
     "핵심 사실 3"
   ],
+  "keyFactsMeta": [
+    { "factAssertedAt": "YYYY 또는 YYYY-MM 또는 unknown", "temporalRole": "current 또는 background" },
+    { "factAssertedAt": "...", "temporalRole": "..." },
+    { "factAssertedAt": "...", "temporalRole": "..." }
+  ],
   "insight": "${KEY_INSIGHT_FIELD_SPEC} (기업 영향·경영진 대응은 K-Battery 생태계(LGES, SK On, SDI, 소재사 등) 관점에서 구체화할 것.)",
   "soWhat": {
     "ifTrue": "이 신호가 사실이라면 K-Battery 생태계 관점에서 무엇이 바뀌는가 (완성형 1문장)",
@@ -150,6 +157,11 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 - **중요**: \`relevantSourceIndices\` 필드에는 이 브리핑과 직접 관련된 핵심 기사 번호만 정수 배열로 포함하세요.
 - **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요. 중복 방지를 위해 keyFacts 작성 시 헤드라인, oneLineSummary(논지) 및 insight(시사점)의 내용을 반복하여 재진술하지 마십시오. 오직 객관적 팩트와 수치 데이터 전달에 집중해야 합니다.
 - **출처·검증 태그 금지**: keyFacts 각 문장 끝에 \`(Yahoo Finance, 2026년 7월 / 검증됨)\`, \`(... / 미검증)\`, \`(... 기준 / 신뢰도 보통)\` 같은 출처명·시점·신뢰도 꼬리표를 절대 붙이지 마십시오. 출처는 하단 Sources 링크로만 제공합니다. 팩트 문장은 순수하게 사실만 서술하고 괄호 태그로 마무리하지 마십시오.
+- **시점 판정 (keyFactsMeta, keyFacts와 같은 순서·개수로 필수)**:
+  - \`factAssertedAt\`: 그 사실이 **성립·발생하는 시점**을 "YYYY-MM" 또는 "YYYY"로. 기사 발행일이 아니라 사실 자체의 시점. **본문에서 시점을 특정할 수 없으면 반드시 "unknown"** — 추측·역산 금지(틀린 날짜보다 unknown이 낫다).
+  - \`temporalRole\`: 이번 뉴스의 **새 전개**면 \`current\`, 기사가 인용한 **과거 맥락/배경**(2024년 등 과거 수치)이면 \`background\`.
+  - **background 시점 문장 표기(필수)**: temporalRole이 background인 사실은 keyFacts의 그 문장 안에 **절대 연도를 명시**할 것(예: "2024년 …"). "작년/지난해" 상대표현 금지. 시점 없는 배경 사실은 오래된 맥락이 현재처럼 읽히므로 금지.
+  - **unknown 수치 근거 금지**: factAssertedAt이 unknown인 사실의 수치를 insight/soWhat의 확정 근거로 쓰지 마십시오.
 - **심층 인사이트(Key Insight) 및 soWhat (★판단형 의사결정 체계 적용★)**:
 ${KEY_INSIGHT_GUIDE}
   - 여기서 '기업'은 우선적으로 한국 배터리 생태계(LGES, SK On, SDI, 소재사 등)를 뜻합니다. 다만 근거 없이 특정국·특정사의 의도를 단정하지 말고 구조적 결과로 서술하십시오.
@@ -202,12 +214,27 @@ JSON만 출력하세요.`;
         await recordKeyInsightMetrics(kiResult, 'battery'); // 내부에서 예외를 삼킴(생성 비중단)
         const finalInsight = kiResult.insight;
 
+        // 시점 메타(keyFactsMeta)를 keyFacts와 인덱스 정렬해 구조화(검증·지표용). 배터리는
+        // fact 단위 소스 결박이 없어 sourceIds는 비움(카드 단위 sources 사용) — 시점 체크에는 무관.
+        const factTexts: string[] = Array.isArray(parsed.keyFacts) ? parsed.keyFacts : [];
+        const factMeta: Record<string, unknown>[] = Array.isArray(parsed.keyFactsMeta) ? parsed.keyFactsMeta : [];
+        const structuredFacts: KeyFactStructured[] = factTexts.map((t, i) => ({
+            id: `f${i + 1}`,
+            text: String(t || '').trim(),
+            sourceIds: [],
+            factAssertedAt: normFactAssertedAt(factMeta[i]?.factAssertedAt),
+            temporalRole: factMeta[i]?.temporalRole === 'background' ? 'background' as const : 'current' as const,
+        }));
+        // 배터리 insight는 평문(restsOn 결박 없음) → c16(unknown 정량 근거)는 미적용, 분포만 기록.
+        await recordTemporalMetrics(structuredFacts, undefined, 'battery');
+
         return {
             headline: parsed.headline || parsed.title,
             category: parsed.category,
             oneLineSummary: parsed.oneLineSummary,
             hashtags: parsed.hashtags,
             keyFacts: parsed.keyFacts,
+            structuredFacts,
             insight: finalInsight,
             framework: matchedFrameworks.map(f => f.name).join(', '),
             sources: selectedSources,

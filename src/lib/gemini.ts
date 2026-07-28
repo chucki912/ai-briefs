@@ -4,7 +4,8 @@ import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matche
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
-import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets } from './analyzers/structured-checks';
+import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, normFactAssertedAt } from './analyzers/structured-checks';
+import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, AI_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
@@ -140,10 +141,15 @@ export async function generateIssueFromCluster(
         const parsed = JSON.parse((await result.response).text());
 
         // keyFacts: sourceIndices([n], 1-based) → sourceRef.id 결박 (R2)
-        const rawFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: any, i: number) => {
-            const idxs: number[] = Array.isArray(f?.sourceIndices) ? f.sourceIndices : [];
+        const rawFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: Record<string, unknown>, i: number) => {
+            const idxs: number[] = Array.isArray(f?.sourceIndices) ? f.sourceIndices as number[] : [];
             const sourceIds = idxs.map(n => sourceRefs[n - 1]?.id).filter((x): x is string => !!x);
-            return { id: `f${i + 1}`, text: String(f?.text || '').trim(), sourceIds, publishedAt: f?.publishedAt || undefined };
+            return {
+                id: `f${i + 1}`, text: String(f?.text || '').trim(), sourceIds,
+                publishedAt: f?.publishedAt || undefined,
+                factAssertedAt: normFactAssertedAt(f?.factAssertedAt),
+                temporalRole: f?.temporalRole === 'background' ? 'background' as const : 'current' as const,
+            };
         });
 
         // AN: C2 하드 실패 — 미해석(Google 등) 소스에만 결박된 fact는 폐기(거짓 귀속 방지, 312 날조보다 정직한 사망)
@@ -196,6 +202,9 @@ export async function generateIssueFromCluster(
             confidence: (['high', 'medium', 'low'].includes(kiRaw.confidence) ? kiRaw.confidence : 'medium'),
             mundaneAlternative: String(kiRaw.mundaneAlternative || ''),
         };
+
+        // 시점 오염 지표(rule 4) — background/unknown/미표기 분포 기록(파이프라인 비중단)
+        await recordTemporalMetrics(structuredFacts, keyInsight, 'ai');
 
         // soWhat V2 + legacy 4분면 파생
         const swRaw = parsed.soWhat || {};

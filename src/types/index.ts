@@ -31,11 +31,14 @@ export interface SourceRef {
 }
 
 // keyFact: 보도된 사실 + 근거 소스 결박(≥1) + 발행일 (R1/R2/D10)
+export type TemporalRole = 'current' | 'background';
 export interface KeyFactStructured {
   id: string;               // "f1", "f2" ...
   text: string;             // 보도 사실만(메커니즘/추론 금지)
   sourceIds: string[];      // ≥1 (C1). 빈 배열이면 스키마 무효
-  publishedAt?: string;
+  publishedAt?: string;     // 소스 발행일(ISO)
+  factAssertedAt?: string;  // 사실 성립 시점: 'YYYY-MM' | 'YYYY' | 'unknown'(추측 금지)
+  temporalRole?: TemporalRole; // current=이번 전개 / background=인용된 과거 맥락
 }
 
 // keyInsight: 추론임을 명시 + 근거 fact 결박 + 확신도 + '지루한 대안'(D5 억제)

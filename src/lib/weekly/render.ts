@@ -31,21 +31,28 @@ function renderTable(t: WeeklyTable): string {
     return `${title}${head}\n${sep}\n${body}`;
 }
 
-/** 헤드라인 1줄: [등급] 라벨 — 정량 수치 1개(단위/규모 동반, 시점 표기 불인정). */
-function headlineLine(c: WeeklyThreadContent): string {
-    const metric =
-        c.metricsUsed.find(isQuantitativeMetric)
-        ?? extractQuantitativeMetrics(`${c.background} ${c.mainContent}`)[0]
-        ?? `관측 ${c.observedDates.length}일`; // 정량 수치 부재 시 관측일 수(진짜 카운트) 폴백
+/** 리터럴 이스케이프 개행 방어(생성 단계에서 새면 렌더가 깨지므로 최종 정규화). */
+function nl(s: string): string {
+    return (s ?? '').replace(/\\n/g, '\n').replace(/\\t/g, ' ');
+}
+
+/** 헤드라인 1줄: [등급] 라벨 — 정량 수치 1개(단위/규모 동반, 시점 불인정, 줄 간 중복 회피). */
+function headlineLine(c: WeeklyThreadContent, used: Set<string>): string {
+    const candidates = [
+        ...c.metricsUsed.filter(isQuantitativeMetric),
+        ...extractQuantitativeMetrics(`${c.background} ${c.mainContent}`),
+    ];
+    const metric = candidates.find(m => !used.has(m)) ?? candidates[0] ?? `관측 ${c.observedDates.length}일`;
+    used.add(metric);
     return `- [${c.grade}] ${c.label} — ${metric}`;
 }
 
 function renderThread(c: WeeklyThreadContent, idx: number): string {
     const parts = [
         `### ${idx}. [${c.grade}] ${c.label}`,
-        `\n[배경]\n${c.background}`,
-        `\n[주요 내용]\n${c.mainContent}`,
-        `\n[시사점]\n${c.implications}`,
+        `\n[배경]\n${nl(c.background)}`,
+        `\n[주요 내용]\n${nl(c.mainContent)}`,
+        `\n[시사점]\n${nl(c.implications)}`,
     ];
     const table = renderTable(c.table);
     if (table) parts.push(`\n${table}`);
@@ -84,7 +91,8 @@ export function renderWeeklyReport(content: WeeklyReportContent, opts: RenderOpt
         out.push(`\n이번 주 트렌드 성립 0건. 승격 요건(관측 폭·출처 독립성·과거 근거)을 충족한 스레드가 없어 트렌드로 승격하지 않는다.`);
     } else {
         if (promoted.length < 3) out.push(`\n이번 주 트렌드 성립 ${promoted.length}건.`);
-        out.push('\n' + promoted.slice(0, 3).map(headlineLine).join('\n'));
+        const usedMetrics = new Set<string>();
+        out.push('\n' + promoted.slice(0, 3).map(c => headlineLine(c, usedMetrics)).join('\n'));
     }
 
     // 1. 트렌드 스레드

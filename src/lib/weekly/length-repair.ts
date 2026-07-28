@@ -37,7 +37,9 @@ export async function repairLength(text: string, target: number, kind: string): 
 ${current}`;
         try {
             const result = await generateWithRetry(model, prompt);
-            const out = (await result.response).text().trim();
+            // FLASH가 개행을 리터럴 "\n" 문자열로 이스케이프해 반환하는 경우가 있어 정규화
+            // (미정규화 시 본문이 마크다운 한 줄로 깨져 거대 헤더로 렌더됨 — 실측 버그).
+            const out = (await result.response).text().trim().replace(/\\n/g, '\n').replace(/\\t/g, ' ');
             if (out.length > 0) current = out;
         } catch (e) {
             console.warn(`[LengthRepair] ${kind} 보정 실패(무시): ${e instanceof Error ? e.message : e}`);

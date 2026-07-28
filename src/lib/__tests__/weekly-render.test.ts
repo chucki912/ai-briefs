@@ -50,6 +50,17 @@ chk('full: 관측 항목 수 포함', renderWeeklyReport(withDemoted, { showDemo
 chk('off: demoted 섹션 없음', !renderWeeklyReport(withDemoted, { showDemoted: 'off' }).includes('트렌드 미성립'));
 chk('dod_failed → 규격 미달 태그', renderWeeklyReport(withDemoted).includes('[규격 미달]'));
 
+// ── 리터럴 개행 정규화(렌더 깨짐 방어) ──────────────────────────────────────
+const escaped = renderWeeklyReport(base({ threads: [thread({ mainContent: '첫째 줄\\n\\n둘째 줄' })], promotedCount: 1 }));
+chk('리터럴 \\n 정규화(백슬래시-n 미잔존)', !escaped.includes('\\n'));
+
+// ── 헤드라인 수치 줄 간 중복 회피 ────────────────────────────────────────────
+const dupMetric = renderWeeklyReport(base({
+    threads: [thread({ threadKey: 'a', label: 'A', metricsUsed: ['90%', '30년'] }), thread({ threadKey: 'b', label: 'B', grade: 'B', metricsUsed: ['90%', '557,090대'] })],
+    promotedCount: 2,
+}));
+chk('헤드라인: 같은 수치 반복 안 함', dupMetric.includes('[A] A — 90%') && dupMetric.includes('[B] B — 557,090대'), dupMetric.split('## 1.')[0]);
+
 // ── DoD12: demoted 건수 == 실제 강등 수 ─────────────────────────────────────
 const md = renderWeeklyReport(withDemoted);
 chk('DoD12: 건수 표기 == 실제', md.includes(`(${withDemoted.demoted.length}건)`));

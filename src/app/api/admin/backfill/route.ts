@@ -19,12 +19,20 @@ export async function POST(req: Request) {
 
         if (domains.length === 0) return NextResponse.json({ error: 'no valid domains' }, { status: 400 });
 
+        const reset = body.reset === true; // 스냅샷 후 기존 threadIndex 폐기하고 재구성(중복 제거)
         const jobId = `backfill_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         await kvSet(`backfill_job:${jobId}`, { status: 'running', progress: 0, log: [] }, 3600);
 
         waitUntil((async () => {
             const log: string[] = [];
             try {
+                if (reset) {
+                    const { snapshotThreadIndex, clearThreadIndex } = await import('@/lib/thread-index');
+                    const snapKey = `threadIndex:__snapshot__:${Date.now()}`;
+                    const saved = await snapshotThreadIndex(snapKey);
+                    const cleared = await clearThreadIndex();
+                    log.push(`snapshot ${saved} → ${snapKey}; cleared ${cleared}`);
+                }
                 const { stats, threadsWritten } = await runBackfill({
                     asOfDate, weeks, domains, write: true,
                     onLog: (m) => { log.push(m); },

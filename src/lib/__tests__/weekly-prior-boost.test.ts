@@ -47,7 +47,7 @@ async function integration() {
     await runDeterministicPasses({
         dates: [], domain: 'ai', asOf: '2026-07-08', isoWeek: isoWeekKey('2026-07-08'), store, persist: true,
         items: [item('a', '2026-07-06', 'reuters.com'), item('b', '2026-07-08', 'bloomberg.com')],
-        clusterFn: async () => [{ threadKey: 't_seed', label: 'S', matchedExisting: false, members: [{ itemId: 'a', industryTags: [tag('semiconductor')] }, { itemId: 'b', industryTags: [tag('ai_software')] }] }],
+        clusterFn: async () => [{ threadKey: 't_seed', label: 'S', matchedExisting: false, participants: [], members: [{ itemId: 'a', industryTags: [tag('semiconductor')] }, { itemId: 'b', industryTags: [tag('ai_software')] }] }],
     });
 
     // W2: t_seed(matched, pw=1) + t_new(pw=0). webBoost 스파이.
@@ -60,8 +60,8 @@ async function integration() {
         dates: [], domain: 'ai', asOf: '2026-07-15', isoWeek: isoWeekKey('2026-07-15'), store, persist: true, webBoost,
         items: [item('c', '2026-07-13', 'reuters.com'), item('d', '2026-07-15', 'bloomberg.com'), item('e', '2026-07-13', 'ft.com'), item('f', '2026-07-15', 'wsj.com')],
         clusterFn: async () => [
-            { threadKey: 't_seed', label: 'S', matchedExisting: true, members: [{ itemId: 'c', industryTags: [tag('semiconductor')] }, { itemId: 'd', industryTags: [tag('ai_software')] }] },
-            { threadKey: 't_new', label: 'N', matchedExisting: false, members: [{ itemId: 'e', industryTags: [tag('semiconductor')] }, { itemId: 'f', industryTags: [tag('ai_software')] }] },
+            { threadKey: 't_seed', label: 'S', matchedExisting: true, participants: [], members: [{ itemId: 'c', industryTags: [tag('semiconductor')] }, { itemId: 'd', industryTags: [tag('ai_software')] }] },
+            { threadKey: 't_new', label: 'N', matchedExisting: false, participants: [], members: [{ itemId: 'e', industryTags: [tag('semiconductor')] }, { itemId: 'f', industryTags: [tag('ai_software')] }] },
         ],
     });
 

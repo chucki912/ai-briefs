@@ -33,6 +33,7 @@ interface RawThread {
     threadKey?: string;
     label?: string;
     matchedExisting?: boolean;
+    participants?: unknown[];
     members?: { itemIndex?: number; industryTags?: unknown }[];
 }
 
@@ -76,16 +77,22 @@ export function parseAndSanitize(
         }
         if (members.length === 0) return;
 
+        const participants = Array.isArray(t.participants)
+            ? Array.from(new Set(t.participants.filter((p): p is string => typeof p === 'string' && p.trim().length > 0).map(p => p.trim())))
+            : [];
+
         const existing = byKey.get(threadKey);
         if (existing) {
-            // 동일 threadKey 병합(아이템 dedup)
+            // 동일 threadKey 병합(아이템·participants dedup)
             const seen = new Set(existing.members.map(m => m.itemId));
             for (const m of members) if (!seen.has(m.itemId)) { seen.add(m.itemId); existing.members.push(m); }
+            existing.participants = Array.from(new Set([...existing.participants, ...participants]));
         } else {
             byKey.set(threadKey, {
                 threadKey,
                 label,
                 matchedExisting: candidateKeys.has(threadKey),
+                participants,
                 members,
             });
         }
@@ -117,24 +124,36 @@ function buildPrompt(
         : '';
 
     return `당신은 ${domainNote} 산업 이슈를 "동일 인과 메커니즘" 기준으로 묶는 분류기다.
-트렌드 여부·등급·중요도는 판단하지 마라. 오직 클러스터링과 산업 태그 부여만 한다.
+트렌드 여부·등급·중요도는 판단하지 마라. 오직 메커니즘 클러스터링과 산업 태그 부여만 한다.
 ${rejectionBlock}
+## threadKey는 기업이 아니라 "인과 메커니즘"을 명명한다 (가장 중요)
+- threadKey/label은 **"무엇이(주체군) — 왜(원인/동력) — 어느 방향으로(결과) 움직이는가"** 가
+  한 문장으로 성립해야 한다.
+- **기업명·제품명 단독은 threadKey가 될 수 없다.** 금지 예: byd, catl, panasonic_expansion,
+  sk_on_battery. 이런 키는 회사의 "크기"를 트렌드로 착각하게 만든다.
+- 좋은 예: sodium_ion_cost_parity_drives_grid_storage(나트륨이온 원가동등화→그리드저장 전이),
+  chinese_oem_localization_evades_tariffs(중국 OEM이 관세회피 위해 현지생산),
+  cylindrical_cell_capacity_race_for_ev_oems(원통형 셀 증설 경쟁).
+- 기업/기관은 threadKey가 아니라 **participants[]** 에 담는다.
+
 ## 규칙
-1. 키워드가 아니라 동일 인과 메커니즘으로 묶는다.
-   - 같은 기업의 다른 사건도 메커니즘이 다르면 분리한다.
-   - 다른 기업의 같은 메커니즘은 하나로 통합한다.
-2. 아래 "기존 스레드"와 동일 메커니즘이면 반드시 그 threadKey를 그대로 재사용하고
-   matchedExisting=true로 표기한다. 신규 키 남발 금지.
-3. 신규 스레드의 threadKey는 영문 snake_case로 만든다.
-4. 각 아이템(member)에 industryTag를 1개 이상 부여한다. **폐쇄형 목록에서만 선택**한다.
-   목록에 없는 자유 문자열은 금지. 아이템이 실제로 걸치는 산업만 태깅한다(남발 금지).
-5. 단독 아이템(메커니즘 공유 없음)도 자체 스레드로 낸다.
+1. **같은 메커니즘을 보이는 서로 다른 주체는 하나로 병합**한다(participants에 여럿 담김).
+   이것이 M4(확산·전이)를 의미있게 만드는 유일한 방법이다. (예: CATL·삼성SDI·SK온이 모두
+   전고체 양산을 앞당기면 → solid_state_massproduction_pull_in 하나로.)
+2. **같은 기업이라도 인과가 다르면 분리**한다. 한 스레드의 아이템들이 단일 인과 문장으로
+   요약되지 않으면 반드시 쪼갠다. (예: 한 기업의 저가정책 점유율 / 자율주행 안전 / 해외 진출은
+   서로 다른 3개 메커니즘 = 3개 스레드.)
+3. 아래 "기존 스레드"와 동일 메커니즘이면 그 threadKey를 재사용하고 matchedExisting=true.
+   단, 기존 키가 기업명 단독이면 재사용하지 말고 메커니즘 키를 새로 만든다.
+4. 각 아이템에 industryTag를 1개 이상 부여한다(폐쇄형 목록에서만). 아이템이 실제로 걸친
+   산업만. 메커니즘으로 좁게 묶으면 태그도 자연히 좁아진다.
+5. 단독 메커니즘 아이템도 자체 스레드로 낸다.
 6. JSON만 출력한다.
 
 ## 허용 industryTag(이 값만 사용)
 ${tagList}
 
-## 기존 스레드(재사용 후보)
+## 기존 스레드(재사용 후보 — 메커니즘 키만 재사용)
 ${candidateList}
 
 ## 이번 주 아이템
@@ -144,10 +163,11 @@ ${itemList}
 {
   "threads": [
     {
-      "threadKey": "english_snake_case",
-      "label": "한글 스레드명(20자 이내)",
+      "threadKey": "mechanism_in_english_snake_case",
+      "label": "메커니즘 진술(무엇이 왜 어느 방향으로, 30자 이내)",
       "matchedExisting": false,
-      "members": [ { "itemIndex": 0, "industryTags": ["semiconductor"] } ]
+      "participants": ["CATL", "삼성SDI"],
+      "members": [ { "itemIndex": 0, "industryTags": ["battery_energy_storage"] } ]
     }
   ]
 }

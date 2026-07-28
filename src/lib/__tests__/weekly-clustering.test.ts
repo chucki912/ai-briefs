@@ -56,6 +56,18 @@ const r3 = parseAndSanitize(raw3, items, candidateKeys);
 chk('parse: 동일 threadKey 병합', r3.assignments.length === 1);
 chk('parse: 병합 시 아이템 dedup', r3.assignments[0].members.length === 2);
 
+// participants 추출 + dedup
+const raw5 = JSON.stringify({ threads: [{ threadKey: 'mech_a', label: '메커니즘', participants: ['CATL', '삼성SDI', 'CATL', ''], members: [{ itemIndex: 0, industryTags: ['battery_energy_storage'] }] }] });
+const r5 = parseAndSanitize(raw5, items, candidateKeys);
+chk('parse: participants 추출+dedup+빈값 제거', JSON.stringify(r5.assignments[0].participants) === JSON.stringify(['CATL', '삼성SDI']));
+// participants 병합(동일 threadKey)
+const raw6 = JSON.stringify({ threads: [
+    { threadKey: 'mech_b', label: 'M', participants: ['CATL'], members: [{ itemIndex: 0, industryTags: ['battery_energy_storage'] }] },
+    { threadKey: 'mech_b', label: 'M', participants: ['LG엔솔'], members: [{ itemIndex: 1, industryTags: ['battery_energy_storage'] }] },
+] });
+chk('parse: 동일 threadKey participants 병합', JSON.stringify(parseAndSanitize(raw6, items, candidateKeys).assignments[0].participants) === JSON.stringify(['CATL', 'LG엔솔']));
+chk('parse: participants 없으면 빈배열', parseAndSanitize(JSON.stringify({ threads: [{ threadKey: 'noP', label: 'x', members: [{ itemIndex: 0, industryTags: ['battery_energy_storage'] }] }] }), items, candidateKeys).assignments[0].participants.length === 0);
+
 // member 0개 스레드 제거
 const raw4 = JSON.stringify({ threads: [{ threadKey: 'empty', label: 'E', members: [] }] });
 chk('parse: 빈 스레드 제거', parseAndSanitize(raw4, items, candidateKeys).assignments.length === 0);

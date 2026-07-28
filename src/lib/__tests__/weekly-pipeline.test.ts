@@ -28,8 +28,8 @@ async function main() {
         item('i3', '2026-07-06', 'reuters.com'),
     ];
     const w1Clusters: ClusterAssignment[] = [
-        { threadKey: 't_hbm', label: 'HBM', matchedExisting: false, members: [{ itemId: 'i1', industryTags: [tag('semiconductor')] }, { itemId: 'i2', industryTags: [tag('ai_software')] }] },
-        { threadKey: 't_single', label: '단독', matchedExisting: false, members: [{ itemId: 'i3', industryTags: [tag('energy_utilities')] }] },
+        { threadKey: 't_hbm', label: 'HBM', matchedExisting: false, participants: [], members: [{ itemId: 'i1', industryTags: [tag('semiconductor')] }, { itemId: 'i2', industryTags: [tag('ai_software')] }] },
+        { threadKey: 't_single', label: '단독', matchedExisting: false, participants: [], members: [{ itemId: 'i3', industryTags: [tag('energy_utilities')] }] },
     ];
     const w1 = await runDeterministicPasses({
         dates: [], domain: 'ai', asOf: '2026-07-08', isoWeek: isoWeekKey('2026-07-08'),
@@ -50,7 +50,7 @@ async function main() {
         item('j2', '2026-07-15', 'bloomberg.com'),
     ];
     const w2Clusters: ClusterAssignment[] = [
-        { threadKey: 't_hbm', label: 'HBM', matchedExisting: true, members: [{ itemId: 'j1', industryTags: [tag('semiconductor')] }, { itemId: 'j2', industryTags: [tag('ai_software')] }] },
+        { threadKey: 't_hbm', label: 'HBM', matchedExisting: true, participants: [], members: [{ itemId: 'j1', industryTags: [tag('semiconductor')] }, { itemId: 'j2', industryTags: [tag('ai_software')] }] },
     ];
     const w2 = await runDeterministicPasses({
         dates: [], domain: 'ai', asOf: '2026-07-15', isoWeek: isoWeekKey('2026-07-15'),

@@ -59,7 +59,7 @@ const itemsPass = [
     item({ itemId: 'i2', publishedAt: '2026-07-22', publisherDomains: ['bloomberg.com'], keyFacts: ['20만장'] }),
 ];
 const clusterPass: ClusterAssignment = {
-    threadKey: 'hbm', label: 'HBM', matchedExisting: false,
+    threadKey: 'hbm', label: 'HBM', matchedExisting: false, participants: [],
     members: [mem('i1', ['semiconductor']), mem('i2', ['ai_software'])],
 };
 const gPass = evaluateGate(clusterPass, mkMap(itemsPass), null, { asOf: '2026-07-22' });
@@ -98,7 +98,8 @@ chk('gate: 단일 일자 → single_date 강등', !gOneDay.hardGatePass && gOneD
 // M1 후보: priorEntry에 최근 주차 관측
 const priorEntry: ThreadIndexEntry = {
     threadKey: 'hbm', label: 'HBM', firstObservedAt: '2026-07-06', lastObservedAt: '2026-07-13',
-    weeklyCounts: { [isoWeekKey('2026-07-13')]: 2 }, representativeMetrics: [], anchorSourceIds: [],
+    weeklyCounts: { [isoWeekKey('2026-07-13')]: 2 }, weeklyObservations: {}, participants: [],
+    representativeMetrics: [], anchorSourceIds: [],
     domainTags: ['ai'], industryTags: ['semiconductor'],
 };
 const gM1 = evaluateGate(clusterPass, mkMap(itemsPass), priorEntry, { asOf: '2026-07-22' });

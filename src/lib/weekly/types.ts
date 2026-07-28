@@ -23,11 +23,12 @@ export interface ClusterMember {
     industryTags: IndustryTag[]; // 아이템 단위 태그(M4 교차-아이템 판정 근거)
 }
 
-/** PASS 1 산출: 동일 인과 메커니즘 스레드. */
+/** PASS 1 산출: 동일 인과 메커니즘 스레드. threadKey는 메커니즘을 명명(기업 아님). */
 export interface ClusterAssignment {
-    threadKey: string;          // 영문 스네이크케이스
-    label: string;
+    threadKey: string;          // 영문 스네이크케이스 — 인과 메커니즘 명명(기업/제품명 단독 금지)
+    label: string;              // 메커니즘 진술(무엇이 왜 어느 방향으로)
     matchedExisting: boolean;   // 기존 threadIndex threadKey 재사용 여부
+    participants: string[];     // 이 메커니즘을 보이는 주체(기업/기관) — 기업은 여기에 담는다
     members: ClusterMember[];
 }
 

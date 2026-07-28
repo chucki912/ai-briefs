@@ -21,6 +21,8 @@ const base = (over: Partial<ThreadIndexEntry> = {}): ThreadIndexEntry => ({
     firstObservedAt: '2026-07-01',
     lastObservedAt: '2026-07-03',
     weeklyCounts: { '2026-W27': 2 },
+    weeklyObservations: {},
+    participants: ['SK하이닉스'],
     representativeMetrics: ['월 14만장'],
     anchorSourceIds: ['s1'],
     domainTags: ['ai'],

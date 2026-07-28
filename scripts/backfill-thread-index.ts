@@ -34,18 +34,31 @@ function parseArgs() {
     const asof = get('asof');
     const asOfDate = asof ? new Date(`${asof}T12:00:00`) : new Date();
     const write = args.includes('--write');
-    return { weeks, domains, asOfDate, write };
+    const reset = args.includes('--reset'); // 스냅샷 후 기존 threadIndex 폐기하고 재백필
+    return { weeks, domains, asOfDate, write, reset };
 }
 
 async function main() {
-    const { weeks, domains, asOfDate, write } = parseArgs();
+    const { weeks, domains, asOfDate, write, reset } = parseArgs();
     if (!process.env.REDIS_URL && !process.env.KV_REST_API_URL) {
         console.error('❌ REDIS_URL / KV_REST_API_URL 미설정 — .env.local 확인 필요(로컬에서 InMemory로 떨어지면 백필 무의미).');
         process.exit(1);
     }
     if (domains.length === 0) { console.error('❌ 유효 domain 없음'); process.exit(1); }
+    if (reset && !write) { console.error('❌ --reset은 --write와 함께만 사용(폐기 후 미기록은 무의미).'); process.exit(1); }
 
-    console.log(`\n=== threadIndex 백필 ${write ? '(WRITE)' : '(DRY-RUN, 미기록)'} ===`);
+    // --reset: 스냅샷 보존 → 기존 threadIndex 폐기 → 재백필 (메커니즘 기반 재구성)
+    if (reset) {
+        const { snapshotThreadIndex, clearThreadIndex } = await import('../src/lib/thread-index');
+        const snapKey = `threadIndex:__snapshot__:${asOfDate.toISOString().slice(0, 10)}_${Math.floor(asOfDate.getTime() / 1000)}`;
+        const saved = await snapshotThreadIndex(snapKey);
+        console.log(`📸 스냅샷 보존: ${saved}건 → ${snapKey}`);
+        if (saved === 0) console.warn('   ⚠️ 스냅샷 0건 — 기존 threadIndex가 비어 있음(첫 백필일 수 있음)');
+        const cleared = await clearThreadIndex();
+        console.log(`🗑️  기존 threadIndex 폐기: ${cleared}건 삭제 + 레지스트리 비움\n`);
+    }
+
+    console.log(`\n=== threadIndex 백필 ${write ? '(WRITE)' : '(DRY-RUN, 미기록)'}${reset ? ' [RESET]' : ''} ===`);
     console.log(`기준일=${asOfDate.toISOString().slice(0, 10)} weeks=${weeks} domains=${domains.join(',')} prefix=${process.env.REDIS_PREFIX || 'ai_brief'}\n`);
 
     const { runBackfill } = await import('../src/lib/weekly/backfill');

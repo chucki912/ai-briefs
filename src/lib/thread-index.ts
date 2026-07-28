@@ -125,6 +125,8 @@ export function mergeThreadIndex(
         // 신규 스레드도 자체 필드 내 중복은 정리해 저장한다.
         return {
             ...incoming,
+            weeklyObservations: incoming.weeklyObservations ?? {},
+            participants: uniq(incoming.participants ?? []),
             representativeMetrics: uniq(incoming.representativeMetrics ?? []).slice(-REP_METRICS_CAP),
             anchorSourceIds: uniq(incoming.anchorSourceIds ?? []).slice(-ANCHOR_IDS_CAP),
             domainTags: uniq(incoming.domainTags ?? []),
@@ -138,6 +140,8 @@ export function mergeThreadIndex(
         firstObservedAt: minDate(existing.firstObservedAt, incoming.firstObservedAt),
         lastObservedAt: maxDate(existing.lastObservedAt, incoming.lastObservedAt),
         weeklyCounts: { ...existing.weeklyCounts, ...incoming.weeklyCounts }, // 주 단위 overwrite
+        weeklyObservations: { ...(existing.weeklyObservations ?? {}), ...(incoming.weeklyObservations ?? {}) }, // 주 단위 overwrite
+        participants: uniq([...(existing.participants ?? []), ...(incoming.participants ?? [])]), // add-only
         representativeMetrics: uniq([
             ...(existing.representativeMetrics ?? []),
             ...(incoming.representativeMetrics ?? []),
@@ -223,4 +227,32 @@ export async function deleteThreadIndex(threadKey: string): Promise<void> {
     if (keys.includes(threadKey)) {
         await kvSet(REGISTRY_KEY, keys.filter((k) => k !== threadKey), THREAD_INDEX_TTL_SECONDS);
     }
+}
+
+/**
+ * 재백필 전 전체 threadIndex를 별도 키로 스냅샷(전후 비교·복구용). 반환: 보존 건수.
+ * snapshotKey는 호출자가 타임스탬프 포함해 부여한다(덮어쓰기 방지).
+ */
+export async function snapshotThreadIndex(snapshotKey: string): Promise<number> {
+    const entries = await getAllThreadIndexes();
+    await kvSet(snapshotKey, { savedAtKey: snapshotKey, count: entries.length, entries }, THREAD_INDEX_TTL_SECONDS);
+    return entries.length;
+}
+
+/** 스냅샷 조회(복구·비교용). */
+export async function getThreadIndexSnapshot(snapshotKey: string): Promise<{ count: number; entries: ThreadIndexEntry[] } | null> {
+    return kvGet<{ count: number; entries: ThreadIndexEntry[] }>(snapshotKey);
+}
+
+/**
+ * 전체 threadIndex 폐기 — 재백필 전용. 반드시 snapshotThreadIndex 성공 후 호출할 것.
+ * 모든 엔트리 삭제 + 레지스트리 비움. 반환: 삭제 건수.
+ */
+export async function clearThreadIndex(): Promise<number> {
+    const keys = await listThreadKeys();
+    for (const k of keys) {
+        await kvSet(threadStoreKey(k), null, THREAD_INDEX_TTL_SECONDS);
+    }
+    await kvSet(REGISTRY_KEY, [], THREAD_INDEX_TTL_SECONDS);
+    return keys.length;
 }

@@ -46,6 +46,7 @@ chk('motionTypes: M1/M2/M4 필터', JSON.stringify(candidateMotionTypes({ M1: tr
 const entry: ThreadIndexEntry = {
     threadKey: 't', label: 'L', firstObservedAt: '2026-06-01', lastObservedAt: '2026-07-13',
     weeklyCounts: { [isoWeekKey('2026-07-13')]: 2, [isoWeekKey('2026-07-06')]: 1, [isoWeekKey('2026-05-01')]: 3 },
+    weeklyObservations: {}, participants: [],
     representativeMetrics: [], anchorSourceIds: [], domainTags: ['ai'], industryTags: ['semiconductor'],
 };
 const ipe = internalPriorEvidence(entry, '2026-07-20', 8);

@@ -176,12 +176,23 @@ export interface ApiResponse<T> {
 // 과거 관측을 threadKey 단위로 누적해 게이트/등급 판정(M1·priorWeeksInternal)의
 // 결정론적 근거로 쓴다. 저장 키: threadIndex:{threadKey} (원본 브리핑 90일 TTL과
 // 분리, 최소 365일 유지). 접근 레이어는 src/lib/thread-index.ts.
+// 주차별 관측 항목 — provenance 재구성용(원본 브리핑 90일 소멸 대비). [배경] 슬롯의
+// "지난 N주 관측" 근거 제시에 필요.
+export interface ThreadObservationItem {
+  itemId: string;
+  observedAt: string;                    // YYYY-MM-DD
+  title: string;
+  sourceUrls: string[];
+}
+
 export interface ThreadIndexEntry {
-  threadKey: string;                     // 영문 스네이크케이스, 스레드 안정 식별자
-  label: string;                         // 사람이 읽는 스레드명(최신 관측 우선)
+  threadKey: string;                     // 영문 스네이크케이스 — 인과 메커니즘 명명(기업 아님)
+  label: string;                         // 메커니즘 진술(최신 관측 우선)
   firstObservedAt: string;               // 최초 관측일 YYYY-MM-DD
   lastObservedAt: string;                // 최종 관측일 YYYY-MM-DD
   weeklyCounts: Record<string, number>;  // { isoWeek: count } — 예: "2026-W30": 3 (주 단위 overwrite)
+  weeklyObservations: Record<string, ThreadObservationItem[]>; // { isoWeek: [항목] } — 주 단위 overwrite
+  participants: string[];                // 이 메커니즘을 보인 주체(기업/기관) — add-only
   representativeMetrics: string[];       // 대표 수치(add-only 누적, dedup)
   anchorSourceIds: string[];             // 앵커 소스 id(add-only 누적, dedup)
   domainTags: string[];                  // 관측된 vertical(ai|battery) — add-only

@@ -49,12 +49,18 @@ export function buildEntryFromGate(
     domain: 'ai' | 'battery',
 ): ThreadIndexEntry {
     const dates = gate.observedDates;
+    const observations = cluster.members
+        .map(m => itemsById.get(m.itemId))
+        .filter((it): it is NormalizedItem => it !== undefined)
+        .map(it => ({ itemId: it.itemId, observedAt: it.publishedAt, title: it.title, sourceUrls: it.sourceUrls }));
     return {
         threadKey: gate.threadKey,
         label: gate.label,
         firstObservedAt: dates[0] ?? '',
         lastObservedAt: dates[dates.length - 1] ?? '',
         weeklyCounts: { [isoWeek]: cluster.members.length },
+        weeklyObservations: { [isoWeek]: observations },
+        participants: cluster.participants ?? [],
         representativeMetrics: extractMetrics(cluster, itemsById),
         anchorSourceIds: gate.publishers,
         domainTags: [domain],

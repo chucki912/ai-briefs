@@ -105,5 +105,18 @@ const priorEntry: ThreadIndexEntry = {
 const gM1 = evaluateGate(clusterPass, mkMap(itemsPass), priorEntry, { asOf: '2026-07-22' });
 chk('gate: M1 후보(prior 1주 관측)', gM1.motionCandidates.M1 === true && gM1.priorWeeksInternal === 1);
 
+// ── 게이트 (a) 재정의(STEP 4.6): pw>=1이면 주내 1일이어도 누적 관측폭으로 통과 ──
+const oneDate2Pub = [
+    item({ itemId: 'x1', publishedAt: '2026-07-22', publisherDomains: ['reuters.com'] }),
+    item({ itemId: 'x2', publishedAt: '2026-07-22', publisherDomains: ['bloomberg.com'] }),
+];
+const clusterX: ClusterAssignment = { threadKey: 'hbm', label: 'HBM', matchedExisting: false, participants: [], members: [mem('x1', ['semiconductor']), mem('x2', ['ai_software'])] };
+const pw2Entry: ThreadIndexEntry = { ...priorEntry, weeklyCounts: { [isoWeekKey('2026-07-13')]: 2, [isoWeekKey('2026-07-06')]: 1 } };
+chk('새게이트: pw>=2 & 주내1일 → 통과(obs+pw>=3)', evaluateGate(clusterX, mkMap(oneDate2Pub), pw2Entry, { asOf: '2026-07-22' }).hardGatePass === true);
+chk('새게이트: pw=1 & 주내1일 → 탈락(obs+pw=2<3)', evaluateGate(clusterX, mkMap(oneDate2Pub), priorEntry, { asOf: '2026-07-22' }).hardGatePass === false);
+chk('새게이트: pw=0 & 주내1일 → 탈락(현행 obs>=2 유지)', evaluateGate(clusterX, mkMap(oneDate2Pub), null, { asOf: '2026-07-22' }).hardGatePass === false);
+const oneDate1Pub = [item({ itemId: 'x1', publishedAt: '2026-07-22', publisherDomains: ['reuters.com'] }), item({ itemId: 'x2', publishedAt: '2026-07-22', publisherDomains: ['reuters.com'] })];
+chk('새게이트: (b) 단일출처는 pw 무관 탈락', evaluateGate(clusterX, mkMap(oneDate1Pub), pw2Entry, { asOf: '2026-07-22' }).demotedReasons.includes('single_publisher'));
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} weekly-gate: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

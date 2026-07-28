@@ -35,6 +35,35 @@ const REGISTRY_KEY = 'threadIndex:__registry__';
 /** 400일 — 원본 브리핑 90일과 분리, >=365일 요건 충족. 활성 스레드는 매주 갱신. */
 export const THREAD_INDEX_TTL_SECONDS = 400 * 24 * 60 * 60;
 
+// ── threadKey 정규화 (STEP 4.6-0) ────────────────────────────────────────────
+// 매주 새 변종 threadKey(overcomes↔overcome, 어순 차이)가 생기면 priorWeeks가 영구히
+// 샌다. 정규화 canonical 형태로 매칭·병합해 이를 차단한다(판단이 아니라 버그 수정).
+const THREADKEY_STOPWORDS = new Set([
+    'the', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'in', 'on', 'with', 'by', 'into',
+    'as', 'at', 'from', 'that', 'this', 'its', 'their', 'are', 'is', 'be', 'via',
+]);
+
+/** 경량 stemming — 복수형·3인칭·현재분사·과거형 어미 제거(overcomes→overcom). */
+function stemToken(t: string): string {
+    return t
+        .replace(/ies$/, 'y')
+        .replace(/(ss|x|ch|sh)es$/, '$1')
+        .replace(/([^s])s$/, '$1')
+        .replace(/(ing|ed)$/, '');
+}
+
+/**
+ * threadKey의 canonical 비교형: 소문자 → 토큰화 → 불용어 제거 → stemming →
+ * 중복 제거 → 어순 정규화(정렬) → join. canonical이 완전 일치하면 동일 threadKey로 본다.
+ */
+export function canonicalThreadKey(key: string): string {
+    const tokens = key.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+        .filter(t => !THREADKEY_STOPWORDS.has(t))
+        .map(stemToken)
+        .filter(t => t.length > 0);
+    return Array.from(new Set(tokens)).sort().join('_');
+}
+
 // ── ISO 주차 ────────────────────────────────────────────────────────────────
 
 /**

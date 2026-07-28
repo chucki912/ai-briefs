@@ -68,6 +68,16 @@ const raw6 = JSON.stringify({ threads: [
 chk('parse: 동일 threadKey participants 병합', JSON.stringify(parseAndSanitize(raw6, items, candidateKeys).assignments[0].participants) === JSON.stringify(['CATL', 'LG엔솔']));
 chk('parse: participants 없으면 빈배열', parseAndSanitize(JSON.stringify({ threads: [{ threadKey: 'noP', label: 'x', members: [{ itemIndex: 0, industryTags: ['battery_energy_storage'] }] }] }), items, candidateKeys).assignments[0].participants.length === 0);
 
+// ── canonical 매칭(STEP 4.6-0): 변종 threadKey 수렴 ──
+import { canonicalThreadKey } from '../thread-index';
+chk('canonical: overcomes==overcome', canonicalThreadKey('battery_swap_overcomes_downtime') === canonicalThreadKey('battery_swap_overcome_downtime'));
+chk('canonical: 불용어·어순 정규화', canonicalThreadKey('cost_leadership_drives_the_dominance') === canonicalThreadKey('the_dominance_of_cost_leadership_drive'));
+// 기존 후보와 canonical 일치하는 변종 → 기존 키로 수렴(matchedExisting)
+const candKey = new Set(['sodium_ion_drives_low_cost_commercialization']);
+const rawVar = JSON.stringify({ threads: [{ threadKey: 'sodium_ions_drive_low_costs_commercialization', label: 'v', participants: [], members: [{ itemIndex: 0, industryTags: ['battery_energy_storage'] }] }] });
+const rVar = parseAndSanitize(rawVar, items, candKey);
+chk('canonical: 변종 → 기존 threadKey 수렴', rVar.assignments[0].threadKey === 'sodium_ion_drives_low_cost_commercialization' && rVar.assignments[0].matchedExisting === true);
+
 // member 0개 스레드 제거
 const raw4 = JSON.stringify({ threads: [{ threadKey: 'empty', label: 'E', members: [] }] });
 chk('parse: 빈 스레드 제거', parseAndSanitize(raw4, items, candidateKeys).assignments.length === 0);

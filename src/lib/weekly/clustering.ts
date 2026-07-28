@@ -14,6 +14,7 @@ import { FLASH_MODEL } from '../gemini-models';
 import {
     INDUSTRY_TAGS, INDUSTRY_TAG_LABELS, validateIndustryTags,
 } from '@/configs/industry-tags';
+import { canonicalThreadKey } from '../thread-index';
 import type { NormalizedItem, ClusterAssignment, ClusterMember } from './types';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -56,11 +57,22 @@ export function parseAndSanitize(
 
     const rejectedTags: string[] = [];
     const byKey = new Map<string, ClusterAssignment>();
+    // canonical(정규화)형 → 확정 threadKey. 변종(어미/어순 차이)을 동일 스레드로 수렴.
+    const canonToKey = new Map<string, string>();
+    for (const k of candidateKeys) canonToKey.set(canonicalThreadKey(k), k);
 
     rawThreads.forEach((t, tIdx) => {
         const proposedKey = typeof t.threadKey === 'string' ? t.threadKey : '';
-        const matched = candidateKeys.has(proposedKey);
-        const threadKey = matched ? proposedKey : toSnakeKey(proposedKey || t.label || '', tIdx);
+        const canon = canonicalThreadKey(proposedKey || t.label || '');
+        let threadKey: string;
+        if (candidateKeys.has(proposedKey)) {
+            threadKey = proposedKey;                 // 정확 일치(기존 재사용)
+        } else if (canon && canonToKey.has(canon)) {
+            threadKey = canonToKey.get(canon)!;      // canonical 일치 → 기존/동일 변종에 수렴
+        } else {
+            threadKey = toSnakeKey(proposedKey || t.label || '', tIdx); // 신규
+            if (canon) canonToKey.set(canon, threadKey);
+        }
         const label = (typeof t.label === 'string' && t.label.trim()) ? t.label.trim() : threadKey;
 
         const members: ClusterMember[] = [];

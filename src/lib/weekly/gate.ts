@@ -94,10 +94,20 @@ export function evaluateGate(
         M4: m4CrossItemCandidate(cluster.members),
     };
 
+    // 게이트 (a) 재정의(STEP 4.6): observedDates>=2와 priorWeeks는 "단발인가"를 서로 다른
+    // 시간 스케일로 측정 — AND 결합은 이중 계상. pw>=1이면 그 주 1일이어도 누적 관측폭으로 통과.
+    //   pw==0  → observedDates >= 2 (현행)
+    //   pw>=1  → observedDates >= 1 AND (observedDates + pw) >= 3
+    const obsOk = weeks === 0
+        ? observedDates.length >= 2
+        : (observedDates.length >= 1 && (observedDates.length + weeks) >= 3);
+    // (b) publisherCount>=2 는 어떤 경우에도 완화 안 함 — 단일 출처는 시간이 아니라 사실성 문제.
+    const pubOk = publisherCount >= 2;
+
     const demotedReasons: DemotedReason[] = [];
-    if (observedDates.length < 2) demotedReasons.push('single_date');
-    if (publisherCount < 2) demotedReasons.push('single_publisher');
-    const hardGatePass = demotedReasons.length === 0;
+    if (!obsOk) demotedReasons.push('single_date');
+    if (!pubOk) demotedReasons.push('single_publisher');
+    const hardGatePass = obsOk && pubOk;
 
     return {
         threadKey: cluster.threadKey,

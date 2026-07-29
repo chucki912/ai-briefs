@@ -10,6 +10,7 @@
 import { assignGrade, internalPriorEvidence, priorWeeksNonLegacy, isLegacyWeek, type PriorEvidence, type MotionTypeCode } from '../weekly/grade';
 import { currentObservedDates, m2CandidateWithTemporal, monthsAgo, isQuoteAnchored, datedBackgroundFacts, quantitativeAnchorFacts } from '../weekly/temporal-inheritance';
 import { normalizeIssue } from '../weekly/corpus';
+import { findInternalVocab, validateWeeklyThread } from '../weekly/validate-weekly';
 import type { NormalizedItem } from '../weekly/types';
 import type { ThreadIndexEntry, IssueItem } from '@/types';
 
@@ -123,6 +124,22 @@ chk('rule3: 정량 앵커는 quote+current만(unknown·발행일앵커 제외)',
             { text: 'no2', factAssertedAt: fa('unknown', 'none', null), temporalRole: 'current' },
         ] }),
     ]).length === 1);
+
+// ── B-6 후속: 내부 어휘 노출 결정론 검사(dry-run 실측 결함) ─────────────────
+const leaked = '만약 M1 유형의 초기 시그널처럼 경쟁이 지속·확대되면 시장 수요 반등이 앞당겨진다.';
+chk('vocab: dry-run에서 실제 노출된 M1 문장 적발', findInternalVocab(leaked).length > 0, JSON.stringify(findInternalVocab(leaked)));
+chk('vocab: M4 확산 표기 적발', findInternalVocab('다수 이종 산업군으로 확산(M4)되면').length > 0);
+chk('vocab: 정상 서술은 통과', findInternalVocab('여러 산업으로 번지는 양상이 지속되면 락인 효과가 발생한다.').length === 0);
+chk('vocab: 킬 트리거·승격·게이트 적발',
+    findInternalVocab('킬 트리거').length > 0 && findInternalVocab('승격 요건').length > 0 && findInternalVocab('게이트 통과').length > 0);
+const leakThread = {
+    threadKey: 't', label: 'l', grade: 'B' as const, observedDates: ['2026-07-29', '2026-07-30'],
+    background: '배경'.repeat(60), mainContent: '내용'.repeat(300), implications: leaked + '판단'.repeat(60),
+    nextWeekCheck: '확인', killTrigger: '2026-09-30까지 30% 이하면 철회', metricsUsed: ['40%'],
+    table: { headers: ['a', 'b'], rows: [['1', '2'], ['3', '4']] }, motionTypes: ['M1' as const],
+};
+chk('vocab: validateWeeklyThread가 hard 위반으로 잡음(재생성→강등 경로)',
+    validateWeeklyThread(leakThread as never).some(f => f.rule === 'internal_vocab_exposed' && f.severity === 'hard'));
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} weekly-temporal-inheritance: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

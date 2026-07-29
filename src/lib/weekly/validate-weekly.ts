@@ -40,6 +40,26 @@ export function eightGramOverlap(implication: string, body: string): number {
     return overlap;
 }
 
+/** 독자 문서에 노출 금지된 내부 어휘 패턴(B-6). 매칭된 표현을 반환. */
+export const INTERNAL_VOCAB_PATTERNS: Array<[RegExp, string]> = [
+    [/\bM[1-5]\b/g, '운동유형 코드(M1~M5)'],
+    [/motionType/gi, 'motionType'],
+    [/승격/g, '승격'],
+    [/강등/g, '강등'],
+    [/게이트/g, '게이트'],
+    [/스레드/g, '스레드'],
+    [/threadKey/gi, 'threadKey'],
+    [/priorWeeks\w*/gi, 'priorWeeks'],
+    [/observedDates/gi, 'observedDates'],
+    [/킬\s*트리거/g, '킬 트리거'],
+    [/등급\s*[ABC]\b/g, '등급 코드'],
+];
+export function findInternalVocab(text: string): string[] {
+    const hits = new Set<string>();
+    for (const [re, label] of INTERNAL_VOCAB_PATTERNS) if (re.test(text || '')) hits.add(label);
+    return [...hits];
+}
+
 /** 인용된 원문("…"/『…』/「…」)을 제외한 본문의 8-gram 집합 — 동일 원문 인용은 정당한 겹침이므로 제외. */
 export function bodyEightGrams(text: string): Set<string> {
     const noQuotes = (text || '').replace(/["“”『「][^"“”』」]*["“”』」]?/g, ' ');
@@ -106,6 +126,13 @@ export function validateWeeklyThread(c: WeeklyThreadContent): WeeklyGateFailure[
     }
     // 5: 시사점 명시율 100% (비어있지 않음)
     if (implLen === 0) fails.push({ rule: 'implication_present', severity: 'hard', detail: '시사점이 비어 있음.' });
+
+    // B-6: 독자 문서에 내부 어휘 노출 금지(결정론 검사 — 프롬프트 지시만으로는 새어나감이 실측됨).
+    // dry-run(W31 battery)에서 PASS 5 시사점에 motionType 코드(M1/M4)가 4건 노출된 사례로 도입.
+    const vocabHits = findInternalVocab(`${c.background} ${c.mainContent} ${c.implications} ${c.nextWeekCheck} ${c.killTrigger}`);
+    if (vocabHits.length > 0) {
+        fails.push({ rule: 'internal_vocab_exposed', severity: 'hard', detail: `내부 어휘 노출: ${vocabHits.join(', ')} — 독자 문서에는 결론만 쓰고 방법론 용어(운동유형 코드·승격/강등·게이트·스레드 등)를 쓰지 말 것. 등급은 확립/형성 중/관찰 중으로 서술.` });
+    }
 
     // 7: distinct 정량 수치 >=3 (단위/규모 동반만 — 시점/연도/버전 제외, 헤드라인과 동일 정의)
     const distinctNums = new Set([

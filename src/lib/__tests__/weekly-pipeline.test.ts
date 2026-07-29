@@ -14,7 +14,8 @@ const chk = (name: string, cond: boolean, d?: string) => {
 
 const item = (id: string, date: string, pub: string): NormalizedItem => ({
     itemId: id, publishedAt: date, domain: 'ai', title: id,
-    keyFacts: ['수치 2배 증가'], sourceUrls: [], publisherDomains: [pub],
+    keyFacts: ['수치 2배 증가'], facts: [{ text: '수치 2배 증가' }], hasAnchorSource: false,
+    sourceUrls: [], publisherDomains: [pub],
 });
 const tag = (t: IndustryTag) => t;
 

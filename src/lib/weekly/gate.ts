@@ -13,6 +13,7 @@ import type {
     ClusterAssignment, ClusterMember, GateResult, MotionCandidates, NormalizedItem, DemotedReason,
 } from './types';
 import { priorWeeksInternal } from '../thread-index';
+import { currentObservedDates, m2CandidateWithTemporal } from './temporal-inheritance';
 import { isDenylistedDomain } from '../validate-triangulation';
 import { SOURCE_TIERING } from '../validation-config';
 
@@ -49,12 +50,17 @@ export function m4CrossItemCandidate(members: ClusterMember[]): boolean {
 /**
  * M2 후보(가속·임계) 휴리스틱 — 확정 아님. PASS 4가 두 시점 수치·변화율로 확정한다.
  * 서로 다른 2개 이상 날짜에서 수치를 담은 keyFact가 관측되면 후보로 본다.
+ *
+ * rule 3(B-4): 시점 메타가 있는 아이템은 temporal 규칙으로 판정한다 —
+ * quote 앵커된 시점 2개 이상 AND 양쪽 모두 12개월 초과가 아닐 것(m2CandidateWithTemporal).
+ * 발행일 앵커(sourcePublishedAt)·legacy·unknown은 정량 비교 앵커로 쓰지 않는다.
+ * 시점 메타가 전무한(구코드) 클러스터는 기존 날짜-휴리스틱으로 폴백한다.
  */
-function m2Candidate(members: ClusterMember[], itemsById: Map<string, NormalizedItem>): boolean {
+function m2Candidate(members: ClusterMember[], itemsById: Map<string, NormalizedItem>, asOf: string | Date): boolean {
+    const items = members.map(m => itemsById.get(m.itemId)).filter((x): x is NormalizedItem => !!x);
+    if (items.some(it => it.hasAnchorSource)) return m2CandidateWithTemporal(items, asOf);
     const datesWithNumbers = new Set<string>();
-    for (const m of members) {
-        const item = itemsById.get(m.itemId);
-        if (!item) continue;
+    for (const item of items) {
         if (item.keyFacts.some(f => NUMERIC.test(f))) datesWithNumbers.add(item.publishedAt);
     }
     return datesWithNumbers.size >= 2;
@@ -71,7 +77,9 @@ export function evaluateGate(
         .map(m => itemsById.get(m.itemId))
         .filter((x): x is NormalizedItem => x !== undefined);
 
-    const observedDates = Array.from(new Set(items.map(i => i.publishedAt))).sort();
+    // rule 3(B-4): observedDates는 temporalRole=='current' 사실이 있는 날짜만 계상.
+    // background 전용 날짜(과거 맥락만 인용한 날)는 '이번 전개의 관측'이 아니다.
+    const observedDates = currentObservedDates(items);
 
     // 출처 독립성: distinct registrable domain(denylist 제외)
     const publisherSet = new Set<string>();
@@ -90,7 +98,7 @@ export function evaluateGate(
 
     const motionCandidates: MotionCandidates = {
         M1: weeks >= 1,
-        M2: m2Candidate(cluster.members, itemsById),
+        M2: m2Candidate(cluster.members, itemsById, opts.asOf),
         M4: m4CrossItemCandidate(cluster.members),
     };
 

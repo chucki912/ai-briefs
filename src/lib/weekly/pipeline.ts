@@ -18,7 +18,7 @@ import { isoWeekKey } from '../thread-index';
 import { kvThreadIndexStore, type ThreadIndexStore } from './thread-index-store';
 import { evaluateGate } from './gate';
 import {
-    assignGrade, candidateMotionTypes, internalPriorEvidence,
+    assignGrade, candidateMotionTypes, internalPriorEvidence, priorWeeksNonLegacy,
     type Grade, type GradeResult, type MotionTypeCode, type PriorEvidence,
 } from './grade';
 
@@ -52,7 +52,8 @@ export function buildEntryFromGate(
     const observations = cluster.members
         .map(m => itemsById.get(m.itemId))
         .filter((it): it is NormalizedItem => it !== undefined)
-        .map(it => ({ itemId: it.itemId, observedAt: it.publishedAt, title: it.title, sourceUrls: it.sourceUrls }));
+        // legacy는 관측 단위 속성(B-4): anchorSource 필드가 확인된 산출물만 non-legacy(false).
+        .map(it => ({ itemId: it.itemId, observedAt: it.publishedAt, title: it.title, sourceUrls: it.sourceUrls, legacy: !it.hasAnchorSource }));
     return {
         threadKey: gate.threadKey,
         label: gate.label,
@@ -153,7 +154,11 @@ export async function runDeterministicPasses(opts: RunDeterministicOptions): Pro
         }
         const priorEvidence: PriorEvidence[] = [...internal, ...web];
         const motionTypes = candidateMotionTypes(gate.motionCandidates);
-        const gradeResult = assignGrade({ priorWeeksInternal: gate.priorWeeksInternal, motionTypes, priorEvidence });
+        // A 게이트는 non-legacy 관측만으로 판정(B-4/B-5 (c)). B/C는 legacy 포함.
+        const pwNonLegacy = priorWeeksNonLegacy(priorEntry, opts.asOf);   // 창 기본 8주(gate와 동일)
+        const gradeResult = assignGrade({
+            priorWeeksInternal: gate.priorWeeksInternal, priorWeeksNonLegacy: pwNonLegacy, motionTypes, priorEvidence,
+        });
 
         graded.push({
             threadKey: cluster.threadKey, label: cluster.label, participants: cluster.participants ?? [],

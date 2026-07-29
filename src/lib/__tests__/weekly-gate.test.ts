@@ -49,7 +49,8 @@ chk('normalize: keyFacts fallback(structuredFacts)',
 // ── evaluateGate ─────────────────────────────────────────────────────────────
 const item = (over: Partial<NormalizedItem>): NormalizedItem => ({
     itemId: 'ai:2026-07-20#0', publishedAt: '2026-07-20', domain: 'ai',
-    title: 't', keyFacts: ['수치 2배'], sourceUrls: [], publisherDomains: ['reuters.com'], ...over,
+    title: 't', keyFacts: ['수치 2배'], facts: [{ text: '수치 2배' }], hasAnchorSource: false,
+    sourceUrls: [], publisherDomains: ['reuters.com'], ...over,
 });
 const mkMap = (items: NormalizedItem[]) => new Map(items.map(i => [i.itemId, i]));
 

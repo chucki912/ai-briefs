@@ -9,7 +9,7 @@
  * 실운영/백필 공통 경로. 스토리지는 getBriefByDate(store.ts) 단일 원천을 쓴다.
  */
 import type { IssueItem } from '@/types';
-import type { NormalizedItem } from './types';
+import type { NormalizedItem, NormalizedFact } from './types';
 import { getBriefByDate } from '../store';
 import { urlToRegistrableDomain } from '../validate-triangulation';
 import { canonicalizePublisher } from '@/configs/publisher-normalization';
@@ -21,10 +21,19 @@ export function normalizeIssue(
     domain: 'ai' | 'battery',
     idx: number,
 ): NormalizedItem {
-    // 원사실만: keyFacts 우선, 없으면 structuredFacts.text
+    // 시점 메타 상속(rule 3): structuredFacts가 원천. 주간에서 재추출·재판정하지 않는다.
+    // legacy 판정 = anchorSource 필드 존재 여부(구코드 산출물엔 factAssertedAt 자체가 없음).
+    // 판별 불가(구조화 fact 없음/필드 부재)는 legacy로 처리 — 안전한 방향.
+    const structured = issue.structuredFacts ?? [];
+    const hasAnchorSource = structured.some(f => !!f.factAssertedAt?.anchorSource);
+    const facts: NormalizedFact[] = structured.length > 0
+        ? structured.map(f => ({ text: f.text, factAssertedAt: f.factAssertedAt, temporalRole: f.temporalRole }))
+        : (issue.keyFacts ?? []).map(t => ({ text: t }));   // 구코드 battery: 평문 keyFacts만
+
+    // 원사실 텍스트(프롬프트용, 하위호환): keyFacts 우선, 없으면 structuredFacts.text
     const keyFacts = (issue.keyFacts && issue.keyFacts.length > 0)
         ? issue.keyFacts
-        : (issue.structuredFacts?.map(f => f.text).filter(Boolean) ?? []);
+        : structured.map(f => f.text).filter(Boolean);
 
     // 소스 URL: sourceRefs.url ∪ sources (dedup)
     const sourceUrls = Array.from(new Set([
@@ -46,6 +55,8 @@ export function normalizeIssue(
         domain,
         title: issue.headline,
         keyFacts,
+        facts,
+        hasAnchorSource,
         sourceUrls,
         publisherDomains,
     };

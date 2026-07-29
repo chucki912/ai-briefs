@@ -10,12 +10,14 @@ const chk = (name: string, cond: boolean, d?: string) => {
     else { fail++; console.log(`[FAIL] ${name}${d ? ' — ' + d : ''}`); }
 };
 
-const internal = (n: number): PriorEvidence[] => Array.from({ length: n }, (_, i) => ({ source: 'internal' as const, observedAt: `2026-W${20 + i}` }));
+// B-4: A 산정은 non-legacy(검증된) 내부 관측만 인정 → 기본 헬퍼는 legacy:false
+const internal = (n: number): PriorEvidence[] => Array.from({ length: n }, (_, i) => ({ source: 'internal' as const, observedAt: `2026-W${20 + i}`, legacy: false }));
+const internalLegacy = (n: number): PriorEvidence[] => Array.from({ length: n }, (_, i) => ({ source: 'internal' as const, observedAt: `2026-W${20 + i}`, legacy: true }));
 const web = (n: number): PriorEvidence[] => Array.from({ length: n }, (_, i) => ({ source: 'web' as const, observedAt: '2026-06-01', url: 'https://x.com', quote: 'q' }));
 const M = (...xs: MotionTypeCode[]) => xs;
 
 // ── A 확립 ───────────────────────────────────────────────────────────────────
-chk('A: pw>=3 & motion>=2 & internal', assignGrade({ priorWeeksInternal: 3, motionTypes: M('M1', 'M2'), priorEvidence: internal(3) }).grade === 'A');
+chk('A: pw>=3 & motion>=2 & non-legacy internal', assignGrade({ priorWeeksInternal: 3, priorWeeksNonLegacy: 3, motionTypes: M('M1', 'M2'), priorEvidence: internal(3) }).grade === 'A');
 chk('A: pw=2면 A 불가 → B', assignGrade({ priorWeeksInternal: 2, motionTypes: M('M1', 'M2'), priorEvidence: internal(2) }).grade === 'B');
 chk('A: motion 1개면 A 불가', assignGrade({ priorWeeksInternal: 4, motionTypes: M('M1'), priorEvidence: internal(4) }).grade !== 'A');
 

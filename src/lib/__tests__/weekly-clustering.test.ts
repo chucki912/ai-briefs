@@ -11,7 +11,7 @@ const chk = (name: string, cond: boolean, d?: string) => {
 
 const items: NormalizedItem[] = [0, 1, 2].map(i => ({
     itemId: `ai:2026-07-2${i}#0`, publishedAt: `2026-07-2${i}`, domain: 'ai',
-    title: `t${i}`, keyFacts: [], sourceUrls: [], publisherDomains: [],
+    title: `t${i}`, keyFacts: [], facts: [], hasAnchorSource: false, sourceUrls: [], publisherDomains: [],
 }));
 const candidateKeys = new Set(['hbm_supply_tightening']);
 

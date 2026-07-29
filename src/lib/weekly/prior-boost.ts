@@ -63,7 +63,8 @@ export function validateWebEvidence(raw: RawWebEvidence, asOf: string | Date): P
     // 기능적 용도는 'asOf 이전' 불리언(→hasWebEvidence→B)이며 observedDates/M2/일일렌더에 미투입.
     // ★ B-4(rule 3 주간 상속)에서 web source의 observedAt를 **저신뢰 모델주장일**로 취급할 것:
     //   'asOf 이전 선행 존재' 불리언으로만 쓰고, M2 비교·정량 시점 앵커로는 절대 쓰지 말 것.
-    return { source: 'web', observedAt: parsed.iso, url, quote, mechanismNote };
+    // legacy: true — web observedAt는 모델주장 발행일(quote 미결속)이므로 A 산정에서 배제한다(B-4).
+    return { source: 'web', observedAt: parsed.iso, legacy: true, url, quote, mechanismNote };
 }
 
 /** grounded 응답 텍스트에서 근거 배열 파싱. {evidence:[...]} 또는 [...] 허용. */

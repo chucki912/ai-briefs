@@ -27,20 +27,22 @@ const base = (over: Partial<WeeklyReportContent> = {}): WeeklyReportContent => (
 
 // ── 0건 처리 ─────────────────────────────────────────────────────────────────
 const zero = renderWeeklyReport(base({ demoted: [demoted('X', 'single_date')] }));
-chk('0건: "트렌드 성립 0건" 명시', zero.includes('트렌드 성립 0건'));
-chk('0건: 트렌드 스레드 섹션 없음', !zero.includes('## 1. 트렌드 스레드'));
+chk('0건: 결론문(방법론 금지)', zero.includes('지속적 흐름으로 볼 만한 움직임은 관측되지 않음'));
+chk('0건: 섹션1 고정출력 + 빈 결과 1줄', zero.includes('## 1. 트렌드') && zero.includes('이번 주 확립된 트렌드 없음'));
+chk('0건: 섹션3 고정출력 + 빈 결과 1줄', zero.includes('## 3. 다음 주 확인 포인트') && zero.includes('이번 주 검증 대상 없음'));
+chk('0건: 내부어휘 미노출', !zero.includes('승격') && !zero.includes('스레드가') && !zero.includes('게이트'));
 chk('0건: demoted 섹션 건수 표기', zero.includes('트렌드 미성립 (1건)'));
 
 // ── N<3 헤드라인 ─────────────────────────────────────────────────────────────
 const two = renderWeeklyReport(base({ threads: [thread({ threadKey: 'a', label: 'A스레드' }), thread({ threadKey: 'b', label: 'B스레드', grade: 'B' })], promotedCount: 2 }));
-chk('N<3: "성립 2건" 명시', two.includes('트렌드 성립 2건'));
-chk('헤드라인: 등급+수치 포함', two.includes('[A] A스레드 — 월 14만장'));
+chk('N<3: 건수 명시(독자 용어)', two.includes('확립·형성 중 흐름 2건'));
+chk('헤드라인: 등급명칭(번역)+수치', two.includes('[확립] A스레드 — 월 14만장'));
 
 // ── 정형 3단 + 표 ────────────────────────────────────────────────────────────
 const full = renderWeeklyReport(base({ threads: [thread()], promotedCount: 1 }));
 chk('정형 3단 라벨', full.includes('[배경]') && full.includes('[주요 내용]') && full.includes('[시사점]'));
 chk('표 렌더', full.includes('| 구분 | 전년 | 금년 |'));
-chk('다음 주 확인 + 킬트리거', full.includes('## 3. 다음 주 확인') && full.includes('킬 트리거:'));
+chk('다음 주 확인 + 확인시점(내부어휘 금지)', full.includes('## 3. 다음 주 확인') && full.includes('확인 시점:') && !full.includes('킬 트리거'));
 
 // ── showDemoted 모드 ─────────────────────────────────────────────────────────
 const withDemoted = base({ threads: [thread()], promotedCount: 1, demoted: [demoted('강등1', 'single_date'), demoted('강등2', 'dod_failed')] });
@@ -48,7 +50,8 @@ chk('titles(기본): 제목+태그', renderWeeklyReport(withDemoted).includes('-
 chk('titles: 건수 2건', renderWeeklyReport(withDemoted).includes('트렌드 미성립 (2건)'));
 chk('full: 관측 항목 수 포함', renderWeeklyReport(withDemoted, { showDemoted: 'full' }).includes('관측 항목'));
 chk('off: demoted 섹션 없음', !renderWeeklyReport(withDemoted, { showDemoted: 'off' }).includes('트렌드 미성립'));
-chk('dod_failed → 규격 미달 태그', renderWeeklyReport(withDemoted).includes('[규격 미달]'));
+chk('dod_failed → 독자 태그', renderWeeklyReport(withDemoted).includes('[관측 근거 불충분]'));
+chk('단발관측 섹션 성격 설명 1줄', renderWeeklyReport(withDemoted).includes('지속성 판단이 불가한 항목'));
 
 // ── 리터럴 개행 정규화(렌더 깨짐 방어) ──────────────────────────────────────
 const escaped = renderWeeklyReport(base({ threads: [thread({ mainContent: '첫째 줄\\n\\n둘째 줄' })], promotedCount: 1 }));
@@ -59,7 +62,7 @@ const dupMetric = renderWeeklyReport(base({
     threads: [thread({ threadKey: 'a', label: 'A', metricsUsed: ['90%', '30년'] }), thread({ threadKey: 'b', label: 'B', grade: 'B', metricsUsed: ['90%', '557,090대'] })],
     promotedCount: 2,
 }));
-chk('헤드라인: 같은 수치 반복 안 함', dupMetric.includes('[A] A — 90%') && dupMetric.includes('[B] B — 557,090대'), dupMetric.split('## 1.')[0]);
+chk('헤드라인: 같은 수치 반복 안 함', dupMetric.includes('[확립] A — 90%') && dupMetric.includes('[형성 중] B — 557,090대'), dupMetric.split('## 1.')[0]);
 
 // ── DoD12: demoted 건수 == 실제 강등 수 ─────────────────────────────────────
 const md = renderWeeklyReport(withDemoted);

@@ -197,6 +197,10 @@ export interface ThreadObservationItem {
   observedAt: string;                    // YYYY-MM-DD
   title: string;
   sourceUrls: string[];
+  /** 관측 단위 속성(스레드 단위 낙인 아님). false = 새 코드 산출물(anchorSource 필드 확인).
+   *  true 또는 부재 = legacy(시점 메타 미검증) → A 등급 산정에서 배제, B/C 근거로는 유효.
+   *  기존 backfill 엔트리엔 이 필드가 없어 자동으로 legacy 취급된다(판별 불가 = 안전한 방향). */
+  legacy?: boolean;
 }
 
 export interface ThreadIndexEntry {

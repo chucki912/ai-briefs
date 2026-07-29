@@ -5,6 +5,14 @@
  * 게이트 판정값은 전부 코드가 확정한다(설계 원칙: LLM은 클러스터링·서술만).
  */
 import type { IndustryTag } from '@/configs/industry-tags';
+import type { FactAssertedAt, TemporalRole } from '@/types';
+
+/** PASS 0 산출: 일일 keyFact + 시점 메타(일일에서 상속 — 주간에서 재추출·재판정 금지, rule 3). */
+export interface NormalizedFact {
+    text: string;
+    factAssertedAt?: FactAssertedAt;  // {value, evidence, anchorSource} — 구코드 산출물엔 부재
+    temporalRole?: TemporalRole;      // current=이번 전개 / background=과거 맥락
+}
 
 /** PASS 0 산출: 일일 브리핑 IssueItem을 주간 파이프라인 최소 스키마로 정규화. */
 export interface NormalizedItem {
@@ -12,7 +20,12 @@ export interface NormalizedItem {
     publishedAt: string;       // YYYY-MM-DD (브리핑 date, battery- 접두사 제거)
     domain: 'ai' | 'battery';
     title: string;             // = IssueItem.headline
-    keyFacts: string[];        // 원사실만(일일 파이프라인 판단 필드 제외)
+    keyFacts: string[];        // 원사실 텍스트(프롬프트용, 하위호환)
+    facts: NormalizedFact[];   // 원사실 + 시점 메타(rule 3 판정 원천)
+    /** 원본 브리프가 새 코드 산출물인가 = factAssertedAt.anchorSource 필드 존재.
+     *  legacy 판정의 단일 기준(날짜 아님 — 타임존·재생성 케이스에서 어긋남).
+     *  false면 legacy(시점 메타 미검증) → A 등급 산정에서 배제. */
+    hasAnchorSource: boolean;
     sourceUrls: string[];      // 원본 소스 URL
     publisherDomains: string[]; // registrable domain(정규화·alias 적용, dedup). denylist 제외는 게이트에서.
 }

@@ -40,7 +40,7 @@ chk('parse: JSON 없음 → []', parsePriorBoostResponse('아무 텍스트').len
 // ── 파이프라인 조건부 호출: pw==0 스레드에만 webBoost, 웹근거로 B 승격 ──
 async function integration() {
     const store = new InMemoryThreadIndexStore();
-    const item = (id: string, date: string, pub: string): NormalizedItem => ({ itemId: id, publishedAt: date, domain: 'ai', title: id, keyFacts: ['수치 2배'], sourceUrls: [], publisherDomains: [pub] });
+    const item = (id: string, date: string, pub: string): NormalizedItem => ({ itemId: id, publishedAt: date, domain: 'ai', title: id, keyFacts: ['수치 2배'], facts: [{ text: '수치 2배' }], hasAnchorSource: false, sourceUrls: [], publisherDomains: [pub] });
     const tag = (t: IndustryTag) => t;
 
     // W1: t_seed 관측(다음 주 pw=1 만들기 위함)

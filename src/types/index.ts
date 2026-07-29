@@ -32,12 +32,23 @@ export interface SourceRef {
 
 // keyFact: 보도된 사실 + 근거 소스 결박(≥1) + 발행일 (R1/R2/D10)
 export type TemporalRole = 'current' | 'background';
+
+// factAssertedAt: 사실 성립 시점을 '증거와 함께' 부여한다(D-fix). value만 채우라는 압력이
+// 오연도(형식 정상·연도 틀림)를 낳았으므로, 원문 근거(evidence)를 함께 요구하고 없으면 unknown 강제.
+// anchorSource: value의 출처 구분. 'quote'=원문 인용 근거, 'sourcePublishedAt'=발행일 앵커(current 오분류시
+// 오래된 사실에 기사일이 찍힐 수 있음 — 주간 rule 3 상속에서 두 종류를 다르게 취급해야 함), 'none'=unknown.
+export type AnchorSource = 'quote' | 'sourcePublishedAt' | 'none';
+export interface FactAssertedAt {
+  value: string;            // 'YYYY-MM' | 'YYYY' | 'unknown'
+  evidence: string | null;  // 시점을 명시한 원문 인용(anchorSource='quote'일 때). 그 외 null
+  anchorSource: AnchorSource;
+}
 export interface KeyFactStructured {
   id: string;               // "f1", "f2" ...
   text: string;             // 보도 사실만(메커니즘/추론 금지)
   sourceIds: string[];      // ≥1 (C1). 빈 배열이면 스키마 무효
   publishedAt?: string;     // 소스 발행일(ISO)
-  factAssertedAt?: string;  // 사실 성립 시점: 'YYYY-MM' | 'YYYY' | 'unknown'(추측 금지)
+  factAssertedAt?: FactAssertedAt; // 사실 성립 시점 + 근거(추측 금지, evidence 없으면 unknown)
   temporalRole?: TemporalRole; // current=이번 전개 / background=인용된 과거 맥락
 }
 

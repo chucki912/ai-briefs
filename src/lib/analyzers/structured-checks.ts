@@ -11,6 +11,7 @@ import type {
     KeyInsightStructured,
     SourceRef,
     SoWhatV2,
+    FactAssertedAt,
 } from '@/types';
 
 export interface CheckIssue {
@@ -212,12 +213,16 @@ export function hasQuantitativeClaim(text: string): boolean {
     return QUANT_CLAIM.test(text || '');
 }
 
-/** C15: temporalRole='background' fact는 문장 내에 시점(연도)을 반드시 표기.
- *  미표기 background는 '오래된 맥락이 현재처럼 읽히는' 오염이므로 위반. */
+/** C15: 시점이 **확인된**(value≠unknown) background fact는 문장 내에 그 시점(연도)을 표기해야 한다.
+ *  DoD 정정: 시점이 없는 것(unknown)을 없다고 두는 것은 위반이 아니다. 시점이 확인됐는데 렌더에
+ *  안 쓰는 것이 위반(오래된 맥락이 현재처럼 읽히는 오염). background+unknown은 허용. */
 export function c15_backgroundNeedsTimepoint(facts: KeyFactStructured[]): CheckIssue[] {
-    const bad = facts.filter(f => f.temporalRole === 'background' && !hasInTextTimepoint(f.text));
+    const bad = facts.filter(f =>
+        f.temporalRole === 'background'
+        && !!f.factAssertedAt && f.factAssertedAt.value !== 'unknown'
+        && !hasInTextTimepoint(f.text));
     return bad.length
-        ? [{ code: 'c15_background_no_timepoint', severity: 'error', message: `배경(background) fact ${bad.length}건이 문장 내 시점 미표기: ${bad.map(f => `"${f.text.slice(0, 40)}"`).join(' / ')}` }]
+        ? [{ code: 'c15_background_no_timepoint', severity: 'error', message: `시점 확인된 배경 fact ${bad.length}건이 문장 내 시점 미표기: ${bad.map(f => `${f.id}(${f.factAssertedAt?.value})`).join(' / ')}` }]
         : [];
 }
 
@@ -227,9 +232,99 @@ export function c16_unknownNotNumericBasis(insight: KeyInsightStructured, facts:
     const byId = new Map(facts.map(f => [f.id, f]));
     const bad = (insight.restsOnFactIds || [])
         .map(id => byId.get(id))
-        .filter((f): f is KeyFactStructured => !!f && f.factAssertedAt === 'unknown' && hasQuantitativeClaim(f.text));
+        .filter((f): f is KeyFactStructured => !!f && f.factAssertedAt?.value === 'unknown' && hasQuantitativeClaim(f.text));
     return bad.length
         ? [{ code: 'c16_unknown_numeric_basis', severity: 'warning', message: `keyInsight가 시점불명(unknown) 정량 fact ${bad.length}건에 근거: ${bad.map(f => f.id).join(',')}` }]
+        : [];
+}
+
+/** evidence 구절이 제공된 원문(소스 텍스트)에 실제로 존재하는지. 사람이 URL을 열던 검사를 코드로.
+ *  'sourcePublishedAt'(코드가 발행일로 앵커)·null(부재)은 대조 대상이 아니다. */
+export function evidenceInSource(evidence: string | null, sourceText: string): boolean {
+    if (!evidence || evidence === 'sourcePublishedAt') return true;
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+    return norm(sourceText).includes(norm(evidence));
+}
+
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+/** evidence가 'YYYY-MM'의 월까지 뒷받침하는지(월명·M월·숫자월·YYYY-MM). 연도만 뒷받침되면 false → 월 격하. */
+export function evidenceSupportsMonth(evidence: string, yyyymm: string): boolean {
+    const n = parseInt(yyyymm.slice(5, 7), 10);
+    if (!n) return false;
+    const e = evidence.toLowerCase();
+    if (e.includes(yyyymm)) return true;                       // "2026-07"
+    if (e.includes(`${n}월`)) return true;                     // 한국어 "7월"
+    const name = MONTH_NAMES[n - 1];
+    if (name && (e.includes(name) || e.includes(name.slice(0, 3)))) return true; // july / jul
+    if (new RegExp(`[/\\-. ]0?${n}[/\\-. ]`).test(e)) return true; // "07/" "/07/" 등
+    return false;
+}
+
+/** evidence 결속: evidence가 원문에 있고 value의 **연도**를 뒷받침해야 유효. 월 미뒷받침이면 YYYY로 격하.
+ *  실패 시 unknown(anchorSource='none'). 성공 시 anchorSource='quote'. 발행일 앵커(sourcePublishedAt)는
+ *  이 함수 밖에서 코드가 부여(current 사실 한정) — value 출처를 저장 구조로 구분하기 위한 필드. */
+export function bindEvidence(rawValue: unknown, rawEvidence: unknown, sourceText: string): FactAssertedAt {
+    let evidence: string | null = (typeof rawEvidence === 'string' && rawEvidence.trim()) ? rawEvidence.trim() : null;
+    const value = normFactAssertedAt(rawValue);
+    if (evidence && !evidenceInSource(evidence, sourceText)) evidence = null; // 원문에 없는 인용 = 날조
+    if (!evidence || value === 'unknown') return { value: 'unknown', evidence: null, anchorSource: 'none' };
+    const year = value.slice(0, 4);
+    if (!evidence.includes(year)) return { value: 'unknown', evidence: null, anchorSource: 'none' }; // 연도 미뒷받침
+    if (/^\d{4}-\d{2}$/.test(value) && !evidenceSupportsMonth(evidence, value)) return { value: year, evidence, anchorSource: 'quote' }; // 월 미뒷받침 → YYYY 격하
+    return { value, evidence, anchorSource: 'quote' };
+}
+
+/** C17: value가 dated인데 evidence가 원문에 없으면 위반(날조된 근거 = 오연도 재발 경로). sourceText 주입 필요. */
+export function c17_evidenceMustExist(facts: KeyFactStructured[], sourceText: string): CheckIssue[] {
+    const bad = facts.filter(f => {
+        const fa = f.factAssertedAt;
+        return fa && fa.value !== 'unknown' && !evidenceInSource(fa.evidence, sourceText);
+    });
+    return bad.length
+        ? [{ code: 'c17_evidence_not_in_source', severity: 'error', message: `factAssertedAt evidence가 원문에 없음 ${bad.length}건: ${bad.map(f => `${f.id}("${(f.factAssertedAt?.evidence ?? '').slice(0, 30)}")`).join(' / ')}` }]
+        : [];
+}
+
+/** C19 술어: keyFact 텍스트의 연도가 factAssertedAt.value에 결속되는가(렌더 오염 차단, 대칭).
+ *  value==unknown → 텍스트에 연도가 있으면 위반. value!=unknown → 텍스트 연도가 value 연도와 다르면 위반.
+ *  렌더되는 것은 텍스트 문자열이므로, 내부 필드(value)뿐 아니라 텍스트도 결속해야 독자 기준 오염이 사라진다. */
+export function factTextYearViolation(f: KeyFactStructured): boolean {
+    const years = [...new Set(f.text.match(/(19|20)\d{2}/g) ?? [])];
+    const value = f.factAssertedAt?.value;
+    if (!value || value === 'unknown') return years.length > 0;   // unknown: 연도 금지
+    const vy = value.slice(0, 4);
+    if (years.some(y => y !== vy)) return true;                   // 불일치
+    // 시점 확인된 background는 텍스트에 그 연도를 표기해야 함(c15 통합, 재생성으로 추가)
+    if (f.temporalRole === 'background' && !years.includes(vy)) return true;
+    return false;
+}
+
+/** C19: 위 술어의 위반을 CheckIssue로. dated/unknown 구분 코드. */
+export function c19_textYearMatchesValue(facts: KeyFactStructured[]): CheckIssue[] {
+    const issues: CheckIssue[] = [];
+    for (const f of facts) {
+        if (!factTextYearViolation(f)) continue;
+        const value = f.factAssertedAt?.value;
+        const years = [...new Set(f.text.match(/(19|20)\d{2}/g) ?? [])];
+        if (!value || value === 'unknown') {
+            issues.push({ code: 'c19_unknown_has_year', severity: 'error', message: `${f.id} value=unknown인데 text에 연도(${years.join(',')})` });
+        } else if (years.length && years.some(y => y !== value.slice(0, 4))) {
+            issues.push({ code: 'c19_year_mismatch', severity: 'error', message: `${f.id} value=${value}인데 text 연도(${years.join(',')}) 불일치` });
+        } else {
+            issues.push({ code: 'c19_background_missing_year', severity: 'error', message: `${f.id} 시점 확인된 background(${value})인데 text 연도 미표기` });
+        }
+    }
+    return issues;
+}
+
+/** C18(휴ristic): 한 fact 문장에 서로 다른 연도가 2개 이상 = 단일사건·단일시점 위반 가능(병합 사건). */
+export function c18_singleTimepoint(facts: KeyFactStructured[]): CheckIssue[] {
+    const bad = facts.filter(f => {
+        const years = new Set([...(f.text.match(/(19|20)\d{2}/g) ?? [])]);
+        return years.size >= 2;
+    });
+    return bad.length
+        ? [{ code: 'c18_multi_year_fact', severity: 'warning', message: `단일 fact에 복수 연도(병합 사건 의심) ${bad.length}건: ${bad.map(f => f.id).join(',')}` }]
         : [];
 }
 
@@ -238,21 +333,30 @@ export interface TemporalDistribution {
     total: number;
     current: number;
     background: number;
-    unknown: number;        // factAssertedAt === 'unknown'
+    unknown: number;        // value === 'unknown'
     datedYear: number;      // 'YYYY'
     datedMonth: number;     // 'YYYY-MM'
-    backgroundMissingTimepoint: number; // C15 위반 건수
+    backgroundMissingTimepoint: number; // C15 위반(시점 확인된 background가 미표기)
+    backgroundUnknown: number;          // background인데 value=unknown(허용, 기록만)
+    sourceAnchored: number; // evidence === 'sourcePublishedAt'(발행일 앵커)
+    bodyEvidenced: number;  // evidence가 원문 인용(모델 제공)
 }
 export function factTemporalDistribution(facts: KeyFactStructured[]): TemporalDistribution {
-    const d: TemporalDistribution = { total: 0, current: 0, background: 0, unknown: 0, datedYear: 0, datedMonth: 0, backgroundMissingTimepoint: 0 };
+    const d: TemporalDistribution = { total: 0, current: 0, background: 0, unknown: 0, datedYear: 0, datedMonth: 0, backgroundMissingTimepoint: 0, backgroundUnknown: 0, sourceAnchored: 0, bodyEvidenced: 0 };
     for (const f of facts) {
         d.total += 1;
-        if (f.temporalRole === 'background') d.background += 1; else d.current += 1;
-        const fa = f.factAssertedAt || 'unknown';
+        const isBg = f.temporalRole === 'background';
+        if (isBg) d.background += 1; else d.current += 1;
+        const fa = f.factAssertedAt?.value || 'unknown';
         if (fa === 'unknown') d.unknown += 1;
         else if (/^\d{4}-\d{2}$/.test(fa)) d.datedMonth += 1;
         else if (/^\d{4}$/.test(fa)) d.datedYear += 1;
-        if (f.temporalRole === 'background' && !hasInTextTimepoint(f.text)) d.backgroundMissingTimepoint += 1;
+        const as = f.factAssertedAt?.anchorSource;
+        if (as === 'sourcePublishedAt') d.sourceAnchored += 1;
+        else if (as === 'quote') d.bodyEvidenced += 1;
+        if (isBg && fa === 'unknown') d.backgroundUnknown += 1;
+        // C15: 시점 확인된 background만 미표기 위반 대상(unknown background는 허용)
+        if (isBg && fa !== 'unknown' && !hasInTextTimepoint(f.text)) d.backgroundMissingTimepoint += 1;
     }
     return d;
 }

@@ -4,7 +4,8 @@ import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matche
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
-import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, normFactAssertedAt } from './analyzers/structured-checks';
+import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, bindEvidence, c17_evidenceMustExist, c18_singleTimepoint, c19_textYearMatchesValue } from './analyzers/structured-checks';
+import { repairFactYears } from './analyzers/fact-year-repair';
 import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL } from './gemini-models';
@@ -119,8 +120,11 @@ export async function generateIssueFromCluster(
         publishedAt: n.publishedAt instanceof Date ? n.publishedAt.toISOString() : undefined,
         resolved: !/news\.google\.com/.test(n.url), // Google 리다이렉트는 미해석(R4 나이브 0%)
     }));
-    // 뉴스 리스트에 인덱스 부여 (sourceIndices가 이 번호를 참조)
-    const indexedNews = cluster.map((n, i) => `[${i + 1}] ${n.title} — ${n.source || ''}`).join('\n');
+    // 뉴스 리스트에 인덱스 부여 (sourceIndices가 이 번호를 참조).
+    // 본문 스니펫 포함 — factAssertedAt.evidence(시점 원문 인용)를 뽑을 수 있도록.
+    const indexedNews = cluster.map((n, i) => `[${i + 1}] ${n.title} — ${n.source || ''}\n    ${(n.description || '').slice(0, 300)}`).join('\n');
+    // evidence 원문 대조용 텍스트(모델이 본 것과 동일 범위)
+    const sourceText = cluster.map(n => `${n.title} ${n.description || ''}`).join('\n');
     const frameworkLines = frameworks.length
         ? frameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')
         : '지정된 렌즈 없음(none). 프레임워크를 언급하지 말고 사실 기반으로만 분석할 것.';
@@ -141,24 +145,39 @@ export async function generateIssueFromCluster(
         const parsed = JSON.parse((await result.response).text());
 
         // keyFacts: sourceIndices([n], 1-based) → sourceRef.id 결박 (R2)
+        const pubById = new Map(sourceRefs.map(s => [s.id, s.publishedAt]));
+        const latestPubOf = (ids: string[]): string | null => {
+            const ds = ids.map(id => pubById.get(id)).filter((x): x is string => !!x).sort();
+            return ds.length ? ds[ds.length - 1] : null;
+        };
         const rawFacts: KeyFactStructured[] = (Array.isArray(parsed.keyFacts) ? parsed.keyFacts : []).map((f: Record<string, unknown>, i: number) => {
             const idxs: number[] = Array.isArray(f?.sourceIndices) ? f.sourceIndices as number[] : [];
             const sourceIds = idxs.map(n => sourceRefs[n - 1]?.id).filter((x): x is string => !!x);
+            const role = f?.temporalRole === 'background' ? 'background' as const : 'current' as const;
+            // factAssertedAt {value, evidence, anchorSource}: evidence가 원문에 있고 value 연도를 뒷받침해야 유효(오연도 차단).
+            const faRaw = (f?.factAssertedAt && typeof f.factAssertedAt === 'object') ? f.factAssertedAt as Record<string, unknown> : {};
+            const fa = bindEvidence(faRaw.value, faRaw.evidence, sourceText);
+            // current 사실은 근거 없어도 발행일로 앵커. anchorSource로 'quote'와 구분 저장 —
+            // temporalRole 오분류시 오래된 사실에 기사일이 찍힐 수 있어 주간 rule 3에서 다르게 취급해야 함.
+            if (fa.value === 'unknown' && role === 'current') {
+                const pub = latestPubOf(sourceIds);
+                if (pub) { fa.value = pub.slice(0, 7); fa.evidence = null; fa.anchorSource = 'sourcePublishedAt'; }
+            }
             return {
                 id: `f${i + 1}`, text: String(f?.text || '').trim(), sourceIds,
                 publishedAt: f?.publishedAt || undefined,
-                factAssertedAt: normFactAssertedAt(f?.factAssertedAt),
-                temporalRole: f?.temporalRole === 'background' ? 'background' as const : 'current' as const,
+                factAssertedAt: fa,
+                temporalRole: role,
             };
         });
 
         // AN: C2 하드 실패 — 미해석(Google 등) 소스에만 결박된 fact는 폐기(거짓 귀속 방지, 312 날조보다 정직한 사망)
         const resolvedRefIds = new Set(sourceRefs.filter(s => s.resolved !== false).map(s => s.id));
-        const structuredFacts: KeyFactStructured[] = rawFacts
+        const sourcedFacts: KeyFactStructured[] = rawFacts
             .map(f => ({ ...f, sourceIds: f.sourceIds.filter(id => resolvedRefIds.has(id)) }))
             .filter(f => f.sourceIds.length >= 1);
-        if (structuredFacts.length < SOURCE_POLICY.MIN_SOURCED_FACTS) {
-            console.warn(`[C2 hard-fail] "${parsed.headline}": 해석된 소스에 결박된 fact ${structuredFacts.length} < ${SOURCE_POLICY.MIN_SOURCED_FACTS} → 카드 폐기(미해석 소스 과다)`);
+        if (sourcedFacts.length < SOURCE_POLICY.MIN_SOURCED_FACTS) {
+            console.warn(`[C2 hard-fail] "${parsed.headline}": 해석된 소스에 결박된 fact ${sourcedFacts.length} < ${SOURCE_POLICY.MIN_SOURCED_FACTS} → 카드 폐기(미해석 소스 과다)`);
             // 부검 덤프: 사인 판정용(BA). 원시 sourceIndices → 매핑된 id → resolved 필터 후를 단계별로 남긴다.
             for (let i = 0; i < rawFacts.length; i++) {
                 const rawIdxs = Array.isArray(parsed.keyFacts?.[i]?.sourceIndices) ? parsed.keyFacts[i].sourceIndices : [];
@@ -166,6 +185,12 @@ export async function generateIssueFromCluster(
                 console.warn(`[C2 autopsy] f${i + 1} "${rawFacts[i].text.slice(0, 70)}" 원시indices=[${rawIdxs.join(',')}] (클러스터 ${sourceRefs.length}건) → 유효id=[${rawFacts[i].sourceIds.join(',')}] → resolved후=[${afterResolve.join(',')}]`);
             }
             console.warn(`[C2 autopsy] refs: ${sourceRefs.map(s => `${s.id}=${s.outlet || s.url || '?'}${s.resolved === false ? '(미해석)' : ''}`).join(' ')}`);
+            return null;
+        }
+        // C19: 텍스트 연도-필드 결속 재생성/폐기(렌더 오염 차단). 위반 없으면 LLM 호출 0.
+        const structuredFacts = await repairFactYears(sourcedFacts, async p => (await (await generateWithRetry(model, p)).response).text());
+        if (structuredFacts.length < SOURCE_POLICY.MIN_SOURCED_FACTS) {
+            console.warn(`[c19 hard-fail] "${parsed.headline}": 텍스트-연도 위반 폐기 후 fact ${structuredFacts.length} < ${SOURCE_POLICY.MIN_SOURCED_FACTS} → 카드 폐기`);
             return null;
         }
         const survivingIds = new Set(structuredFacts.map(f => f.id));
@@ -205,6 +230,13 @@ export async function generateIssueFromCluster(
 
         // 시점 오염 지표(rule 4) — background/unknown/미표기 분포 기록(파이프라인 비중단)
         await recordTemporalMetrics(structuredFacts, keyInsight, 'ai');
+        // ③ evidence 원문 실존 코드 검사(사람 URL 열람 대체). 파스에서 이미 무효화하므로 잔여=버그 신호.
+        const c17 = c17_evidenceMustExist(structuredFacts, sourceText);
+        const c18 = c18_singleTimepoint(structuredFacts);
+        const c19 = c19_textYearMatchesValue(structuredFacts); // 재생성/폐기 후 잔여=버그 신호
+        if (c17.length) console.warn(`[Temporal Check] "${parsed.headline}": ${c17[0].message}`);
+        if (c18.length) console.warn(`[Temporal Check] "${parsed.headline}": ${c18[0].message}`);
+        if (c19.length) console.warn(`[Temporal Check] "${parsed.headline}": c19 잔여 ${c19.length} — ${c19[0].message}`);
 
         // soWhat V2 + legacy 4분면 파생
         const swRaw = parsed.soWhat || {};

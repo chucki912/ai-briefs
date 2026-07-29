@@ -8,7 +8,8 @@ import { getRecentIssues } from './store';
 import { checkDuplicateIssues, calculateSimilarity } from './gemini';
 import { KEY_INSIGHT_FIELD_SPEC, KEY_INSIGHT_GUIDE, KEY_INSIGHT_CHECKLIST, ensureValidKeyInsight, logKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
-import { normFactAssertedAt } from './analyzers/structured-checks';
+import { bindEvidence, c19_textYearMatchesValue } from './analyzers/structured-checks';
+import { repairFactYears } from './analyzers/fact-year-repair';
 import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, BATTERY_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
@@ -114,7 +115,15 @@ async function generateBatteryIssueFromCluster(
     const matchedFrameworks = matchBatteryFrameworks(primaryNews.title, primaryNews.description);
 
     // 뉴스 리스트에 인덱스 부여
-    const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n출처: ${n.url}`).join('\n\n');
+    // 본문 스니펫 포함 — factAssertedAt.evidence(시점 원문 인용)를 뽑을 수 있도록.
+    const indexedNews = cluster.map((n, i) => `[${i + 1}] 제목: ${n.title}\n    ${(n.description || '').slice(0, 300)}\n출처: ${n.url}`).join('\n\n');
+    const sourceText = cluster.map(n => `${n.title} ${n.description || ''}`).join('\n');
+    // current 사실 발행일 앵커용: 클러스터 최신 발행일(ISO) 또는 null
+    const clusterLatestPub = cluster
+        .map(n => (n.publishedAt instanceof Date ? n.publishedAt.toISOString() : null))
+        .filter((x): x is string => !!x)
+        .sort()
+        .pop() ?? null;
 
     const prompt = `${BATTERY_CONFIG.promptContext}
 
@@ -136,9 +145,9 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
     "핵심 사실 3"
   ],
   "keyFactsMeta": [
-    { "factAssertedAt": "YYYY 또는 YYYY-MM 또는 unknown", "temporalRole": "current 또는 background" },
-    { "factAssertedAt": "...", "temporalRole": "..." },
-    { "factAssertedAt": "...", "temporalRole": "..." }
+    { "factAssertedAt": { "value": "YYYY-MM 또는 YYYY 또는 unknown", "evidence": "원문에서 시점을 명시한 구절 인용, 없으면 빈 문자열" }, "temporalRole": "current 또는 background" },
+    { "factAssertedAt": { "value": "...", "evidence": "..." }, "temporalRole": "..." },
+    { "factAssertedAt": { "value": "...", "evidence": "..." }, "temporalRole": "..." }
   ],
   "insight": "${KEY_INSIGHT_FIELD_SPEC} (기업 영향·경영진 대응은 K-Battery 생태계(LGES, SK On, SDI, 소재사 등) 관점에서 구체화할 것.)",
   "soWhat": {
@@ -158,10 +167,11 @@ ${matchedFrameworks.map(f => `- ${f.name}: ${f.insightTemplate}`).join('\n')}
 - **핵심 사실 (Key Facts)**: 반드시 **정확히 3개의 핵심 사실**을 도출하여 \`keyFacts\` 배열에 담으세요. 4개 이상의 사실이 섞이지 않도록 가장 중요한 3개만 선별하세요. 중복 방지를 위해 keyFacts 작성 시 헤드라인, oneLineSummary(논지) 및 insight(시사점)의 내용을 반복하여 재진술하지 마십시오. 오직 객관적 팩트와 수치 데이터 전달에 집중해야 합니다.
 - **출처·검증 태그 금지**: keyFacts 각 문장 끝에 \`(Yahoo Finance, 2026년 7월 / 검증됨)\`, \`(... / 미검증)\`, \`(... 기준 / 신뢰도 보통)\` 같은 출처명·시점·신뢰도 꼬리표를 절대 붙이지 마십시오. 출처는 하단 Sources 링크로만 제공합니다. 팩트 문장은 순수하게 사실만 서술하고 괄호 태그로 마무리하지 마십시오.
 - **시점 판정 (keyFactsMeta, keyFacts와 같은 순서·개수로 필수)**:
-  - \`factAssertedAt\`: 그 사실이 **성립·발생하는 시점**을 "YYYY-MM" 또는 "YYYY"로. 기사 발행일이 아니라 사실 자체의 시점. **본문에서 시점을 특정할 수 없으면 반드시 "unknown"** — 추측·역산 금지(틀린 날짜보다 unknown이 낫다).
+  - **단일 사건·단일 시점**: 한 keyFact는 하나의 사건·하나의 시점만. 서로 다른 시점의 사건(예: "2024년 파운드리 폐쇄"와 "2026년 TV 생산중단")을 한 문장에 병합하지 말고 별개 keyFact로 분리할 것.
+  - **시점 규칙(필드와 텍스트에 동일 적용)**: \`factAssertedAt.value\`는 시점 "YYYY-MM"/"YYYY", \`evidence\`는 **원문에서 그 시점을 명시한 구절 인용**. **시점 근거가 없으면 value는 "unknown"·evidence는 빈 문자열이고, 동시에 keyFacts 문장에도 연도를 쓰지 않는다(시점 없이 서술).** value가 특정 연도면 문장의 연도도 그 값과 일치시킨다. 필드는 unknown인데 문장엔 "2026년"을 쓰는 식으로 나눠 적용 금지 — 독자가 보는 것은 문장이다. 추측·역산·상식 보완 금지. 기사 발행일이 곧 시점인 current 사실은 unknown으로 두면 코드가 발행일로 앵커함.
   - \`temporalRole\`: 이번 뉴스의 **새 전개**면 \`current\`, 기사가 인용한 **과거 맥락/배경**(2024년 등 과거 수치)이면 \`background\`.
-  - **background 시점 문장 표기(필수)**: temporalRole이 background인 사실은 keyFacts의 그 문장 안에 **절대 연도를 명시**할 것(예: "2024년 …"). "작년/지난해" 상대표현 금지. 시점 없는 배경 사실은 오래된 맥락이 현재처럼 읽히므로 금지.
-  - **unknown 수치 근거 금지**: factAssertedAt이 unknown인 사실의 수치를 insight/soWhat의 확정 근거로 쓰지 마십시오.
+  - **background 시점 문장 표기(필수)**: temporalRole이 background인 사실은 keyFacts의 그 문장 안에 **원문에 근거한 절대 연도를 명시**할 것(예: "2024년 …"). 근거 없으면 background로 분류하지 말 것. "작년/지난해" 상대표현 금지.
+  - **unknown 수치 근거 금지**: value가 unknown인 사실의 수치를 insight/soWhat의 확정 근거로 쓰지 마십시오.
 - **심층 인사이트(Key Insight) 및 soWhat (★판단형 의사결정 체계 적용★)**:
 ${KEY_INSIGHT_GUIDE}
   - 여기서 '기업'은 우선적으로 한국 배터리 생태계(LGES, SK On, SDI, 소재사 등)를 뜻합니다. 다만 근거 없이 특정국·특정사의 의도를 단정하지 말고 구조적 결과로 서술하십시오.
@@ -218,22 +228,37 @@ JSON만 출력하세요.`;
         // fact 단위 소스 결박이 없어 sourceIds는 비움(카드 단위 sources 사용) — 시점 체크에는 무관.
         const factTexts: string[] = Array.isArray(parsed.keyFacts) ? parsed.keyFacts : [];
         const factMeta: Record<string, unknown>[] = Array.isArray(parsed.keyFactsMeta) ? parsed.keyFactsMeta : [];
-        const structuredFacts: KeyFactStructured[] = factTexts.map((t, i) => ({
-            id: `f${i + 1}`,
-            text: String(t || '').trim(),
-            sourceIds: [],
-            factAssertedAt: normFactAssertedAt(factMeta[i]?.factAssertedAt),
-            temporalRole: factMeta[i]?.temporalRole === 'background' ? 'background' as const : 'current' as const,
-        }));
+        const sourcedBatteryFacts: KeyFactStructured[] = factTexts.map((t, i) => {
+            const role = factMeta[i]?.temporalRole === 'background' ? 'background' as const : 'current' as const;
+            // factAssertedAt {value, evidence, anchorSource}: evidence 없거나 원문에 없으면 unknown 강제.
+            const faRaw = (factMeta[i]?.factAssertedAt && typeof factMeta[i].factAssertedAt === 'object')
+                ? factMeta[i].factAssertedAt as Record<string, unknown> : {};
+            const fa = bindEvidence(faRaw.value, faRaw.evidence, sourceText);
+            // current 사실은 근거 없어도 클러스터 발행일로 앵커. anchorSource로 'quote'와 구분(주간 rule 3용).
+            if (fa.value === 'unknown' && role === 'current' && clusterLatestPub) {
+                fa.value = clusterLatestPub.slice(0, 7); fa.evidence = null; fa.anchorSource = 'sourcePublishedAt';
+            }
+            return {
+                id: `f${i + 1}`,
+                text: String(t || '').trim(),
+                sourceIds: [],
+                factAssertedAt: fa,
+                temporalRole: role,
+            };
+        });
+        // C19: 텍스트 연도-필드 결속 재생성/폐기. 렌더되는 keyFacts는 이 repaired 텍스트에서 파생해야 함.
+        const structuredFacts = await repairFactYears(sourcedBatteryFacts, async p => (await (await generateWithRetry(model, p)).response).text());
         // 배터리 insight는 평문(restsOn 결박 없음) → c16(unknown 정량 근거)는 미적용, 분포만 기록.
         await recordTemporalMetrics(structuredFacts, undefined, 'battery');
+        const bc19 = c19_textYearMatchesValue(structuredFacts);
+        if (bc19.length) console.warn(`[Battery Temporal Check] "${parsed.headline || parsed.title}": c19 잔여 ${bc19.length} — ${bc19[0].message}`);
 
         return {
             headline: parsed.headline || parsed.title,
             category: parsed.category,
             oneLineSummary: parsed.oneLineSummary,
             hashtags: parsed.hashtags,
-            keyFacts: parsed.keyFacts,
+            keyFacts: structuredFacts.map(f => f.text), // 렌더 소스 — repaired 텍스트에서 파생(오연도 차단)
             structuredFacts,
             insight: finalInsight,
             framework: matchedFrameworks.map(f => f.name).join(', '),

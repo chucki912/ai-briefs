@@ -38,7 +38,15 @@ export const ISSUE_RESPONSE_SCHEMA = {
                     text: { type: 'string', description: '보도 사실만: 수치·주체·날짜. 해석 금지.' },
                     sourceIndices: { type: 'array', items: { type: 'integer' }, description: '이 사실의 근거 뉴스 번호([n], 1-based). 최소 1개 필수.' },
                     publishedAt: { type: 'string', description: '해당 사실의 발행일(ISO 또는 YYYY-MM-DD). 미상이면 빈 문자열.' },
-                    factAssertedAt: { type: 'string', description: '이 사실이 성립·발생하는 시점을 "YYYY-MM" 또는 "YYYY"로. 본문에서 시점을 특정할 수 없으면 반드시 "unknown". 추측·역산 금지.' },
+                    factAssertedAt: {
+                        type: 'object',
+                        description: '이 사실이 성립·발생하는 시점과 그 근거. value만 채우려 하지 말 것 — 근거 없는 시점은 unknown.',
+                        properties: {
+                            value: { type: 'string', description: '시점 "YYYY-MM" 또는 "YYYY". 아래 evidence에 인용할 구절이 원문에 없으면 반드시 "unknown".' },
+                            evidence: { type: 'string', description: '제공된 뉴스(제목·스니펫)에서 그 시점을 명시한 구절을 그대로 복사·인용. 원문에 시점 표기가 없으면 빈 문자열. 절대 지어내거나 추론하지 말 것.' },
+                        },
+                        required: ['value', 'evidence'],
+                    },
                     temporalRole: { type: 'string', enum: ['current', 'background'], description: 'current=이번 수집 주기의 새 전개. background=기사가 인용한 과거 맥락(오래된 배경 사실).' },
                 },
                 required: ['text', 'sourceIndices', 'factAssertedAt', 'temporalRole'],
@@ -110,10 +118,11 @@ ${recentContextStr}
 2. **thesis**: 이 카드의 단일 논지 1문장(주장 명제). 사건 나열 금지.
    - **fact 멤버십 규칙**: 한 이슈의 모든 fact는 동일한 단일 사건의 서술이어야 함. 기업명·인물명 등 엔티티가 겹친다는 이유만으로 별개 사건을 결박 금지 — 'A사가 X를 했다'와 'B가 A사를 겨냥해 Y를 했다'는 A사가 공통이어도 별개 사건임. 판별 기준: 두 fact의 주어·행위·시점이 하나의 사건으로 서술 가능한가? 불가하면 별도 이슈로 분리하고, 이슈 수 제한에 걸리면 중요도 낮은 쪽을 버릴 것 (봉합보다 누락이 나음).
 3. **keyFacts (최소 1개, 최대 3개)**: 보도된 사실만(수치·주체·날짜). **메커니즘·인과·해석·의도 추정 절대 금지**(그건 keyInsight 소관). 각 fact의 \`sourceIndices\`에 그 사실을 실제로 뒷받침하는 뉴스 번호를 **1개 이상** 넣을 것. **입력에 근거 있는 사실이 3개 미만이면 그 개수만큼만 작성할 것 — 3개를 채우기 위해 사실을 만들지 말 것.**
-   - **factAssertedAt (사실 시점)**: 그 사실이 **성립·발생하는 시점**을 "YYYY-MM" 또는 "YYYY"로 적는다. 기사 발행일이 아니라 사실 자체의 시점이다. **본문에서 시점을 특정할 수 없으면 반드시 "unknown"** — 절대 추측하거나 오늘 날짜로 역산하지 말 것. 틀린 날짜보다 unknown이 낫다.
+   - **단일 사건·단일 시점(필수)**: 한 keyFact는 **하나의 사건, 하나의 시점**만 담는다. 서로 다른 시점의 사건(예: "2024년 파운드리 폐쇄"와 "2026년 TV 생산중단")을 한 문장에 병합하지 말 것 — 별개 keyFact로 **분리**해 각각에 시점을 부여한다.
+   - **시점 규칙(필드와 텍스트에 동일하게 적용)**: value는 사실 성립 시점("YYYY-MM"/"YYYY"). **evidence에는 제공된 뉴스 텍스트에서 그 시점을 명시한 구절을 그대로 복사·인용**한다. **시점 근거가 없으면 factAssertedAt.value는 "unknown"·evidence는 빈 문자열이고, 동시에 keyFact 텍스트(text)에도 연도를 쓰지 않는다(시점 없이 서술).** value가 특정 연도면 텍스트에 등장하는 연도도 반드시 그 값과 일치시킨다. **필드에선 unknown인데 텍스트엔 "2026년"을 쓰는 식으로 두 규칙을 나눠 적용하지 말 것** — 독자가 보는 것은 텍스트다. 추측·역산·상식 보완 금지(형식만 맞고 틀린 연도가 무표기보다 나쁘다). 기사 발행일이 곧 시점인 current 사실은 evidence를 못 찾아도 unknown으로 두면 코드가 발행일로 앵커한다.
    - **temporalRole**: 이 사실이 \`current\`(이번 뉴스가 전하는 **새 전개**)인지 \`background\`(기사가 인용한 **과거 맥락/배경**)인지 판정한다. 2024년 등 과거 수치를 배경으로 인용한 것이면 반드시 background.
-   - **background 시점 문장 표기(필수)**: temporalRole이 background인 사실은 **그 사실 문장(text) 안에 연도를 반드시 명시**할 것(예: "2024년 4분기 …"). "작년/지난해" 같은 상대표현이 아니라 절대 연도로. 시점 없는 배경 사실은 오래된 맥락이 현재처럼 읽히므로 금지.
-   - **unknown 수치 근거 금지**: factAssertedAt이 unknown인 사실의 수치는 추세·비교의 확정 근거로 쓰지 말 것. 서술은 가능하나, keyInsight가 그 수치에 근거하도록 만들지 말 것(시점 불명 수치를 현재 근거로 오인 방지).
+   - **background 시점 문장 표기(필수)**: temporalRole이 background인 사실은 **그 사실 문장(text) 안에 연도를 반드시 명시**할 것(예: "2024년 4분기 …"). "작년/지난해" 같은 상대표현이 아니라 절대 연도로. 단, 그 연도는 원문에 근거해야 하며 근거 없으면 background로 분류하지 말 것(unknown current로).
+   - **unknown 수치 근거 금지**: value가 unknown인 사실의 수치는 추세·비교의 확정 근거로 쓰지 말 것. 서술은 가능하나, keyInsight가 그 수치에 근거하도록 만들지 말 것.
 4. **keyInsight**:
 ${KEY_INSIGHT_GUIDE}
    - \`restsOnFactIndices\`: 이 인사이트가 근거하는 keyFacts 위치(1-based)를 명시.

@@ -27,16 +27,19 @@ export interface TemporalMetrics {
     unknown: number;        // factAssertedAt === 'unknown'
     datedYear: number;      // 'YYYY'
     datedMonth: number;     // 'YYYY-MM'
-    backgroundMissingTimepoint: number; // C15 위반(배경인데 문장 내 시점 미표기)
+    backgroundMissingTimepoint: number; // C15 위반(시점 확인된 background가 미표기)
+    backgroundUnknown: number;          // background+value=unknown(허용, 기록만)
     unknownNumericBasisCards: number;   // C16 위반 카드 수(unknown 정량에 근거한 insight)
+    sourceAnchored: number;             // 발행일로 앵커된 fact(evidence='sourcePublishedAt')
+    bodyEvidenced: number;              // 원문 인용으로 시점 근거를 댄 fact
     updatedAt: number;
 }
 
 function emptyMetrics(): TemporalMetrics {
     return {
         cards: 0, facts: 0, current: 0, background: 0, unknown: 0,
-        datedYear: 0, datedMonth: 0, backgroundMissingTimepoint: 0,
-        unknownNumericBasisCards: 0, updatedAt: 0,
+        datedYear: 0, datedMonth: 0, backgroundMissingTimepoint: 0, backgroundUnknown: 0,
+        unknownNumericBasisCards: 0, sourceAnchored: 0, bodyEvidenced: 0, updatedAt: 0,
     };
 }
 
@@ -58,7 +61,7 @@ export async function recordTemporalMetrics(
     const unknownNumericBasis = insight ? c16_unknownNotNumericBasis(insight, facts).length > 0 : false;
 
     // 구조화 로그(검증 grep용). 지표 KV 적재와 독립 — KV 실패해도 로그는 남는다.
-    console.log(`[TEMPORAL-METRIC] domain=${domain} facts=${d.total} current=${d.current} background=${d.background} unknown=${d.unknown} datedYear=${d.datedYear} datedMonth=${d.datedMonth} bgMissingTimepoint=${d.backgroundMissingTimepoint} unknownNumericBasis=${unknownNumericBasis ? 1 : 0}`);
+    console.log(`[TEMPORAL-METRIC] domain=${domain} facts=${d.total} current=${d.current} background=${d.background} unknown=${d.unknown} datedYear=${d.datedYear} datedMonth=${d.datedMonth} sourceAnchored=${d.sourceAnchored} bodyEvidenced=${d.bodyEvidenced} bgMissingTimepoint=${d.backgroundMissingTimepoint} bgUnknown=${d.backgroundUnknown} unknownNumericBasis=${unknownNumericBasis ? 1 : 0}`);
 
     try {
         const key = metricsKey(domain);
@@ -71,6 +74,9 @@ export async function recordTemporalMetrics(
         m.datedYear += d.datedYear;
         m.datedMonth += d.datedMonth;
         m.backgroundMissingTimepoint += d.backgroundMissingTimepoint;
+        m.backgroundUnknown += d.backgroundUnknown;
+        m.sourceAnchored += d.sourceAnchored;
+        m.bodyEvidenced += d.bodyEvidenced;
         if (unknownNumericBasis) m.unknownNumericBasisCards += 1;
         m.updatedAt = now;
         await kvSet(key, m, TEMPORAL_METRICS_TTL_SEC);

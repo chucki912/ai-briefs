@@ -5,6 +5,7 @@ import Parser from 'rss-parser';
 import { NewsItem } from '@/types';
 import { createHash } from 'crypto';
 import { BATTERY_CONFIG, getBatterySourceScore, isLGExcluded } from '@/configs/battery';
+import { parseFeedDate, logFilterMetric, logCollectMetric } from './date-utils';
 
 const parser = new Parser({
     timeout: 10000,
@@ -23,16 +24,19 @@ export async function fetchBatteryNews(): Promise<NewsItem[]> {
     // 1. RSS 피드에서 뉴스 수집
     console.log('[Battery] Step 1: RSS 피드 수집 중...');
     const rssFeedNews = await fetchFromBatteryRssFeeds();
+    logCollectMetric('battery', 'rss', rssFeedNews);
     allNews.push(...rssFeedNews);
 
     // 2. Google News에서 배터리 키워드 검색
     console.log('[Battery] Step 2: Google News 검색 중...');
     const googleNews = await fetchFromBatteryGoogleNews();
+    logCollectMetric('battery', 'google-news', googleNews);
     allNews.push(...googleNews);
 
     if (BRAVE_API_KEY) {
         console.log('[Battery] Step 3: Brave Search 검색 중...');
         const braveNews = await fetchFromBatteryBraveSearch();
+        logCollectMetric('battery', 'brave', braveNews);
         allNews.push(...braveNews);
     }
 
@@ -40,6 +44,7 @@ export async function fetchBatteryNews(): Promise<NewsItem[]> {
     if (TAVILY_API_KEY) {
         console.log('[Battery] Step 3.5: Tavily Search 검색 중...');
         const tavilyNews = await fetchFromBatteryTavilySearch();
+        logCollectMetric('battery', 'tavily', tavilyNews);
         allNews.push(...tavilyNews);
     }
 
@@ -78,7 +83,7 @@ async function fetchFromBatteryRssFeeds(): Promise<NewsItem[]> {
                             description: item.contentSnippet || item.content || '',
                             url: item.link,
                             source: feed.name,
-                            publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                            publishedAt: parseFeedDate(item.pubDate),
                         });
                     }
                 }
@@ -114,7 +119,7 @@ async function fetchFromBatteryGoogleNews(): Promise<NewsItem[]> {
                         description: item.contentSnippet || '',
                         url: item.link,
                         source: 'Google News',
-                        publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                        publishedAt: parseFeedDate(item.pubDate),
                     });
                 }
             }
@@ -169,7 +174,7 @@ async function fetchFromBatteryBraveSearch(): Promise<NewsItem[]> {
                     description: item.description || '',
                     url: item.url,
                     source: sourceName,
-                    publishedAt: new Date(),
+                    publishedAt: parseFeedDate(item.page_age ?? item.age),
                 });
             }
 
@@ -202,6 +207,7 @@ async function fetchFromBatteryTavilySearch(): Promise<NewsItem[]> {
                     include_images: false,
                     include_raw_content: false,
                     max_results: 5,
+                    topic: 'news', // published_date 확보 위해 필수(basic+days만으론 날짜 미반환 — 실측)
                     days: 1
                 }),
             });
@@ -221,7 +227,7 @@ async function fetchFromBatteryTavilySearch(): Promise<NewsItem[]> {
                     description: result.content || '',
                     url: result.url,
                     source: 'Tavily Search',
-                    publishedAt: new Date(),
+                    publishedAt: parseFeedDate(result.published_date),
                 });
             }
 
@@ -242,6 +248,7 @@ function filterBatteryNews(news: NewsItem[]): NewsItem[] {
     const seenUrls = new Set<string>();
     const seenTitles: string[] = [];
     const unique: NewsItem[] = [];
+    let staleExcluded = 0, nullKept = 0;
 
     for (const item of news) {
         // 1. URL 중복 체크
@@ -254,9 +261,14 @@ function filterBatteryNews(news: NewsItem[]): NewsItem[] {
         );
         if (isDuplicateTitle) continue;
 
-        // 3. 시간 필터 (24시간 이내)
-        const age = now.getTime() - item.publishedAt.getTime();
-        if (age > maxAge) continue;
+        // 3. 시간 필터 (24시간 이내). 실제 발행일이 있으면 stale(>24h) 제외.
+        //    발행일 미상(null)은 제외하지 않되 fresh로 간주하지 않고 유지 — current 계상 불가는 하류(추출)에서.
+        if (item.publishedAt) {
+            const age = now.getTime() - item.publishedAt.getTime();
+            if (age > maxAge) { staleExcluded++; continue; }
+        } else {
+            nullKept++;
+        }
 
         // 4. ⚡ LG 제외 필터 (K-Battery Outside-in 관점)
         if (isLGExcluded(item.title, item.description)) {
@@ -275,6 +287,7 @@ function filterBatteryNews(news: NewsItem[]): NewsItem[] {
         unique.push(item);
     }
 
+    logFilterMetric('battery', news.length, staleExcluded, nullKept, unique.length);
     return unique;
 }
 
@@ -297,8 +310,8 @@ function sortByBatteryRelevance(news: NewsItem[]): NewsItem[] {
 
         if (scoreA !== scoreB) return scoreB - scoreA;
 
-        // 동일 점수면 최신순
-        return b.publishedAt.getTime() - a.publishedAt.getTime();
+        // 동일 점수면 최신순(발행일 미상은 후순위)
+        return (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0);
     });
 }
 

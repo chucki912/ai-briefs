@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { NewsItem } from '@/types';
 import { createHash } from 'crypto';
+import { parseFeedDate, logFilterMetric, logCollectMetric } from './date-utils';
 import {
     RSS_FEEDS,
     PRIMARY_KEYWORDS,
@@ -27,15 +28,18 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
 
     // 1. RSS 피드에서 뉴스 수집
     const rssFeedNews = await fetchFromRssFeeds();
+    logCollectMetric('ai', 'rss', rssFeedNews);
     allNews.push(...rssFeedNews);
 
     // 2. Google News에서 주요 키워드 검색
     const googleNews = await fetchFromGoogleNews();
+    logCollectMetric('ai', 'google-news', googleNews);
     allNews.push(...googleNews);
 
     // 3. Brave Search에서 주요 키워드 검색 (강화)
     if (braveApiKey()) {
         const braveNews = await fetchFromBraveSearch();
+        logCollectMetric('ai', 'brave', braveNews);
         allNews.push(...braveNews);
     } else {
         console.warn('[NewsCollector] Brave API Key가 설정되지 않아 건너뜁니다.');
@@ -44,6 +48,7 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
     // 4. Tavily Search에서 주요 키워드 검색 (추가)
     if (tavilyApiKey()) {
         const tavilyNews = await fetchFromTavilySearch();
+        logCollectMetric('ai', 'tavily', tavilyNews);
         allNews.push(...tavilyNews);
     } else {
         console.warn('[NewsCollector] Tavily API Key가 설정되지 않아 건너뜁니다.');
@@ -81,7 +86,7 @@ async function fetchFromRssFeeds(): Promise<NewsItem[]> {
                         description: item.contentSnippet || item.content || '',
                         url: item.link,
                         source: feed.name,
-                        publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                        publishedAt: parseFeedDate(item.pubDate),
                     });
                 }
             }
@@ -115,7 +120,7 @@ async function fetchFromGoogleNews(): Promise<NewsItem[]> {
                         description: item.contentSnippet || '',
                         url: item.link,
                         source: 'Google News',
-                        publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                        publishedAt: parseFeedDate(item.pubDate),
                     });
                 }
             }
@@ -182,12 +187,11 @@ async function fetchFromBraveSearch(): Promise<NewsItem[]> {
                     description: item.description || '',
                     url: item.url,
                     source: sourceName,
-                    publishedAt: new Date(), // Brave doesn't guarantee absolute date, treat as fresh
+                    // 실측(2026-07): freshness=pd가 40% stale을 흘리고 page_age는 100% 존재.
+                    // 실제 발행일을 파싱하고 필터가 stale을 걸러내게 한다(new Date() 프레시 스탬핑 제거).
+                    publishedAt: parseFeedDate(item.page_age ?? item.age),
                 });
             }
-
-            // Fix publishedAt for Brave items if possible (Brave returns 'age' string usually).
-            // For now, let's treat them as "fresh" (new Date()).
 
             console.log(`[Brave Search] "${keyword}": ${items.length}개 항목`);
         } catch (error) {
@@ -218,6 +222,7 @@ async function fetchFromTavilySearch(): Promise<NewsItem[]> {
                     include_images: false,
                     include_raw_content: false,
                     max_results: 5,
+                    topic: 'news', // published_date 확보 위해 필수(basic+days만으론 날짜 미반환 — 실측)
                     days: 1 // 최신 뉴스 위주
                 }),
             });
@@ -237,7 +242,7 @@ async function fetchFromTavilySearch(): Promise<NewsItem[]> {
                     description: result.content || '',
                     url: result.url,
                     source: 'Tavily Search',
-                    publishedAt: new Date(), // Tavily results are fresh
+                    publishedAt: parseFeedDate(result.published_date),
                 });
             }
 
@@ -261,6 +266,7 @@ function filterAndDeduplicate(news: NewsItem[]): NewsItem[] {
     const seenTitles: string[] = [];
 
     const unique: NewsItem[] = [];
+    let staleExcluded = 0, nullKept = 0;
 
     for (const item of news) {
         // 1. URL 중복 체크
@@ -274,12 +280,14 @@ function filterAndDeduplicate(news: NewsItem[]): NewsItem[] {
         });
         if (isDuplicateTitle) continue;
 
-        // 3. 시간 필터 (24시간 이내)
-        // Brave item might have meaningless date, so skip check if date looks invalid/current? 
-        // No, fetcher logic assigned new Date() if unknown, so it's always "now".
-        // Keep logic.
-        const age = now.getTime() - item.publishedAt.getTime();
-        if (age > maxAge) continue;
+        // 3. 시간 필터 (24시간 이내). 실제 발행일이 있으면 stale(>24h) 제외.
+        //    발행일 미상(null)은 제외하지 않되 fresh로 간주하지 않고 유지 — current 계상 불가는 하류(추출)에서.
+        if (item.publishedAt) {
+            const age = now.getTime() - item.publishedAt.getTime();
+            if (age > maxAge) { staleExcluded++; continue; }
+        } else {
+            nullKept++;
+        }
 
         // 4. 제외 키워드 체크
         const hasExcludeKeyword = EXCLUDE_RULES.excludeKeywords.some(
@@ -298,6 +306,7 @@ function filterAndDeduplicate(news: NewsItem[]): NewsItem[] {
         unique.push(item);
     }
 
+    logFilterMetric('ai', news.length, staleExcluded, nullKept, unique.length);
     return unique;
 }
 
@@ -322,8 +331,8 @@ function sortByRelevance(news: NewsItem[]): NewsItem[] {
 
         if (scoreA !== scoreB) return scoreB - scoreA;
 
-        // 동일 점수면 최신순
-        return b.publishedAt.getTime() - a.publishedAt.getTime();
+        // 동일 점수면 최신순(발행일 미상은 가장 오래된 것으로 취급해 후순위)
+        return (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0);
     });
 }
 

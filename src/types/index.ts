@@ -7,7 +7,7 @@ export interface NewsItem {
   description: string;
   url: string;
   source: string;
-  publishedAt: Date;
+  publishedAt: Date | null; // 실제 발행일. 파싱 불가·부재 시 null(추측 금지). null은 신선도 판정에서만 배제하고 항목은 유지.
   category?: string;
 }
 

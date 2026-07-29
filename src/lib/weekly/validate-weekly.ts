@@ -40,6 +40,21 @@ export function eightGramOverlap(implication: string, body: string): number {
     return overlap;
 }
 
+/** 인용된 원문("…"/『…』/「…」)을 제외한 본문의 8-gram 집합 — 동일 원문 인용은 정당한 겹침이므로 제외. */
+export function bodyEightGrams(text: string): Set<string> {
+    const noQuotes = (text || '').replace(/["“”『「][^"“”』」]*["“”』」]?/g, ' ');
+    return wordNgrams(noQuotes, 8);
+}
+/** 승격 스레드 쌍이 공유하는 8-gram 목록(인용 원문 제외). content bleed 탐지.
+ *  스펙: 승격 쌍 간 본문 8-gram 중복 0건 — **비율 임계가 아니라 0-tolerance**(공유 8-gram이
+ *  하나라도 있으면 위반). 근거: 8연속 어절의 우연 일치는 극히 드물어 공유=복사/전이 신호이며,
+ *  인용 원문은 이미 제외한다. 오탐(우연 보일러플레이트 공유)은 재생성 1회로 자기교정되고,
+ *  재생성 후에도 남는 겹침만 강등되므로 0-tolerance가 안전하다(임의 임계 배제). */
+export function sharedBodyEightGrams(a: string, b: string): string[] {
+    const gb = bodyEightGrams(b);
+    return [...bodyEightGrams(a)].filter(g => gb.has(g));
+}
+
 /** 마크다운 헤더 수/최대 깊이. */
 export function headerStats(md: string): { count: number; maxDepth: number } {
     let count = 0, maxDepth = 0;

@@ -12,7 +12,7 @@ import { assignGrade, type Grade, type MotionTypeCode } from './grade';
 import { generateBody } from './body-gen';
 import { getJudgmentProvider, type JudgmentProvider } from './judgment';
 import { structureBody, type WeeklyTable } from './structure';
-import { validateWeeklyThread, hasHardFailure, buildRegenFeedback } from './validate-weekly';
+import { validateWeeklyThread, hasHardFailure, buildRegenFeedback, sharedBodyEightGrams } from './validate-weekly';
 import { repairThreadLengths } from './length-repair';
 
 export interface WeeklyThreadContent {
@@ -180,16 +180,40 @@ export async function generateWeeklyReportContent(
 
     const outcomes = await mapWithConcurrency(selected, concurrency, (t) => processThread(t, items, provider));
 
-    const threads: WeeklyThreadContent[] = [];
     const extraDemoted: DemotedThread[] = [];
     const attemptTraces: Record<string, WeeklyAttemptEntry[]> = {};
+    // selected(등급 랭크) 순서 유지 — i<j에서 j가 하위 랭크(겹침 시 재생성/강등 대상).
+    const contents: { content: WeeklyThreadContent; thread: GradedThread }[] = [];
     for (let i = 0; i < outcomes.length; i++) {
         const o = outcomes[i];
-        const threadKey = selected[i].threadKey;
-        attemptTraces[threadKey] = o.trace;
-        if (o.kind === 'content') threads.push(o.content);
+        attemptTraces[selected[i].threadKey] = o.trace;
+        if (o.kind === 'content') contents.push({ content: o.content, thread: selected[i] });
         else extraDemoted.push(o.demoted);
     }
+
+    // 8-gram 중복 DoD(스펙: 승격 쌍 간 본문 8-gram 중복 0건 — 0-tolerance, 비율 임계 아님).
+    // 공유 8-gram이 하나라도 있으면 하위 랭크 재생성 1회 → 재실패 시 강등. 인용 원문은 제외.
+    const bodyOf = (c: WeeklyThreadContent) => `${c.background} ${c.mainContent} ${c.implications}`;
+    const demotedIdx = new Set<number>();
+    for (let i = 0; i < contents.length; i++) {
+        if (demotedIdx.has(i)) continue;
+        for (let j = i + 1; j < contents.length; j++) {
+            if (demotedIdx.has(j)) continue;
+            const shared = sharedBodyEightGrams(bodyOf(contents[i].content), bodyOf(contents[j].content));
+            if (shared.length === 0) continue;
+            console.warn(`[8gram DoD] "${contents[i].thread.threadKey}"×"${contents[j].thread.threadKey}" 공유 8-gram ${shared.length}건 → 재생성: ${JSON.stringify(shared.slice(0, 2))}`);
+            const fb = `다른 승격 사안과 본문 표현이 겹친다(공유 문장: ${JSON.stringify(shared.slice(0, 2))}). 이 사안(${contents[j].thread.label}) 고유의 사실·수치로 차별화해 다시 쓰라. 공통 배경 서술을 줄이고 이 사안만의 전개에 집중.`;
+            const rebuilt = await buildThreadContent(contents[j].thread, items, provider, fb);
+            if (rebuilt && sharedBodyEightGrams(bodyOf(contents[i].content), bodyOf(rebuilt)).length === 0) {
+                contents[j] = { content: rebuilt, thread: contents[j].thread };
+            } else {
+                console.warn(`[8gram DoD] "${contents[j].thread.threadKey}" 재생성 후에도 "${contents[i].thread.threadKey}"와 과다 겹침 → 강등`);
+                demotedIdx.add(j);
+                extraDemoted.push({ threadKey: contents[j].thread.threadKey, label: contents[j].thread.label, reason: 'dod_failed', memberCount: contents[j].thread.members.length });
+            }
+        }
+    }
+    const threads: WeeklyThreadContent[] = contents.filter((_, i) => !demotedIdx.has(i)).map(c => c.content);
 
     return {
         isoWeek: result.isoWeek,

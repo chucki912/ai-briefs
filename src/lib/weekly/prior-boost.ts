@@ -55,6 +55,14 @@ export function validateWebEvidence(raw: RawWebEvidence, asOf: string | Date): P
     const asOfDate = asOf instanceof Date ? asOf : new Date(`${String(asOf).slice(0, 10)}T00:00:00`);
     if (!(parsed.date < asOfDate)) return null;           // asOf 이전(선행)만 인정
 
+    // [C-7 정합성 주의 — B-4에서 처리] observedAt은 모델이 주장한 발행일이다. 일일 트랙의
+    // factAssertedAt처럼 quote에 결속돼 있지 않다(일일: 근거 없으면 unknown / anchorSource로
+    // quote↔pubDate 구분). 여기선 형식+asOf이전만 검증하므로, 인용문에 근거 없는 추정 발행일이
+    // 통과할 수 있다(= 일일에서 막은 오염의 잠재적 재유입 경로).
+    // 현재 영향은 제한적: 웹 근거만이면 상한 B(A는 hasInternalPrior 요구), observedAt의 유일한
+    // 기능적 용도는 'asOf 이전' 불리언(→hasWebEvidence→B)이며 observedDates/M2/일일렌더에 미투입.
+    // ★ B-4(rule 3 주간 상속)에서 web source의 observedAt를 **저신뢰 모델주장일**로 취급할 것:
+    //   'asOf 이전 선행 존재' 불리언으로만 쓰고, M2 비교·정량 시점 앵커로는 절대 쓰지 말 것.
     return { source: 'web', observedAt: parsed.iso, url, quote, mechanismNote };
 }
 

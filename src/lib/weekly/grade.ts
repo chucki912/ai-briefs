@@ -25,7 +25,9 @@ export type MotionTypeCode = 'M1' | 'M2' | 'M3' | 'M4' | 'M5';
 /** 과거 근거 1건. internal(threadIndex 관측)과 web(PASS 2.5)을 절대 섞어 세지 않는다. */
 export interface PriorEvidence {
     source: 'internal' | 'web';
-    observedAt: string;         // internal: isoWeek 또는 관측일 / web: 발행일
+    // internal: isoWeek 또는 관측일(검증된 브리프 일자) / web: 모델주장 발행일(저신뢰 — quote 미결속).
+    // [B-4] web observedAt는 'asOf 이전 선행' 불리언으로만 쓰고 M2·정량 앵커 금지(prior-boost.ts C-7 주석).
+    observedAt: string;
     url?: string;
     quote?: string;
     mechanismNote?: string;

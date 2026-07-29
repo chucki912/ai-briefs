@@ -70,7 +70,8 @@ export function buildEntryFromGate(
 
 export interface GradedThread {
     threadKey: string;
-    label: string;
+    label: string;              // 메커니즘 진술
+    participants: string[];     // 주체(기업/기관) — grounding query의 subject
     matchedExisting: boolean;
     members: ClusterMember[];
     gate: GateResult;
@@ -155,7 +156,8 @@ export async function runDeterministicPasses(opts: RunDeterministicOptions): Pro
         const gradeResult = assignGrade({ priorWeeksInternal: gate.priorWeeksInternal, motionTypes, priorEvidence });
 
         graded.push({
-            threadKey: cluster.threadKey, label: cluster.label, matchedExisting: cluster.matchedExisting,
+            threadKey: cluster.threadKey, label: cluster.label, participants: cluster.participants ?? [],
+            matchedExisting: cluster.matchedExisting,
             members: cluster.members, gate, motionTypes, priorEvidence,
             grade: gradeResult.grade, gradeResult,
         });

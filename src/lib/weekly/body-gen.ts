@@ -49,8 +49,19 @@ export function parseBodyDraft(
     return { draftText, confirmedMotionTypes: Array.from(new Set(confirmed)) };
 }
 
+/** grounding query = 주체(participants) + 메커니즘(label) + 최근 연도. 회사명만/메커니즘만 검색을 피한다. */
+export function buildGroundingQuery(participants: string[], label: string, observedDates: string[]): string {
+    const subject = participants.slice(0, 2).join(' ');
+    const year = observedDates.length ? observedDates[observedDates.length - 1].slice(0, 4) : '';
+    return `${subject} ${label} ${year}`.replace(/\s+/g, ' ').trim();
+}
+
+// 독자 문서에 노출 금지할 내부 어휘(본문 프롬프트에서도 배제 지시).
+const INTERNAL_VOCAB_BAN = '승격/강등/게이트/스레드/threadKey/motionType/M1~M5/priorWeeks/observedDates/등급코드(A·B·C)/킬 트리거';
+
 export function buildBodyPrompt(input: {
     label: string;
+    participants: string[];
     grade: Grade;
     observedDates: string[];
     priorWeeksInternal: number;
@@ -59,6 +70,8 @@ export function buildBodyPrompt(input: {
     items: NormalizedItem[];
     regenFeedback?: string;
 }): string {
+    const groundingQuery = buildGroundingQuery(input.participants, input.label, input.observedDates);
+    const subject = input.participants.slice(0, 3).join(', ') || '(주체 미상)';
     const facts = input.items.flatMap(it => it.keyFacts).slice(0, 20).map(f => `- ${f}`).join('\n');
     const sources = Array.from(new Set(input.items.flatMap(it => it.sourceUrls))).slice(0, 15).join('\n');
     const priorLines = input.priorEvidence.map(e =>
@@ -66,7 +79,14 @@ export function buildBodyPrompt(input: {
     ).join('\n') || '(선행 관측 없음)';
 
     return `당신은 LG경영연구원의 주간 산업 인텔리전스 애널리스트다. 독자는 CEO·경영진이다.
-아래 스레드의 본문을 하우스 스타일로 작성하라. **[배경]과 [주요 내용]만** 쓴다. [시사점]은 쓰지 마라(별도 단계).
+아래 사안의 본문을 하우스 스타일로 작성하라. **[배경]과 [주요 내용]만** 쓴다. [시사점]은 쓰지 마라(별도 단계).
+
+## googleSearch 검증 (주체 + 메커니즘)
+- 검증 쿼리: "${groundingQuery}"
+- **주체(${subject})가 이 메커니즘을 보이는 최근 근거**만 반영하라. 회사명만으로 검색해 일반 뉴스를 끌어오지 말 것.
+
+## 독자 문체(중요) — 결론을 말하고 방법론을 말하지 않는다
+- 다음 내부 어휘를 본문에 절대 노출하지 말 것: ${INTERNAL_VOCAB_BAN}. 등급은 확립/형성 중/관찰 중으로만 서술.
 
 ## 확정값(코드가 계산 — 재계산·반박 금지, 그대로 인용)
 - 등급: ${input.grade}
@@ -114,7 +134,7 @@ export async function generateBody(thread: GradedThread, items: NormalizedItem[]
     const memberIds = new Set(thread.members.map(m => m.itemId));
     const scopedItems = items.filter(it => memberIds.has(it.itemId));
     const prompt = buildBodyPrompt({
-        label: thread.label, grade: thread.grade, observedDates: thread.gate.observedDates,
+        label: thread.label, participants: thread.participants, grade: thread.grade, observedDates: thread.gate.observedDates,
         priorWeeksInternal: thread.gate.priorWeeksInternal, motionTypes: thread.motionTypes,
         priorEvidence: thread.priorEvidence, items: scopedItems.length ? scopedItems : items, regenFeedback,
     });

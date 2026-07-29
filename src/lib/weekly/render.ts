@@ -15,11 +15,18 @@ export type ShowDemoted = 'full' | 'titles' | 'off';
 
 const DOMAIN_LABEL: Record<'ai' | 'battery', string> = { ai: 'AI', battery: '배터리' };
 
+// 등급은 정보 가치가 있으므로 독자용 명칭으로 번역해 노출한다(A/B/C 원문 코드 노출 금지).
+const GRADE_LABEL: Record<string, string> = { A: '확립', B: '형성 중', C: '관찰 중' };
+function gradeLabel(g: string): string {
+    return GRADE_LABEL[g] ?? '관찰 중';
+}
+
+// 탈락 사유 — 독자 용어로 통일(게이트 기호·코드 노출 금지).
 const DEMOTED_REASON_TAG: Record<string, string> = {
     single_date: '단일일 관측',
     single_publisher: '단일 출처',
-    no_prior_evidence: '과거 근거 없음',
-    dod_failed: '규격 미달',
+    no_prior_evidence: '선행 관측 없음',
+    dod_failed: '관측 근거 불충분',
 };
 
 function renderTable(t: WeeklyTable): string {
@@ -44,12 +51,12 @@ function headlineLine(c: WeeklyThreadContent, used: Set<string>): string {
     ];
     const metric = candidates.find(m => !used.has(m)) ?? candidates[0] ?? `관측 ${c.observedDates.length}일`;
     used.add(metric);
-    return `- [${c.grade}] ${c.label} — ${metric}`;
+    return `- [${gradeLabel(c.grade)}] ${c.label} — ${metric}`;
 }
 
 function renderThread(c: WeeklyThreadContent, idx: number): string {
     const parts = [
-        `### ${idx}. [${c.grade}] ${c.label}`,
+        `### ${idx}. [${gradeLabel(c.grade)}] ${c.label}`,
         `\n[배경]\n${nl(c.background)}`,
         `\n[주요 내용]\n${nl(c.mainContent)}`,
         `\n[시사점]\n${nl(c.implications)}`,
@@ -62,14 +69,16 @@ function renderThread(c: WeeklyThreadContent, idx: number): string {
 function renderDemoted(demoted: DemotedThread[], mode: ShowDemoted): string {
     if (mode === 'off') return '';
     const header = `## 4. 관찰 중 · 트렌드 미성립 (${demoted.length}건)`;
-    if (demoted.length === 0) return `${header}\n\n해당 없음`;
+    if (demoted.length === 0) return `${header}\n\n이번 주 관찰만 된 항목 없음`;
+    // 섹션 성격 1줄 — 무엇인지(결과)를 독자 용어로 설명.
+    const desc = `이번 주 관측되었으나 단일일·단일 출처로 지속성 판단이 불가한 항목`;
     const lines = demoted.map(d => {
-        const tag = DEMOTED_REASON_TAG[d.reason] ?? d.reason;
+        const tag = DEMOTED_REASON_TAG[d.reason] ?? '관측 근거 불충분';
         return mode === 'full'
             ? `- ${d.label} — [${tag}] (관측 항목 ${d.memberCount}건)`
             : `- ${d.label} — [${tag}]`;
     });
-    return `${header}\n\n${lines.join('\n')}`;
+    return `${header}\n\n${desc}\n\n${lines.join('\n')}`;
 }
 
 export interface RenderOptions {
@@ -85,31 +94,39 @@ export function renderWeeklyReport(content: WeeklyReportContent, opts: RenderOpt
     const out: string[] = [];
     out.push(`# 주간 ${domain} 산업 트렌드 리포트 (${content.isoWeek})`);
 
+    // 0~4 전 섹션을 매주 항상 출력한다(번호 건너뛰지 않음). 빈 섹션은 제목 유지 + 결과 1줄.
+    // 방법론(왜 비었는지)이 아니라 결과(무엇이 없는지)를 쓴다.
+
     // 0. 헤드라인
     out.push(`\n## 0. 주간 헤드라인`);
     if (promoted.length === 0) {
-        out.push(`\n이번 주 트렌드 성립 0건. 승격 요건(관측 폭·출처 독립성·과거 근거)을 충족한 스레드가 없어 트렌드로 승격하지 않는다.`);
+        // 결론만, 방법론 금지. 0건은 3줄 규칙 예외로 1줄.
+        out.push(`\n이번 주 ${domain} 도메인에서 지속적 흐름으로 볼 만한 움직임은 관측되지 않음.`);
     } else {
-        if (promoted.length < 3) out.push(`\n이번 주 트렌드 성립 ${promoted.length}건.`);
+        if (promoted.length < 3) out.push(`\n이번 주 확립·형성 중 흐름 ${promoted.length}건.`);
         const usedMetrics = new Set<string>();
         out.push('\n' + promoted.slice(0, 3).map(c => headlineLine(c, usedMetrics)).join('\n'));
     }
 
-    // 1. 트렌드 스레드
-    if (promoted.length > 0) {
-        out.push(`\n## 1. 트렌드 스레드`);
+    // 1. 트렌드
+    out.push(`\n## 1. 트렌드`);
+    if (promoted.length === 0) {
+        out.push(`\n이번 주 확립된 트렌드 없음`);
+    } else {
         promoted.forEach((c, i) => out.push('\n' + renderThread(c, i + 1)));
     }
 
     // 2. 교차 관찰 (실제 상호작용 없으면 비운다 — 억지 연결 금지)
     out.push(`\n## 2. 교차 관찰`);
-    out.push(`\n이번 주 스레드 간 유의미한 상호 강화·상충은 관측되지 않음.`);
+    out.push(`\n이번 주 사안 간 유의미한 상호 강화·상충은 관측되지 않음.`);
 
     // 3. 다음 주 확인 포인트
-    if (promoted.length > 0) {
-        out.push(`\n## 3. 다음 주 확인 포인트`);
+    out.push(`\n## 3. 다음 주 확인 포인트`);
+    if (promoted.length === 0) {
+        out.push(`\n이번 주 검증 대상 없음`);
+    } else {
         out.push('\n' + promoted.map(c =>
-            `- **${c.label}**: ${c.nextWeekCheck}\n  - 킬 트리거: ${c.killTrigger}`,
+            `- **${c.label}**: ${c.nextWeekCheck}\n  - 확인 시점: ${c.killTrigger}`,
         ).join('\n'));
     }
 

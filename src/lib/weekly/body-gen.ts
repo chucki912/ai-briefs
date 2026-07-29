@@ -109,10 +109,14 @@ ${input.regenFeedback ? `\n## 재생성 피드백(직전 초안 DoD 미달 — �
 /** PASS 4 실행. grounded 초안 생성 후 <<MOTION>> 확정 파싱. regenFeedback 있으면 교정 지시. */
 export async function generateBody(thread: GradedThread, items: NormalizedItem[], regenFeedback?: string): Promise<BodyDraft> {
     const model = genAI.getGenerativeModel({ model: MODEL, tools: [{ googleSearch: {} } as never] });
+    // STEP 5: PASS 4 입력을 이 스레드의 멤버 itemId로 스코핑 — 전체 코퍼스 facts를 넘기면
+    // 다른 스레드 내용이 본문에 새어든다(content bleed). 멤버 없으면(방어) 전체로 폴백.
+    const memberIds = new Set(thread.members.map(m => m.itemId));
+    const scopedItems = items.filter(it => memberIds.has(it.itemId));
     const prompt = buildBodyPrompt({
         label: thread.label, grade: thread.grade, observedDates: thread.gate.observedDates,
         priorWeeksInternal: thread.gate.priorWeeksInternal, motionTypes: thread.motionTypes,
-        priorEvidence: thread.priorEvidence, items, regenFeedback,
+        priorEvidence: thread.priorEvidence, items: scopedItems.length ? scopedItems : items, regenFeedback,
     });
     const result = await generateWithRetry(model, prompt);
     const text = (await result.response).text();

@@ -4,7 +4,7 @@
  *  · bet에 observe.metric 복사 금지(c20) — 채워진 듯 보이는 은폐 차단
  *  · 빈 슬롯 허용 + 렌더 생략(라벨만 남기지 않음)
  */
-import { c20_betNotMetric, c10_actComplete } from '../analyzers/structured-checks';
+import { c20_betNotMetric, c10_actComplete, c21_costMagnitudeGrounded } from '../analyzers/structured-checks';
 import { aggregateSoWhatSlots } from '../analyzers/sowhat-metrics';
 import { buildReport } from '../generators/report-builder';
 import type { IssueItem, SoWhatV2 } from '@/types';
@@ -55,6 +55,31 @@ chk('(b) 채워진 슬롯은 정상 출력', mdEmpty.includes('사실이라면:'
 const mdFilled = buildReport([card(withCost, { bet: '공급사 이원화 검토', downside: withCost.costIfWrong! })], new Date('2026-07-30T00:00:00')).markdown;
 chk('(b) 채워지면 틀렸을 때 줄 출력', mdFilled.includes('틀렸을 때: 관측만 지속하다'));
 chk('(b) 더 이상 "—" 대체 없음', !mdFilled.includes('틀렸을 때: —') && !mdEmpty.includes('—'));
+
+// ── c21: costIfWrong 규모의 근거(전방검증 경계사례 기반) ───────────────────
+const cardWithFacts = (cost: string, facts: string[]): IssueItem => ({
+    headline: 'h', keyFacts: facts, insight: 'i', framework: 'none', sources: [],
+    soWhatV2: observeV2({ costIfWrong: cost }), soWhat: { ifTrue: 'a', uncertain: 'b', bet: '', downside: cost },
+} as IssueItem);
+// 실제 불합격 사례(전방검증 ai-run3): 카드 사실에 금액 근거 없음
+chk('c21: 근거 없는 "수십억 달러" 규모 → 위반',
+    c21_costMagnitudeGrounded(cardWithFacts('회복 불가능한 수십억 달러 규모에 달할 것입니다',
+        ['마이크로소프트가 사이버 보안 AI 모델을 공개함'])).some(i => i.code === 'c21_cost_magnitude_ungrounded'));
+chk('c21: 정성적 기술("회복 불가능한 수준") → 통과',
+    c21_costMagnitudeGrounded(cardWithFacts('회복 불가능한 수준의 시장 지위 상실이며 되돌릴 수 없습니다',
+        ['마이크로소프트가 사이버 보안 AI 모델을 공개함'])).length === 0);
+chk('c21: 카드 사실에 금액 근거가 있으면 모호 규모어 허용',
+    c21_costMagnitudeGrounded(cardWithFacts('수십억 달러 규모의 손실',
+        ['메타는 140억 달러 규모 데이터센터 투자를 발표함'])).length === 0);
+chk('c21: 숫자 규모가 keyFacts에 존재하면 통과',
+    c21_costMagnitudeGrounded(cardWithFacts('투자한 140억 달러의 회수가 지연된다',
+        ['메타는 140억 달러 규모 데이터센터 투자를 발표함'])).length === 0);
+chk('c21: 숫자 규모가 keyFacts에 없으면 위반',
+    c21_costMagnitudeGrounded(cardWithFacts('약 30% 매출 감소가 발생한다',
+        ['메타는 데이터센터 투자를 발표함'])).some(i => i.code === 'c21_cost_magnitude_ungrounded'));
+chk('c21: 빈 costIfWrong은 검사 대상 아님', c21_costMagnitudeGrounded(cardWithFacts('', ['x'])).length === 0);
+chk('c21 severity=warning(카드 폐기 아님)',
+    c21_costMagnitudeGrounded(cardWithFacts('수십억 달러', ['x']))[0]?.severity === 'warning');
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} sowhat-slots: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

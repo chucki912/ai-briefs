@@ -4,10 +4,11 @@ import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matche
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
 import { recordKeyInsightMetrics } from './analyzers/key-insight-metrics';
 import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-schema';
-import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, bindEvidence, c17_evidenceMustExist, c18_singleTimepoint, c19_textYearMatchesValue } from './analyzers/structured-checks';
+import { checkCard, c21_costMagnitudeGrounded, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, bindEvidence, c17_evidenceMustExist, c18_singleTimepoint, c19_textYearMatchesValue } from './analyzers/structured-checks';
 import { repairFactYears } from './analyzers/fact-year-repair';
 import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { recordSoWhatMetrics } from './analyzers/sowhat-metrics';
+import { extractQuantitativeMetrics } from '@/configs/weekly-house-style';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, AI_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
@@ -262,7 +263,12 @@ export async function generateIssueFromCluster(
             downside: (soWhatV2.costIfWrong || soWhatV2.action?.costIfWrong || soWhatV2.action?.costIfMissed || '').trim(),
         };
         // So What 슬롯 채움률 지표(빈 값은 정상 — 억지 채움 금지 원칙. 비율만 관측한다).
-        recordSoWhatMetrics(soWhatV2, legacySoWhat, 'ai');
+        // costIfWrong 규모의 근거 유무(c21)도 함께 기록: 근거 없는 수치는 시사점 신뢰를 훼손한다.
+        const costText = soWhatV2.costIfWrong ?? '';
+        const magnitudeState = !costText.trim() ? 'n/a' as const
+            : c21_costMagnitudeGrounded({ keyFacts: cleanedFacts, structuredFacts, soWhatV2, soWhat: legacySoWhat } as IssueItem).length ? 'ungrounded' as const
+                : (extractQuantitativeMetrics(costText).length > 0 ? 'grounded' as const : 'qualitative' as const);
+        recordSoWhatMetrics(soWhatV2, legacySoWhat, 'ai', magnitudeState);
 
         // 소스: fact가 실제 결박한 것만 (271 헤드라인 필터 + 312 cluster[0] 날조 폐기)
         const usedIds = new Set(structuredFacts.flatMap(f => f.sourceIds));

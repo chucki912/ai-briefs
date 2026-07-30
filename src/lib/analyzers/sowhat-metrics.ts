@@ -27,12 +27,14 @@ export function recordSoWhatMetrics(
     v2: SoWhatV2,
     legacy: { bet: string; downside: string },
     domain: 'ai' | 'battery' = 'ai',
+    /** costIfWrong 규모의 근거 유무(c21). 미지정이면 'n/a'로 기록. */
+    magnitude: 'grounded' | 'ungrounded' | 'qualitative' | 'n/a' = 'n/a',
 ): void {
     const costFilled = !empty(v2.costIfWrong) || !empty(v2.action?.costIfWrong);
     const betFilled = !empty(legacy.bet);
     const betEqMetric = !empty(legacy.bet) && !empty(v2.observe?.metric)
         && legacy.bet.trim() === (v2.observe?.metric ?? '').trim();
-    console.log(`[SOWHAT-METRIC] domain=${domain} actionType=${v2.actionType} costIfWrong=${costFilled ? 'filled' : 'empty'} downside=${empty(legacy.downside) ? 'empty' : 'filled'} bet=${betFilled ? 'filled' : 'empty'} betEqualsMetric=${betEqMetric ? 1 : 0}`);
+    console.log(`[SOWHAT-METRIC] domain=${domain} actionType=${v2.actionType} costIfWrong=${costFilled ? 'filled' : 'empty'} downside=${empty(legacy.downside) ? 'empty' : 'filled'} bet=${betFilled ? 'filled' : 'empty'} betEqualsMetric=${betEqMetric ? 1 : 0} costMagnitude=${magnitude}`);
 }
 
 /** 여러 카드의 슬롯 분포 집계(검증 스크립트·리포트용 순수 함수). */

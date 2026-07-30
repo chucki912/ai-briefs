@@ -13,6 +13,7 @@ import type {
     SoWhatV2,
     FactAssertedAt,
 } from '@/types';
+import { extractQuantitativeMetrics } from '@/configs/weekly-house-style';
 
 export interface CheckIssue {
     code: string;
@@ -363,6 +364,38 @@ export function factTemporalDistribution(facts: KeyFactStructured[]): TemporalDi
     return d;
 }
 
+/** 자릿수 없는 모호 규모어(금액 스케일 주장). "수십억 달러"처럼 숫자 없이 규모를 단정하는 표현. */
+const VAGUE_MAGNITUDE = /수십조|수조|수천억|수백억|수십억|수억|수천만|수백만/;
+/** keyFacts에 금액·비율 등 정량 근거가 존재하는가(자릿수 + 단위). */
+const GROUNDED_FIGURE = /\d[\d,.]*\s*(%|퍼센트|억|조|천만|백만|만|달러|원|위안|엔|유로|GW|MW|GWh|kWh|TWh|대|건|명|배)/;
+
+/** C21: costIfWrong의 정량 규모가 카드 사실에 근거하는가.
+ *  시사점·비용은 CEO가 의사결정 근거로 읽는 자리이므로 근거 없는 수치를 허용하지 않는다
+ *  (factAssertedAt·evidence 결속·c19와 동일 원칙). 규모 언급 자체는 금지하지 않는다 —
+ *  근거가 없으면 정성적으로("회복 불가능한 수준") 기술하면 통과한다.
+ *  휴리스틱(반올림·파생 표현 다양)이라 severity=warning: 카드 폐기 대신 계측·프롬프트 교정용. */
+export function c21_costMagnitudeGrounded(issue: IssueItem): CheckIssue[] {
+    const cost = (issue.soWhatV2?.costIfWrong ?? issue.soWhat?.downside ?? '').trim();
+    if (!cost) return [];
+    const factsText = [
+        ...(issue.keyFacts ?? []),
+        ...((issue.structuredFacts ?? []).map(f => f.text)),
+    ].join(' ');
+    const digitTokens = extractQuantitativeMetrics(cost);
+    const vague = VAGUE_MAGNITUDE.exec(cost)?.[0];
+    if (digitTokens.length === 0 && !vague) return [];   // 정성적 기술 → 통과
+    const ungrounded: string[] = [];
+    for (const t of digitTokens) {
+        const num = (t.match(/[\d,.]+/) ?? [''])[0].replace(/[.,]$/, '');
+        if (num && !factsText.includes(num)) ungrounded.push(t);
+    }
+    // 모호 규모어는 카드 사실에 정량 근거가 하나라도 있어야 인정
+    if (vague && !GROUNDED_FIGURE.test(factsText)) ungrounded.push(vague);
+    return ungrounded.length
+        ? [{ code: 'c21_cost_magnitude_ungrounded', severity: 'warning', message: `costIfWrong의 규모가 카드 사실에 근거 없음: ${ungrounded.join(', ')} — 근거 없으면 정성적으로("회복 불가능한 수준") 기술할 것` }]
+        : [];
+}
+
 /** C20: bet(판단 슬롯)에 observe.metric(관측 지표)을 복사하면 위반.
  *  "무엇에 걸 것인가"와 "무엇을 세는가"는 다른 슬롯이다. 복사하면 채워진 것처럼 보이면서
  *  판단이 없어 미출력보다 오래 은폐된다(실측: AI 카드 24/24가 그 상태였다). */
@@ -407,6 +440,7 @@ export function checkCard(issue: IssueItem, now: Date = new Date()): CardCheckRe
     issues.push(...c11_observeHasMetric(sw));
     issues.push(...c12_noneIsEmpty(sw));
     issues.push(...c20_betNotMetric(issue));
+    issues.push(...c21_costMagnitudeGrounded(issue));
     issues.push(...c15_backgroundNeedsTimepoint(facts));
     issues.push(...c16_unknownNotNumericBasis(insight, facts));
 

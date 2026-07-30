@@ -131,6 +131,7 @@ async function processThread(
     thread: GradedThread,
     items: NormalizedItem[],
     provider: JudgmentProvider,
+    buildFn: BuildThreadContentFn = buildThreadContent,
 ): Promise<ThreadOutcome> {
     const trace: WeeklyAttemptEntry[] = [];
     let content: WeeklyThreadContent | null = null;
@@ -138,7 +139,7 @@ async function processThread(
 
     for (let attempt = 0; attempt <= MAX_REGEN; attempt++) {
         const t0 = Date.now();
-        const built = await buildThreadContent(thread, items, provider, feedback);
+        const built = await buildFn(thread, items, provider, feedback);
         if (!built) {
             // 재등급으로 강등(선행근거 소실) — 재생성 대상 아님
             trace.push({ attempt, hardFailures: ['regrade_demoted'], softFailures: [], elapsedSec: (Date.now() - t0) / 1000 });
@@ -160,11 +161,17 @@ async function processThread(
     return { kind: 'demoted', demoted: { threadKey: thread.threadKey, label: thread.label, reason: 'dod_failed', memberCount: thread.members.length }, trace };
 }
 
+/** 본문 생성 함수 시그니처 — 테스트에서 위반 산출물을 강제 주입해 검증 경로를 확인하기 위한
+ *  주입점(pipeline의 clusterFn 주입과 동일 패턴). 프로덕션은 기본값(buildThreadContent) 사용. */
+export type BuildThreadContentFn = (
+    thread: GradedThread, items: NormalizedItem[], provider: JudgmentProvider, feedback?: string,
+) => Promise<WeeklyThreadContent | null>;
+
 /** 승격 스레드에 대해 PASS 4-6 실행(동시 2). 승격 0건이면 빈 threads. */
 export async function generateWeeklyReportContent(
     result: DeterministicWeekResult,
     items: NormalizedItem[],
-    opts: { concurrency?: number; provider?: JudgmentProvider } = {},
+    opts: { concurrency?: number; provider?: JudgmentProvider; buildFn?: BuildThreadContentFn } = {},
 ): Promise<WeeklyReportContent> {
     const provider = opts.provider ?? getJudgmentProvider();
     const concurrency = opts.concurrency ?? 2;
@@ -178,7 +185,8 @@ export async function generateWeeklyReportContent(
         console.log(`[WeeklyReport] 승격 후보 ${ranked.length}건 중 상위 ${MAX_PROMOTED}건만 작성(스펙 상한). 컷: ${cut.map(c => `${c.threadKey}(${c.grade})`).join(', ')}`);
     }
 
-    const outcomes = await mapWithConcurrency(selected, concurrency, (t) => processThread(t, items, provider));
+    const buildFn = opts.buildFn ?? buildThreadContent;
+    const outcomes = await mapWithConcurrency(selected, concurrency, (t) => processThread(t, items, provider, buildFn));
 
     const extraDemoted: DemotedThread[] = [];
     const attemptTraces: Record<string, WeeklyAttemptEntry[]> = {};
@@ -203,7 +211,7 @@ export async function generateWeeklyReportContent(
             if (shared.length === 0) continue;
             console.warn(`[8gram DoD] "${contents[i].thread.threadKey}"×"${contents[j].thread.threadKey}" 공유 8-gram ${shared.length}건 → 재생성: ${JSON.stringify(shared.slice(0, 2))}`);
             const fb = `다른 승격 사안과 본문 표현이 겹친다(공유 문장: ${JSON.stringify(shared.slice(0, 2))}). 이 사안(${contents[j].thread.label}) 고유의 사실·수치로 차별화해 다시 쓰라. 공통 배경 서술을 줄이고 이 사안만의 전개에 집중.`;
-            const rebuilt = await buildThreadContent(contents[j].thread, items, provider, fb);
+            const rebuilt = await buildFn(contents[j].thread, items, provider, fb);
             if (rebuilt && sharedBodyEightGrams(bodyOf(contents[i].content), bodyOf(rebuilt)).length === 0) {
                 contents[j] = { content: rebuilt, thread: contents[j].thread };
             } else {

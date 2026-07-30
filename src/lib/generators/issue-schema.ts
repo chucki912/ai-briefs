@@ -68,16 +68,16 @@ export const ISSUE_RESPONSE_SCHEMA = {
                 ifInferenceHolds: { type: 'string', description: '이 추론이 사실로 굳어질 때 바뀌는 것(사실 진위가 아니라 추론에 조건).' },
                 unknown: { type: 'string', description: '아직 확인되지 않은 핵심 변수.' },
                 actionType: { type: 'string', enum: ['act', 'observe', 'none'], description: "먼저 고를 것. 지금 실행='act', 관측만='observe', 할 것 없음='none'(정당한 선택)." },
+                costIfWrong: { type: 'string', description: "이 판단을 신뢰해 '행동 또는 관측 지속'을 택했는데 신호가 틀렸을 경우의 손실. (i)되돌릴 수 있는지 (ii)대략의 규모를 함께 쓸 것. actionType과 무관하게 작성한다(observe도 관측만 하다 늦는 기회손실이 있음). 입력에서 특정할 수 없으면 빈 문자열(억지로 일반론을 쓰지 말 것)." },
                 action: {
                     type: 'object',
                     description: "actionType='act'일 때만 채울 것.",
                     properties: {
                         what: { type: 'string', description: '구체적 행동(대상+행동).' },
                         reversible: { type: 'boolean', description: '되돌릴 수 있는가.' },
-                        costIfWrong: { type: 'string', description: '움직였는데 틀렸을 때의 비용.' },
                         costIfMissed: { type: 'string', description: '안 움직였는데 맞았을 때의 비용.' },
                     },
-                    required: ['what', 'reversible', 'costIfWrong', 'costIfMissed'],
+                    required: ['what', 'reversible', 'costIfMissed'],
                 },
                 observe: {
                     type: 'object',
@@ -131,8 +131,9 @@ ${KEY_INSIGHT_GUIDE}
    - 프레임워크가 지정된 경우에만 렌즈로 참고하되 명칭·수사를 본문에 복제하지 말 것. none이면 언급하지 말 것.
 5. **soWhat**:
    - **actionType을 먼저 고를 것**: 지금 실행할 게 있으면 'act', 관측만 필요하면 'observe', **지금 할 것이 없으면 'none'(완전히 정당한 선택 — 억지 베팅 금지)**.
-   - 'act'이면 action(what/reversible/costIfWrong/costIfMissed) 전부 채울 것. **costIfMissed(안 움직였는데 맞았을 때 비용)도 반드시**.
-   - 'observe'이면 observe(metric/cadence). metric은 셀 수 있는 지표여야 함.
+   - **costIfWrong(틀렸을 때의 비용) — actionType과 무관하게 작성한다**: 이 판단을 신뢰해 '행동 또는 관측 지속'을 택했는데 신호가 틀렸을 경우의 손실을 **(i) 되돌릴 수 있는지 (ii) 대략의 규모**로 쓸 것. 'observe'·'none'에도 비용이 존재한다(관측만 하다 대응이 늦어지는 기회손실). **입력 사실로 특정할 수 없으면 빈 문자열로 두라 — "시장 신뢰도 저하", "기회 손실 발생" 같은 일반론을 채우지 말 것(빈 값이 낫다).**
+   - 'act'이면 action(what/reversible/costIfMissed) 전부 채울 것. **costIfMissed(안 움직였는데 맞았을 때 비용)도 반드시**.
+   - 'observe'이면 observe(metric/cadence). metric은 셀 수 있는 지표여야 함. **관측 지표는 '베팅'이 아니다** — 실행할 행동이 없으면 행동 슬롯은 비운다(관측 지표를 행동으로 옮겨 적지 말 것).
    - 'none'이면 action·observe를 비울 것.
    - confidence가 'low'이면 actionType은 'observe' 또는 'none'만.
    - \`killTrigger\`: 논지가 무너지는 조건. **오늘(${today}) 이후의 미래 날짜** 또는 관측 가능한 수치 임계를 포함할 것. 과거 날짜 금지.

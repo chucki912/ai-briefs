@@ -7,6 +7,7 @@ import { ISSUE_RESPONSE_SCHEMA, buildIssuePrompt } from './generators/issue-sche
 import { checkCard, SOURCE_POLICY, c13_highRequiresBinding, c14_minDistinctOutlets, bindEvidence, c17_evidenceMustExist, c18_singleTimepoint, c19_textYearMatchesValue } from './analyzers/structured-checks';
 import { repairFactYears } from './analyzers/fact-year-repair';
 import { recordTemporalMetrics } from './analyzers/temporal-metrics';
+import { recordSoWhatMetrics } from './analyzers/sowhat-metrics';
 import { getRecentIssues } from './store';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, AI_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
@@ -244,6 +245,9 @@ export async function generateIssueFromCluster(
             ifInferenceHolds: String(swRaw.ifInferenceHolds || ''),
             unknown: String(swRaw.unknown || ''),
             actionType: (['act', 'observe', 'none'].includes(swRaw.actionType) ? swRaw.actionType : 'none'),
+            // costIfWrong은 actionType 무관 상위 필드(observe/none에도 기회손실이 실재).
+            // 이전엔 action 안에만 있어 act(실측 0건)에서만 도달 가능 → 100% 미출력이었다.
+            costIfWrong: String(swRaw.costIfWrong || '').trim() || undefined,
             action: swRaw.actionType === 'act' ? swRaw.action : undefined,
             observe: swRaw.actionType === 'observe' ? swRaw.observe : undefined,
             killTrigger: String(swRaw.killTrigger || ''),
@@ -251,9 +255,14 @@ export async function generateIssueFromCluster(
         const legacySoWhat = {
             ifTrue: soWhatV2.ifInferenceHolds,
             uncertain: soWhatV2.unknown,
-            bet: soWhatV2.action?.what || soWhatV2.observe?.metric || '지금 실행할 행동 없음(관망)',
-            downside: soWhatV2.action?.costIfWrong || soWhatV2.action?.costIfMissed || '—',
+            // bet은 '무엇에 걸 것인가'(판단), observe.metric은 '무엇을 세는가'(관측 지표) — 다른 슬롯이다.
+            // metric을 bet에 복사하면 채워진 것처럼 보이면서 판단이 없다(실측: AI 24/24가 그 상태).
+            // 쓸 행동이 없으면 빈 슬롯으로 두고 비율을 지표화한다(억지 채움 금지).
+            bet: (soWhatV2.action?.what || '').trim(),
+            downside: (soWhatV2.costIfWrong || soWhatV2.action?.costIfWrong || soWhatV2.action?.costIfMissed || '').trim(),
         };
+        // So What 슬롯 채움률 지표(빈 값은 정상 — 억지 채움 금지 원칙. 비율만 관측한다).
+        recordSoWhatMetrics(soWhatV2, legacySoWhat, 'ai');
 
         // 소스: fact가 실제 결박한 것만 (271 헤드라인 필터 + 312 cluster[0] 날조 폐기)
         const usedIds = new Set(structuredFacts.flatMap(f => f.sourceIds));

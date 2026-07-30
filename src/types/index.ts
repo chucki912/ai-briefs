@@ -68,11 +68,16 @@ export interface SoWhatV2 {
   ifInferenceHolds: string; // 사실이 아니라 '추론'에 조건을 검
   unknown: string;
   actionType: ActionType;   // 먼저 고른다(none 합법화)
+  /** 이 판단을 신뢰해 '행동 또는 관측 지속'을 택했는데 신호가 틀렸을 경우의 손실 —
+   *  (i) 되돌릴 수 있는지 (ii) 대략의 규모. actionType과 무관하게 존재한다
+   *  (observe에도 관측만 하다 늦는 기회손실이 실재). 근거 없으면 빈 값 허용(억지 채움 금지).
+   *  이전에는 action 객체 안에만 있어 act(=0건)에서만 도달 가능했고 100% 미출력이었다. */
+  costIfWrong?: string;
   action?: {                // actionType==='act'일 때만
     what: string;
     reversible: boolean;
-    costIfWrong: string;
-    costIfMissed: string;   // 신규: 안 움직였는데 맞았을 때
+    costIfWrong?: string;   // deep-dive 경로 호환(일일은 상위 costIfWrong 사용)
+    costIfMissed: string;   // 안 움직였는데 맞았을 때(act 한정 — 기존 유지)
   };
   observe?: {               // actionType==='observe'일 때만
     metric: string;         // 무엇을 세는가("지켜본다"만으론 불가)

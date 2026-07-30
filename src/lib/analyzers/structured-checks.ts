@@ -143,12 +143,14 @@ export function c9prime_actRequiresHigh(sw: SoWhatV2, insight: KeyInsightStructu
     return [];
 }
 
-/** C10: actionType='act' → action 전 필드 존재. */
+/** C10: actionType='act' → action 필드 존재(what/reversible/costIfMissed).
+ *  costIfWrong은 action 밖 상위 필드로 승격됐고 **optional**이다(근거 없으면 빈 값 허용 —
+ *  억지 일반론이 빈 슬롯보다 나쁘다). 따라서 여기서 필수로 요구하지 않는다. */
 export function c10_actComplete(sw: SoWhatV2): CheckIssue[] {
     if (sw.actionType !== 'act') return [];
     const a = sw.action;
-    if (!a || !a.what || typeof a.reversible !== 'boolean' || !a.costIfWrong || !a.costIfMissed) {
-        return [{ code: 'c10_incomplete_action', severity: 'error', message: 'actionType=act인데 action 필드 불완전(what/reversible/costIfWrong/costIfMissed)' }];
+    if (!a || !a.what || typeof a.reversible !== 'boolean' || !a.costIfMissed) {
+        return [{ code: 'c10_incomplete_action', severity: 'error', message: 'actionType=act인데 action 필드 불완전(what/reversible/costIfMissed)' }];
     }
     return [];
 }
@@ -361,6 +363,18 @@ export function factTemporalDistribution(facts: KeyFactStructured[]): TemporalDi
     return d;
 }
 
+/** C20: bet(판단 슬롯)에 observe.metric(관측 지표)을 복사하면 위반.
+ *  "무엇에 걸 것인가"와 "무엇을 세는가"는 다른 슬롯이다. 복사하면 채워진 것처럼 보이면서
+ *  판단이 없어 미출력보다 오래 은폐된다(실측: AI 카드 24/24가 그 상태였다). */
+export function c20_betNotMetric(issue: IssueItem): CheckIssue[] {
+    const bet = (issue.soWhat?.bet ?? '').trim();
+    const metric = (issue.soWhatV2?.observe?.metric ?? '').trim();
+    if (bet && metric && bet === metric) {
+        return [{ code: 'c20_bet_equals_metric', severity: 'error', message: `bet이 observe.metric과 동일 문자열 — 판단 슬롯에 관측 지표 복사("${bet.slice(0, 40)}")` }];
+    }
+    return [];
+}
+
 /** C12: actionType='none' → action·observe 부재. */
 export function c12_noneIsEmpty(sw: SoWhatV2): CheckIssue[] {
     if (sw.actionType !== 'none') return [];
@@ -392,6 +406,7 @@ export function checkCard(issue: IssueItem, now: Date = new Date()): CardCheckRe
     issues.push(...c10_actComplete(sw));
     issues.push(...c11_observeHasMetric(sw));
     issues.push(...c12_noneIsEmpty(sw));
+    issues.push(...c20_betNotMetric(issue));
     issues.push(...c15_backgroundNeedsTimepoint(facts));
     issues.push(...c16_unknownNotNumericBasis(insight, facts));
 

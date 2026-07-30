@@ -60,12 +60,14 @@ export default function IssueCard({ issue, index, onDeepDive, isSelectionMode, i
 
         let soWhatText = '';
         if (issue.soWhat) {
-            soWhatText = `\n■ So What (의사결정 판단)
-- 이 신호가 사실이라면: ${issue.soWhat.ifTrue}
-- 아직 불확실한 것: ${issue.soWhat.uncertain}
-- 합리적 베팅: ${issue.soWhat.bet}
-- 틀렸을 때의 비용: ${issue.soWhat.downside}
-`;
+            // 빈 슬롯은 줄을 생략한다(근거 없으면 비운다 — 라벨만 남기지 않음)
+            const swLines = [
+                ['이 신호가 사실이라면', issue.soWhat.ifTrue],
+                ['아직 불확실한 것', issue.soWhat.uncertain],
+                ['합리적 베팅', issue.soWhat.bet],
+                ['틀렸을 때의 비용', issue.soWhat.downside],
+            ].filter(([, v]) => (v ?? '').trim()).map(([k, v]) => `- ${k}: ${v}`);
+            soWhatText = swLines.length ? `\n■ So What (의사결정 판단)\n${swLines.join('\n')}\n` : '';
         }
 
         const contentToCopy = `[${issue.category || issue.framework || 'Issue'}] ${issue.headline}
@@ -167,14 +169,18 @@ ${sourcesText}`;
                             <span className="so-what-label">아직 불확실한 것</span>
                             <p className="so-what-text">{issue.soWhat.uncertain}</p>
                         </div>
-                        <div className="so-what-item">
-                            <span className="so-what-label">합리적 베팅</span>
-                            <p className="so-what-text">{issue.soWhat.bet}</p>
-                        </div>
-                        <div className="so-what-item">
-                            <span className="so-what-label">틀렸을 때의 비용</span>
-                            <p className="so-what-text">{issue.soWhat.downside}</p>
-                        </div>
+                        {(issue.soWhat.bet ?? '').trim() && (
+                            <div className="so-what-item">
+                                <span className="so-what-label">합리적 베팅</span>
+                                <p className="so-what-text">{issue.soWhat.bet}</p>
+                            </div>
+                        )}
+                        {(issue.soWhat.downside ?? '').trim() && (
+                            <div className="so-what-item">
+                                <span className="so-what-label">틀렸을 때의 비용</span>
+                                <p className="so-what-text">{issue.soWhat.downside}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

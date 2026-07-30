@@ -43,7 +43,10 @@ chk("C5' 날짜·수치 모두 없음 탐지", c5prime_killTriggerFuture({ ...sw
 chk("C9' act+low 탐지", c9prime_actRequiresHigh(swAct, { ...insight, confidence: 'low' }).length > 0);
 chk("C9' act+high 정상", c9prime_actRequiresHigh(swAct, insight).length === 0);
 // C10
-chk('C10 불완전 action 탐지', c10_actComplete({ ...swAct, action: { what: 'x', reversible: true, costIfWrong: '', costIfMissed: 'd' } }).length > 0);
+// C10 계약 변경(So What 수정): costIfWrong은 action 밖 상위 필드로 승격 + optional(빈 값 허용).
+// 따라서 costIfWrong 빈 값은 위반이 아니고, costIfMissed 누락이 위반이다.
+chk('C10 불완전 action 탐지(costIfMissed 누락)', c10_actComplete({ ...swAct, action: { what: 'x', reversible: true, costIfMissed: '' } }).length > 0);
+chk('C10 costIfWrong 빈 값은 위반 아님(빈 슬롯 허용)', c10_actComplete({ ...swAct, action: { what: 'x', reversible: true, costIfMissed: 'd' } }).length === 0);
 chk('C10 정상', c10_actComplete(swAct).length === 0);
 // C11
 chk('C11 metric 없음 탐지', c11_observeHasMetric({ ...swAct, actionType: 'observe', action: undefined, observe: { metric: '', cadence: 'd' } }).length > 0);

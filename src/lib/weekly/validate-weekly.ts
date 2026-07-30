@@ -40,19 +40,21 @@ export function eightGramOverlap(implication: string, body: string): number {
     return overlap;
 }
 
-/** 독자 문서에 노출 금지된 내부 어휘 패턴(B-6). 매칭된 표현을 반환. */
+/** 독자 문서에 노출 금지된 내부 어휘 패턴(B-6). 매칭된 표현을 반환.
+ *  ★ /g 플래그 금지: 모듈 레벨 RegExp를 재사용하면 test()가 lastIndex를 누적해
+ *    두 번째 호출부터 위반을 놓친다(간헐적 미검출 = 은폐 재발). 테스트로 적발됨. */
 export const INTERNAL_VOCAB_PATTERNS: Array<[RegExp, string]> = [
-    [/\bM[1-5]\b/g, '운동유형 코드(M1~M5)'],
-    [/motionType/gi, 'motionType'],
-    [/승격/g, '승격'],
-    [/강등/g, '강등'],
-    [/게이트/g, '게이트'],
-    [/스레드/g, '스레드'],
-    [/threadKey/gi, 'threadKey'],
-    [/priorWeeks\w*/gi, 'priorWeeks'],
-    [/observedDates/gi, 'observedDates'],
-    [/킬\s*트리거/g, '킬 트리거'],
-    [/등급\s*[ABC]\b/g, '등급 코드'],
+    [/\bM[1-5]\b/, '운동유형 코드(M1~M5)'],
+    [/motionType/i, 'motionType'],
+    [/승격/, '승격'],
+    [/강등/, '강등'],
+    [/게이트/, '게이트'],
+    [/스레드/, '스레드'],
+    [/threadKey/i, 'threadKey'],
+    [/priorWeeks\w*/i, 'priorWeeks'],
+    [/observedDates/i, 'observedDates'],
+    [/킬\s*트리거/, '킬 트리거'],
+    [/등급\s*[ABC]\b/, '등급 코드'],
 ];
 export function findInternalVocab(text: string): string[] {
     const hits = new Set<string>();

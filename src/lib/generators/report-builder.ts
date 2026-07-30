@@ -70,12 +70,15 @@ ${year}년 ${month}월 ${day}일 (${dayOfWeek})
 `;
 
             if (issue.soWhat) {
-                md += `So What:
-사실이라면: ${issue.soWhat.ifTrue}
-불확실: ${issue.soWhat.uncertain}
-베팅: ${issue.soWhat.bet}
-틀렸을 때: ${issue.soWhat.downside}
-`;
+                // 빈 슬롯은 줄을 생략(근거 없으면 비운다 — 라벨만 남기지 않음)
+                const swPairs: Array<[string, string | undefined]> = [
+                    ['사실이라면', issue.soWhat.ifTrue],
+                    ['불확실', issue.soWhat.uncertain],
+                    ['베팅', issue.soWhat.bet],
+                    ['틀렸을 때', issue.soWhat.downside],
+                ];
+                const swLines = swPairs.filter(([, v]) => (v ?? '').trim()).map(([k, v]) => `${k}: ${v}`);
+                if (swLines.length) md += `So What:\n${swLines.join('\n')}\n`;
             }
 
             md += `원문:

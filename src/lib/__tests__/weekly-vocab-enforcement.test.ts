@@ -61,6 +61,15 @@ async function main() {
         leakTrace.filter(t => t.hardFailures.includes('internal_vocab_exposed')).length === 2,
         JSON.stringify(leakTrace));
 
+    // ── /g lastIndex 상태 버그 재발 방지(동작 기준 가드) ─────────────────────
+    const { findInternalVocab, INTERNAL_VOCAB_PATTERNS } = await import('../weekly/validate-weekly');
+    const v1 = findInternalVocab(LEAK), v2 = findInternalVocab(LEAK), v3 = findInternalVocab('확산(M4)되면');
+    chk('(3) 동일 위반 텍스트 반복 호출이 멱등(1회차=2회차)', v1.length > 0 && v1.length === v2.length, `v1=${v1.length} v2=${v2.length}`);
+    chk('(3) 위반 이후 다른 위반 텍스트도 적발(lastIndex 누적 없음)', v3.length > 0, JSON.stringify(v3));
+    chk('(3) 패턴에 /g 플래그 없음(상태 없는 test 보장)',
+        INTERNAL_VOCAB_PATTERNS.every(([re]) => !re.flags.includes('g')),
+        INTERNAL_VOCAB_PATTERNS.filter(([re]) => re.flags.includes('g')).map(([re]) => String(re)).join(','));
+
     console.log(`\n${fail === 0 ? '✅' : '❌'} weekly-vocab-enforcement: ${pass} passed, ${fail} failed`);
     process.exit(fail === 0 ? 0 : 1);
 }

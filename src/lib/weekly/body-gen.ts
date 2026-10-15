@@ -12,13 +12,13 @@
  */
 import { PRO_MODEL } from '../gemini-models';
 import { generateWithRetry } from '../deep-dive-pipeline';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { LENGTH, STRUCTURE, PARAGRAPH_MIX } from '@/configs/weekly-house-style';
 import type { MotionTypeCode, Grade, PriorEvidence } from './grade';
 import type { GradedThread } from './pipeline';
 import type { NormalizedItem } from './types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 const MODEL = process.env.WEEKLY_BODY_MODEL || PRO_MODEL;
 
 export interface BodyDraft {

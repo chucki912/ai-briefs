@@ -10,9 +10,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(request: Request): Promise<NextResponse<FlashApiResponse>> {
   try {
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
-        { success: false, error: 'GEMINI_API_KEY 가 설정되지 않았습니다. .env.local 을 확인하세요.' },
+        { success: false, error: 'OPENROUTER_API_KEY 가 설정되지 않았습니다. .env.local 을 확인하세요.' },
         { status: 500 },
       );
     }

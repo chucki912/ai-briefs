@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from './llm-client';
 import { NewsItem, IssueItem, SourceRef, KeyFactStructured, KeyInsightStructured, SoWhatV2 } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
@@ -14,7 +14,7 @@ import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, AI_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
 
 // Gemini API 클라이언트 초기화
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 // 뉴스 분석 및 인사이트 생성
 export async function analyzeNewsAndGenerateInsights(

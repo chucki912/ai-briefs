@@ -8,7 +8,7 @@
  */
 import * as dotenv from 'dotenv'; import * as fs from 'fs'; import * as path from 'path'; import { execSync } from 'child_process';
 for (const f of ['.env.local', '.env.development.local', '.env']) { const p = path.join(process.cwd(), f); if (fs.existsSync(p)) dotenv.config({ path: p }); }
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../src/lib/llm-client';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
 import { fetchAllNews } from '../src/lib/collectors/news-fetcher';
 import { generateIssueFromCluster } from '../src/lib/gemini';
@@ -32,8 +32,8 @@ function clusterNewsByTopic(items: NewsItem[]): NewsItem[][] {
 async function main() {
     const nArg = process.argv.find(a => a.startsWith('--n='));
     const N = nArg ? parseInt(nArg.split('=')[1], 10) : 5;
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) { console.log('GEMINI_API_KEY 없음 — 종료'); return; }
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) { console.log('OPENROUTER_API_KEY 없음 — 종료'); return; }
 
     let sha = 'unknown';
     try { sha = execSync('git rev-parse HEAD').toString().trim(); } catch { /* */ }
@@ -44,7 +44,7 @@ async function main() {
     const top = clusters.slice(0, N);
     console.log(`# 수집 ${news.length} 아이템 → 클러스터 ${clusters.length} → top-${top.length}\n`);
 
-    const model = new GoogleGenerativeAI(key).getGenerativeModel({ model: FLASH_MODEL });
+    const model = new OpenRouterGenAI(key).getGenerativeModel({ model: FLASH_MODEL });
     for (let i = 0; i < top.length; i++) {
         const c = top[i];
         console.log(`\n===== [카드 ${i + 1}] 입력 클러스터 (size=${c.length}) =====`);

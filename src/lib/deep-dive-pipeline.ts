@@ -9,7 +9,7 @@
  *      → pass 2(FLASH+responseSchema 구조화, 내용 게이트+2단 복구)
  *      → renderDeepDiveB(파생 마크다운). structured(JSON)가 원본(source of truth).
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from './llm-client';
 import { IssueItem, SourceRef, ReportType, DeepDiveStructured } from '@/types';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 import { TRIANGULATION_CONFIG, CONTENT_GATE_CONFIG, GLOBAL_BUDGET, SOURCE_TIERING, GROUNDING_POLICY } from './validation-config';
@@ -18,7 +18,7 @@ import { validateDeepDiveContent, type ContentGateResult } from './validate-deep
 import { DEEP_DIVE_RESPONSE_SCHEMA, DEEP_DIVE_STRUCTURING_SYSTEM_PROMPT, buildStructuringInput, buildPass1ContentFeedback } from './deep-dive-schema';
 import { renderDeepDiveB } from './render-deep-dive-b';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 // 트렌드 센싱 리포트 (Deep Dive) 생성 결과.
 // structured(JSON)가 원본(source of truth)이고 markdown은 renderDeepDiveB(B유형)가 만든 파생물임.

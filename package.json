@@ -12,6 +12,7 @@
     "check:gemini": "npx tsx scripts/check-gemini-models.ts",
     "test:key-insight": "npx tsx scripts/test-key-insight.ts && npx tsx scripts/test-key-insight-regen.ts && npx tsx scripts/test-key-insight-metrics.ts && npx tsx scripts/test-structured-checks.ts",
     "test:triangulation": "npx tsx src/lib/__tests__/validate-triangulation.test.ts",
+    "test:llm-client": "npx tsx src/lib/__tests__/llm-client.test.ts",
     "test:render-b": "npx tsx src/lib/__tests__/render-deep-dive-b.test.ts",
     "test:content-gate": "npx tsx src/lib/__tests__/validate-deep-dive.test.ts",
     "test:deep-dive-domain": "npx tsx src/lib/__tests__/deep-dive-domain.test.ts",

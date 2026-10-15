@@ -3,15 +3,15 @@
  *
  * 사양은 Anthropic web_search 를 전제했으나, 본 프로젝트는 기존 스택과 동일하게
  * Gemini grounding 으로 실시간 웹 검색을 수행한다(battery-gemini.ts 와 동일 패턴).
- * API 키(GEMINI_API_KEY)는 서버에서만 사용되며 클라이언트 번들에 포함되지 않는다.
+ * API 키(OPENROUTER_API_KEY)는 서버에서만 사용되며 클라이언트 번들에 포함되지 않는다.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { WEEKLY_FLASH_SYSTEM_PROMPT } from './prompt';
 import { parseFlashMemo } from './parse';
 import { FlashMemo, GroundingSource } from './types';
 import { PRO_MODEL } from '../gemini-models';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 /** 모델은 env 로 분리. 기본값은 grounding 품질이 높은 Pro 모델. */
 const MODEL = process.env.WEEKLY_FLASH_MODEL || PRO_MODEL;

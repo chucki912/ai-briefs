@@ -6,7 +6,7 @@
  */
 import * as dotenv from 'dotenv'; import * as fs from 'fs'; import * as path from 'path';
 for (const f of ['.env.local', '.env.development.local', '.env']) { const p = path.join(process.cwd(), f); if (fs.existsSync(p)) dotenv.config({ path: p }); }
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../src/lib/llm-client';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
 import { fetchAllNews } from '../src/lib/collectors/news-fetcher';
 import { generateIssueFromCluster } from '../src/lib/gemini';
@@ -23,8 +23,8 @@ function cluster(items: NewsItem[]): NewsItem[][] {
 interface Row { i: number; size: number; survived: boolean; headline: string; conf: string; restsOnN: number; outletsRestsOn: number; outletsAll: number; }
 
 async function main() {
-    const key = process.env.GEMINI_API_KEY; if (!key) { console.log('no key'); return; }
-    const model = new GoogleGenerativeAI(key).getGenerativeModel({ model: FLASH_MODEL });
+    const key = process.env.OPENROUTER_API_KEY; if (!key) { console.log('no key'); return; }
+    const model = new OpenRouterGenAI(key).getGenerativeModel({ model: FLASH_MODEL });
     const news = await fetchAllNews();
     const nonG = news.filter(n => n.source !== 'Google News');
     const clB = cluster(nonG);

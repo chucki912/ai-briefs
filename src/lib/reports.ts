@@ -1,11 +1,11 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from './llm-client';
 import { IssueItem } from '@/types';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { getIssuesByDateRange } from './store';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 // 통합 리포트의 '기간 구분'(주간/월간/커스텀). 리포트 '모드'는 @/types의 ReportType('consolidated')이며,
 // 이름 충돌을 피하기 위해 AggregationPeriod로 개명 (요청 계약의 허용 값은 불변).

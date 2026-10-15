@@ -11,7 +11,7 @@
  *   --asof=2026-07-24    기준일(기본 오늘, KST 무관 로컬)
  *   --write              threadIndex에 실제 기록(미지정 시 dry-run)
  *
- * 주의: prod KV(REDIS_URL)와 Gemini(GEMINI_API_KEY)에 접근한다. dotenv를 store 로드
+ * 주의: prod KV(REDIS_URL)와 LLM(OPENROUTER_API_KEY)에 접근한다. dotenv를 store 로드
  * 이전에 주입하기 위해 백필 코어는 동적 import한다(CJS 평가 순서 의존 회피).
  */
 import * as dotenv from 'dotenv';

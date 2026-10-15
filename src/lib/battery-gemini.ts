@@ -1,7 +1,7 @@
 // Battery Industry Gemini Analyzer
 // 배터리 산업 전용 분석기 (K-Battery 관점)
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from './llm-client';
 import { NewsItem, IssueItem, KeyFactStructured } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
 import { getRecentIssues } from './store';
@@ -14,13 +14,13 @@ import { recordTemporalMetrics } from './analyzers/temporal-metrics';
 import { FLASH_MODEL } from './gemini-models';
 import { generateStructuredDeepDive, generateWithRetry, BATTERY_DEEP_DIVE_DOMAIN, type TrendReportResult } from './deep-dive-pipeline';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 // 배터리 뉴스 분석 및 인사이트 생성
 export async function analyzeBatteryNewsAndGenerateInsights(
     newsItems: NewsItem[]
-): Promise<IssueItem[]> {FLASH_MODEL
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+): Promise<IssueItem[]> {
+    const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
 
     // 뉴스를 관련 주제별로 클러스터링
     const clusters = clusterBatteryNewsByTopic(newsItems);

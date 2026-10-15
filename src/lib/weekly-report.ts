@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { OpenRouterGenAI, GenerativeModel } from './llm-client';
 import { IssueItem } from '@/types';
 import { FLASH_MODEL, PRO_MODEL } from './gemini-models';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface IssueCluster {
@@ -14,8 +14,7 @@ export interface IssueCluster {
 // ─── 1. AI-Driven Issue Clustering ──────────────────────────────────────────
 export async function clusterIssuesByAI(issues: IssueItem[], domain: 'ai' | 'battery' = 'ai'): Promise<IssueCluster[]> {
     if (issues.length === 0) return [];
-FLASH_MODEL
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+    const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
 
     const issueList = issues.map((issue, idx) =>
         `[${idx}] ${issue.headline}\n    Facts: ${issue.keyFacts.slice(0, 2).join(' | ')}`

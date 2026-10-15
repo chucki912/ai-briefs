@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 (async () => {
-    // env 로드 후 import (모듈 로드 시점에 GEMINI_API_KEY를 읽는 구조라 정적 import 금지)
+    // env 로드 후 import (모듈 로드 시점에 OPENROUTER_API_KEY를 읽는 구조라 정적 import 금지)
     const { generateTrendReport } = await import('../src/lib/gemini');
     const { generateBatteryTrendReport } = await import('../src/lib/battery-gemini');
     const { AI_DEEP_DIVE_DOMAIN, BATTERY_DEEP_DIVE_DOMAIN } = await import('../src/lib/deep-dive-pipeline');

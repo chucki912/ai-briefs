@@ -13,12 +13,12 @@
  *
  * 순수 파트(prompt/parse/validate)는 API 없이 테스트 가능하도록 분리.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { PRO_MODEL } from '../gemini-models';
 import type { PriorEvidence } from './grade';
 import type { WebBoostContext, WebBoostFn } from './pipeline';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 const MODEL = process.env.WEEKLY_PRIOR_BOOST_MODEL || PRO_MODEL;
 const TIMEOUT_MS = 90_000;
 const MAX_ATTEMPTS = 3;

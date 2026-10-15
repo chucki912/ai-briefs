@@ -5,11 +5,11 @@
  * (PRO+googleSearch와 responseSchema 동시 사용 금지). 창작 금지 — 초안에 있는 것만 추출.
  * threadKey/label/grade/판단(시사점·킬트리거)은 코드가 stamp(모델 추출 금지).
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { FLASH_MODEL } from '../gemini-models';
 import { generateWithRetry } from '../deep-dive-pipeline';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 const MODEL = process.env.WEEKLY_STRUCTURE_MODEL || FLASH_MODEL;
 
 export interface WeeklyTable {

@@ -15,7 +15,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../src/lib/llm-client';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
 import {
     validateKeyInsight,
@@ -123,13 +123,13 @@ async function main() {
         return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-        console.log('\n⚠️  GEMINI_API_KEY 미설정 — 실제 API 측정을 건너뜁니다(코드 0).');
+        console.log('\n⚠️  OPENROUTER_API_KEY 미설정 — 실제 API 측정을 건너뜁니다(코드 0).');
         return;
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new OpenRouterGenAI(apiKey);
     const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
     const call = async (prompt: string) => (await (await model.generateContent(prompt)).response).text();
 

@@ -8,14 +8,14 @@
  * 맞춘다(내용·수치·마크다운 보존). 본문 목표는 시사점 길이에서 역산해 비율까지 협응.
  * 상수는 유지(임의 조정 금지). 재생성 빈도를 낮춰 800s 타이밍도 완화.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { FLASH_MODEL } from '../gemini-models';
 import { generateWithRetry } from '../deep-dive-pipeline';
 import { LENGTH } from '@/configs/weekly-house-style';
 import { charLen } from './validate-weekly';
 import type { WeeklyThreadContent } from './report-gen';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 const MODEL = process.env.WEEKLY_REPAIR_MODEL || FLASH_MODEL;
 const TARGET_RATIO = 0.225;          // 비율 창 20~25% 중앙
 const TOL = 0.08;                    // 목표 대비 허용 오차

@@ -11,12 +11,12 @@
  *   - LLM 심사 5항목(structure/evidence/causal/action/style)
  *   - False-Negative율: LLM이 warning/fail 준 1차 insight 중 규칙이 error로 못 잡은 비율
  *
- * API 키(GEMINI_API_KEY) 없으면 안내 후 정상 종료(코드 0). dry-run/타입검사는 키 없이 가능.
+ * API 키(OPENROUTER_API_KEY) 없으면 안내 후 정상 종료(코드 0). dry-run/타입검사는 키 없이 가능.
  */
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../src/lib/llm-client';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
 import { generateIssueFromCluster } from '../src/lib/gemini';
 import { validateKeyInsight, KeyInsightValidation, ValidatedKeyInsightResult } from '../src/lib/analyzers/key-insight';
@@ -130,14 +130,14 @@ async function main() {
         return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-        console.log('\n⚠️  GEMINI_API_KEY 미설정 — 실제 API 평가를 건너뜁니다(코드 0).');
+        console.log('\n⚠️  OPENROUTER_API_KEY 미설정 — 실제 API 평가를 건너뜁니다(코드 0).');
         console.log('    (단위 테스트/타입 검사/--dry-run 은 키 없이 실행 가능)');
         return;
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new OpenRouterGenAI(apiKey);
     const model = genAI.getGenerativeModel({ model: FLASH_MODEL });
     const judge = async (prompt: string) => (await (await model.generateContent(prompt)).response).text();
 

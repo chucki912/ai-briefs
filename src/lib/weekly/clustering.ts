@@ -9,7 +9,7 @@
  *
  * 파싱/살균은 순수 함수(parseAndSanitize)로 분리해 API 없이 테스트 가능.
  */
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { OpenRouterGenAI, GenerativeModel } from '../llm-client';
 import { FLASH_MODEL } from '../gemini-models';
 import {
     INDUSTRY_TAGS, INDUSTRY_TAG_LABELS, validateIndustryTags,
@@ -17,7 +17,7 @@ import {
 import { canonicalThreadKey } from '../thread-index';
 import type { NormalizedItem, ClusterAssignment, ClusterMember } from './types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
 
 export interface ThreadCandidate { threadKey: string; label: string; }
 

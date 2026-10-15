@@ -15,7 +15,7 @@
  *   - 등급 C: 단정하지 말고 무엇을 더 관측해야 판단이 서는지 쓴다.
  * (금지어미·8-gram 중복·C단정 검사는 PASS 7 DoD에서 코드로 강제 — T6)
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../llm-client';
 import { PRO_MODEL } from '../gemini-models';
 import { generateWithRetry } from '../deep-dive-pipeline';
 import { IMPLICATION_FORBIDDEN_ENDINGS, LENGTH } from '@/configs/weekly-house-style';
@@ -104,7 +104,7 @@ JSON만 출력.`;
 /** 기본 구현: Gemini(비-grounded) + responseSchema. 호출경로/에러핸들링 재사용. */
 export class GeminiJudgmentProvider implements JudgmentProvider {
     readonly name = 'gemini';
-    private genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    private genAI = new OpenRouterGenAI(process.env.OPENROUTER_API_KEY || '');
     private model = process.env.WEEKLY_JUDGMENT_MODEL || PRO_MODEL;
 
     async generate(input: JudgmentInput): Promise<Judgment> {

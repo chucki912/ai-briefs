@@ -9,7 +9,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenRouterGenAI } from '../src/lib/llm-client';
 import { FLASH_MODEL } from '../src/lib/gemini-models';
 import { generateIssueFromCluster } from '../src/lib/gemini';
 import { NewsItem } from '../src/types';
@@ -32,9 +32,9 @@ function buildCluster(c: Fx): NewsItem[] {
 
 async function main() {
     const fx: Fx[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'key-insight-cases.json'), 'utf-8')).slice(0, LIMIT);
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) { console.log('GEMINI_API_KEY 없음 — 종료'); return; }
-    const model = new GoogleGenerativeAI(key).getGenerativeModel({ model: FLASH_MODEL });
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) { console.log('OPENROUTER_API_KEY 없음 — 종료'); return; }
+    const model = new OpenRouterGenAI(key).getGenerativeModel({ model: FLASH_MODEL });
 
     const cards: any[] = [];
     for (const c of fx) {

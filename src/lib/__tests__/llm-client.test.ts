@@ -82,7 +82,35 @@ const genAI = new OpenRouterGenAI('test-key');
         chk('200 본문 내 오류 → status 503', (await statusOf()) === 503);
     }
 
-    // 6. 키 미설정 → 즉시 401 오류(네트워크 호출 없음)
+    // 6. 폭주 방어: 기본 max_tokens 적용(호출부 지정 시 우선) + 타임아웃 signal 전달
+    {
+        let sawSignal = false;
+        globalThis.fetch = (async (_url: unknown, init?: { body?: string; signal?: AbortSignal }) => {
+            lastBody = JSON.parse(init?.body ?? '{}');
+            sawSignal = init?.signal instanceof AbortSignal;
+            return new Response(JSON.stringify(ok({ content: 'x' })), { status: 200 });
+        }) as typeof fetch;
+        await genAI.getGenerativeModel({ model: 'm' }).generateContent('Q');
+        chk('기본 max_tokens 적용 + 타임아웃 signal', lastBody.max_tokens === 32768 && sawSignal, `max_tokens=${lastBody.max_tokens} signal=${sawSignal}`);
+        await genAI.getGenerativeModel({ model: 'm', generationConfig: { maxOutputTokens: 1000 } }).generateContent('Q');
+        chk('maxOutputTokens 지정 시 우선', lastBody.max_tokens === 1000);
+    }
+
+    // 7. 타임아웃·전송 실패 → LlmError(503) (호출부가 API 실패로 식별)
+    {
+        const errOf = async () => {
+            try { await genAI.getGenerativeModel({ model: 'm' }).generateContent('Q'); return null; }
+            catch (e) { return e as { name?: string; status?: number; message?: string }; }
+        };
+        globalThis.fetch = (async () => { throw new DOMException('timed out', 'TimeoutError'); }) as typeof fetch;
+        const t = await errOf();
+        chk('타임아웃 → LlmError 503', t?.name === 'LlmError' && t.status === 503 && /시간 초과/.test(t.message ?? ''), JSON.stringify(t));
+        globalThis.fetch = (async () => { throw new TypeError('fetch failed'); }) as typeof fetch;
+        const n = await errOf();
+        chk('전송 실패 → LlmError 503', n?.name === 'LlmError' && n.status === 503, JSON.stringify(n));
+    }
+
+    // 8. 키 미설정 → 즉시 401 오류(네트워크 호출 없음)
     {
         try { await new OpenRouterGenAI('').getGenerativeModel({ model: 'm' }).generateContent('Q'); chk('키 미설정 → 오류', false); }
         catch (e) { chk('키 미설정 → 오류(401)', (e as { status?: number }).status === 401); }

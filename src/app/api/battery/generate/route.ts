@@ -4,6 +4,9 @@ import { analyzeBatteryNewsAndGenerateInsights } from '@/lib/battery-gemini';
 import { saveBrief, getBriefByDate } from '@/lib/store';
 import { BriefReport, IssueItem } from '@/types';
 
+// 수집 ~30s + LLM 이슈 생성(호출당 17~67s, 실측 총 187s) — 기본 제한 근접이라 상향
+export const maxDuration = 800;
+
 // Helper: Markdown 생성
 function buildBatteryMarkdown(issues: IssueItem[], dateStr: string): string {
     let md = `# 🔋 Battery Daily Brief - ${dateStr}\n\n`;

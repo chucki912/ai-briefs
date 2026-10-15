@@ -4,6 +4,9 @@ import { analyzeNewsAndGenerateInsights } from '@/lib/gemini';
 import { buildReport, buildEmptyReport } from '@/lib/generators/report-builder';
 import { saveBrief, getBriefByDate } from '@/lib/store';
 
+// 수집 ~30s + LLM 이슈 생성(호출당 17~67s, 실측 총 187s) — 기본 제한 근접이라 상향
+export const maxDuration = 800;
+
 // 브리핑 생성 API (Vercel Cron 지원을 위해 GET 추가)
 export async function GET(request: Request) {
     return handleGenerate(request);

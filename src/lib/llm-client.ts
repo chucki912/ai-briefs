@@ -15,6 +15,13 @@
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+/**
+ * 폭주 생성·무응답 방어: 출력 상한(추론 토큰 포함) + 요청 타임아웃.
+ * 실측(2026-10-15) 이슈 생성 1회 4~11k 토큰·17~67s — 상한은 최대 실측의 약 3배.
+ */
+const DEFAULT_MAX_TOKENS = 32768;
+const REQUEST_TIMEOUT_MS = 240_000;
+
 /** 검색 1회당 결과 수 / 요청당 총 결과 상한 (Exa: 10건까지 요청가 포함, 초과분 건당 과금) */
 const WEB_SEARCH_MAX_RESULTS = 8;
 const WEB_SEARCH_MAX_TOTAL_RESULTS = 30;
@@ -135,20 +142,31 @@ export class GenerativeModel {
             body.response_format = { type: 'json_object' };
         }
         if (config.temperature !== undefined) body.temperature = config.temperature;
-        if (config.maxOutputTokens !== undefined) body.max_tokens = config.maxOutputTokens;
+        body.max_tokens = config.maxOutputTokens ?? DEFAULT_MAX_TOKENS;
 
         if (!this.apiKey) throw new LlmError('OPENROUTER_API_KEY 가 설정되지 않았습니다.', 401);
 
-        const res = await fetch(OPENROUTER_URL, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${this.apiKey}`,
-                'Content-Type': 'application/json',
-                'X-Title': 'ai-daily-brief',
-            },
-            body: JSON.stringify(body),
-        });
-        const raw = await res.text();
+        // 전송 실패·타임아웃도 LlmError(503)로 — 호출부가 'API 실패'와 '내용 불합격'을 구분할 수 있도록
+        let res: Response;
+        let raw: string;
+        try {
+            res = await fetch(OPENROUTER_URL, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                    'X-Title': 'ai-daily-brief',
+                },
+                body: JSON.stringify(body),
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            });
+            raw = await res.text();
+        } catch (e) {
+            const timedOut = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+            throw new LlmError(timedOut
+                ? `OpenRouter 응답 시간 초과 (${REQUEST_TIMEOUT_MS}ms) [${model}]`
+                : `OpenRouter 전송 실패 [${model}]: ${e instanceof Error ? e.message : e}`, 503);
+        }
         let data: ChatCompletionResponse;
         try {
             data = JSON.parse(raw);

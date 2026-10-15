@@ -1,4 +1,4 @@
-import { OpenRouterGenAI } from './llm-client';
+import { OpenRouterGenAI, LlmError } from './llm-client';
 import { NewsItem, IssueItem, SourceRef, KeyFactStructured, KeyInsightStructured, SoWhatV2 } from '@/types';
 import { matchFrameworks, getFrameworkNames } from './analyzers/framework-matcher';
 import { ensureValidKeyInsight, logKeyInsightResult, type ValidatedKeyInsightResult } from './analyzers/key-insight';
@@ -33,6 +33,7 @@ export async function analyzeNewsAndGenerateInsights(
 
     // 최대 5개 이슈만 생성
     const topClusters = clusters.slice(0, 5);
+    let attempted = 0, llmFailures = 0, lastLlmError = '';
 
     for (const cluster of topClusters) {
         try {
@@ -47,6 +48,7 @@ export async function analyzeNewsAndGenerateInsights(
                 continue;
             }
 
+            attempted++;
             const issue = await generateIssueFromCluster(model, cluster, recentIssues);
             if (issue) {
                 // 중복 체크 2단계: 생성된 이슈 내용 기반 정밀 체크 (AI 활용 가능하나 비용 절감 위해 키워드/소스 매칭 사용)
@@ -59,7 +61,13 @@ export async function analyzeNewsAndGenerateInsights(
             }
         } catch (error) {
             console.error('[Gemini Error]', error);
+            if (error instanceof LlmError) { llmFailures++; lastLlmError = error.message; }
         }
+    }
+
+    // 시도한 클러스터가 전부 API 실패면 빈 리포트 저장 대신 오류로 종료 (2026-10 키 무효 2주 무음 실패 재발 방지)
+    if (attempted > 0 && llmFailures === attempted) {
+        throw new Error(`[Analyze] LLM 호출이 시도한 클러스터 ${attempted}개 모두 실패 — 빈 리포트를 저장하지 않음. 마지막 오류: ${lastLlmError}`);
     }
 
     return issues;
@@ -316,6 +324,8 @@ export async function generateIssueFromCluster(
 
         return issue;
     } catch (error) {
+        // API·전송 실패는 상위로 전파(전멸 판정용). 파싱 실패 등 내용 문제만 null(불합격)로 처리.
+        if (error instanceof LlmError) throw error;
         console.error('[Issue Generation Error]', error);
         return null;
     }

@@ -1,7 +1,7 @@
 // Battery Industry Gemini Analyzer
 // 배터리 산업 전용 분석기 (K-Battery 관점)
 
-import { OpenRouterGenAI } from './llm-client';
+import { OpenRouterGenAI, LlmError } from './llm-client';
 import { NewsItem, IssueItem, KeyFactStructured } from '@/types';
 import { BATTERY_CONFIG } from '@/configs/battery';
 import { getRecentIssues } from './store';
@@ -33,6 +33,7 @@ export async function analyzeBatteryNewsAndGenerateInsights(
 
     // 최대 5개 이슈만 생성
     const topClusters = clusters.slice(0, 5);
+    let attempted = 0, llmFailures = 0, lastLlmError = '';
 
     for (const cluster of topClusters) {
         try {
@@ -46,6 +47,7 @@ export async function analyzeBatteryNewsAndGenerateInsights(
                 continue;
             }
 
+            attempted++;
             const issue = await generateBatteryIssueFromCluster(model, cluster);
             if (issue) {
                 // 중복 체크 2단계: 정밀 체크
@@ -58,7 +60,13 @@ export async function analyzeBatteryNewsAndGenerateInsights(
             }
         } catch (error) {
             console.error('[Battery Gemini Error]', error);
+            if (error instanceof LlmError) { llmFailures++; lastLlmError = error.message; }
         }
+    }
+
+    // 시도한 클러스터가 전부 API 실패면 빈 리포트 저장 대신 오류로 종료 (2026-10 키 무효 2주 무음 실패 재발 방지)
+    if (attempted > 0 && llmFailures === attempted) {
+        throw new Error(`[Battery Analyze] LLM 호출이 시도한 클러스터 ${attempted}개 모두 실패 — 빈 리포트를 저장하지 않음. 마지막 오류: ${lastLlmError}`);
     }
 
     return issues;
@@ -266,6 +274,8 @@ JSON만 출력하세요.`;
             soWhat: parsed.soWhat,
         };
     } catch (error) {
+        // API·전송 실패는 상위로 전파(전멸 판정용). 파싱 실패 등 내용 문제만 null(불합격)로 처리.
+        if (error instanceof LlmError) throw error;
         console.error('[Battery Issue Generation Error]', error);
         return null;
     }
